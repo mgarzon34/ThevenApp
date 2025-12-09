@@ -1,0 +1,64 @@
+/* ========================================================
+ * Estilos para las etiquetas de la componentes y cables
+ * Archivo: etiquetas.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+ 
+ .etiqueta-componente {
+	-fx-font-size: 12px;
+	-fx-text-fill: #002C55;
+	-fx-padding: 2px 4px;
+	-fx-border-radius: 3px;
+ }
+ 
+ .etiqueta-componente-carga {
+	-fx-font-size: 12px;
+	-fx-font-weight: bold;
+	-fx-text-fill: red;
+ }
+ 
+ .etiqueta-nodo {
+	-fx-font-size: 10px;
+	-fx-text-fill: green;
+	-fx-padding: 1px 3px;
+	-fx-border-radius: 2px;
+ }
+ 
+ .etiqueta-analisis-componente {
+ 	-fx-font-size: 12px;
+ 	-fx-font-weight: bold;
+ 	-fx-text-fill: #111;
+ 	-fx-background-color: rgba(255,255,255,0.85);
+ 	-fx-padding: 3 6 3 6;
+ 	-fx-background-radius: 4;
+ 	-fx-border-color: #444;
+ 	-fx-border-width: 1;
+ }
+ 
+ .analisis-indicador-conexion-equivalente {
+	-fx-stroke: red;				/*#444*/
+	-fx-stroke-width: 1.7;
+}
+
+.etiqueta-analisis-borne {
+	-fx-font-size: 14px;
+	-fx-text-fill: #111;
+	-fx-background-color: rgba(255,255,255,0.85);
+	-fx-padding: 2 6 2 6;
+	-fx-background-radius: 6;
+	-fx-border-color: red;
+	-fx-border-width: 1;
+	-fx-font-weight: bold;
+}
+
+.etiqueta-analisis-resto-circuito {
+	-fx-font-size: 13px;
+	-fx-text-fill: #222;
+	-fx-font-weight: bold;
+	-fx-background-color: rgba(255,255,255,0.85);
+	-fx-padding: 3 6 3 6;
+	-fx-background-radius: 6;
+	-fx-border-color: red;		/*#666*/
+	-fx-border-width: 1;
+}

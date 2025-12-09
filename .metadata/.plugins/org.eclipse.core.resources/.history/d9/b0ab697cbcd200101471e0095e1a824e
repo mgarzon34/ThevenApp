@@ -1,0 +1,306 @@
+package com.circuitos.AnalisisCircuitos.gui.controller;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.util.GraphUtil;
+import com.circuitos.temporal.gui.util.UIHelper;
+
+import javafx.beans.value.ChangeListener;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+
+/**
+ * Controlador del panel de opciones de análisis.
+ * Permite al usuario calcular el equivalente de Thévenin o Norton de un circuito,
+ * ya sea mediante auto-detección de nodos de análisis (según componentes de carga) o mediante
+ * selección manual. Además gestiona la visibilidad del circuito original. 
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PanelAnalisisOpcionesController {
+	private static final Logger logger=Logger.getLogger(PanelAnalisisOpcionesController.class.getName());
+	
+	@FXML private Button btnThevenin;
+	@FXML private Button btnNorton;
+	@FXML private CheckBox chkMostrarMiniatura;
+	@FXML private ComboBox<Integer> comboNodoNegativo;
+	@FXML private ComboBox<Integer> comboNodoPositivo;
+	@FXML private Label lblModoSeleccion;
+	
+	private PanelAnalisisController panelAnalisisController;
+	private List<? extends Componente> componentesCircuito;
+	private boolean estadoMiniaturaManaged=false;
+	private ChangeListener<Boolean> checkboxListener;
+	
+	/**
+	 * Inicializa el controlador con las acciones de los botones. 
+	 * Si es posible, realiza la autodetección de nodos de análisis.
+	 */
+	@FXML
+	public void initialize() {
+		configurarBotones();
+		configurarCheckboxMiniatura();
+	}
+	
+	/**
+	 * Configura los botones para realizar análisis por Thevenin o por Norton.
+	 */
+	private void configurarBotones() {
+		btnThevenin.setOnAction(_ -> ejecutarAnalisis("Thevenin"));
+		btnNorton.setOnAction(_ -> ejecutarAnalisis("Norton"));
+	}
+	
+	/**
+	 * Ejecuta el análisis correspondiente según se accione el botón de Thevenin o Norton.
+	 * 
+	 * @param tipo			Tipo de análisis
+	 */
+	private void ejecutarAnalisis(String tipo) {
+		try {
+			if(panelAnalisisController==null) {
+				UIHelper.mostrarError("Error interno: controlador de análisis no disponible");
+				return;
+			}
+			List<Componente> cargas=obtenerTodosComponentesCarga();
+			int nodoNeg, nodoPos;
+			if(!cargas.isEmpty()) {
+				try {
+					//Caso A: se detecta una única carga válida
+					@SuppressWarnings("unchecked")
+					int[] bornes=GraphUtil.detectarBornesCarga(cargas, (List<Componente>) componentesCircuito);
+					nodoNeg=bornes[0];
+					nodoPos=bornes[1];
+					logger.info("Análisis "+tipo+" usando carga definida: "+nodoNeg+"-"+nodoPos);
+				} catch(IllegalArgumentException ex) {
+					UIHelper.mostrarError("Error en la carga seleccionada:\n"+ex.getMessage()+
+								"\n\nCorrija la selección en el área de Diseño o elimine la marca de Carga.");
+					return;
+				}
+			} else {
+				//Caso B: no hay carga o la carga es inválida -> usar selección manual
+				if(!validarSeleccionNodos()) return;
+				nodoNeg=comboNodoNegativo.getValue();
+				nodoPos=comboNodoPositivo.getValue();
+				logger.info("Ejecutando análisis "+tipo+" con nodos seleccionados manualmente: "+nodoNeg+"-"+nodoPos);
+			}
+			if(tipo.equals("Thevenin")) {
+				panelAnalisisController.onCalcularThevenin(nodoNeg, nodoPos);
+			} else {
+				panelAnalisisController.onCalcularNorton(nodoNeg, nodoPos);
+			}
+			asegurarMiniaturaVisibleDespuesAnalisis();
+		} catch(Exception ex) {
+			logger.severe("Error al ejecutar análisis "+tipo+": "+ex.getMessage());
+			UIHelper.mostrarError("Error al ejecutar análisis "+tipo+": "+ex.getMessage());
+		}
+	}
+	
+	/**
+	 * Detecta automáticamente los nodos de análisis basándose en todos los componentes de carga.
+	 * 
+	 * @return Array con [nodoNegativo, nodoPositivo] o {@code null} si no se puede auto-detectar.
+	 * @throws IllegalArgumentException si no se pueden detectar los bornes de carga
+	 */
+	private int[] detectarNodosAnalisis() {
+		List<Componente> carga=obtenerTodosComponentesCarga();
+		if(carga==null || carga.isEmpty()) {
+			return null;
+		}
+		try {
+			@SuppressWarnings("unchecked")
+			List<Componente> todoCircuito=(List<Componente>) componentesCircuito;
+			return GraphUtil.detectarBornesCarga(carga, todoCircuito);
+		} catch(IllegalArgumentException e) {
+			logger.warning("No se pudo autodetectar bornes de carga: "+e.getMessage());
+			return null;
+		}
+	}
+	
+	/**
+	 * Obtiene la lista de todos los componentes marcados como carga.
+	 * 
+	 * @return Lista de componentes marcados como carga
+	 */
+	private List<Componente> obtenerTodosComponentesCarga() {
+		if(componentesCircuito==null) return new ArrayList<>();
+		return componentesCircuito.stream()
+				.filter(Componente::isCarga)
+				.collect(Collectors.toList());
+	}
+	
+	/**
+	 * Actualiza la interfaz gráfica dependiendo de si autodetectamos carga o no, en cuyo caso,
+	 * se activan las cajas para selección manual.
+	 */
+	private void actualizarModoSeleccionCarga() {
+		List<Componente> cargas=obtenerTodosComponentesCarga();
+		boolean hayCarga=!cargas.isEmpty();
+		if(hayCarga) {
+			comboNodoNegativo.setDisable(true);
+			comboNodoPositivo.setDisable(true);
+			int[] bornes=detectarNodosAnalisis();
+			if(bornes!=null) {
+				//Carga válida
+				actualizarCombos(bornes[0], bornes[1]);
+				if(lblModoSeleccion!=null) {
+					lblModoSeleccion.setText("Nodos autodetectados (carga detectada)");
+				}
+			} else {
+				//Carga no válida (disconexa)
+				if(lblModoSeleccion!=null) {
+					lblModoSeleccion.setText("Carga no válida. Revise el diseño del circuito.");
+				}
+			}
+		} else {
+			//Selección manual (sin carga)
+			comboNodoNegativo.setDisable(false);
+			comboNodoPositivo.setDisable(false);
+			if(lblModoSeleccion!=null) {
+				lblModoSeleccion.setText("Seleccione nodos de análisis");
+			}
+			logger.info("Modo análisis: MANUAL");
+		}
+	}
+	
+	/**
+	 * No resetea el combo si ya tiene el valor correcto.
+	 * 
+	 * @param n1			Nodo 1 del combo
+	 * @param n2			Nodo 2 del combo
+	 */
+	private void actualizarCombos(int n1, int n2) {
+		if(!comboNodoNegativo.getItems().contains(n1)) comboNodoNegativo.getItems().add(n1);
+		if(!comboNodoPositivo.getItems().contains(n2)) comboNodoPositivo.getItems().add(n2);
+		comboNodoNegativo.setValue(n1);
+		comboNodoPositivo.setValue(n2);
+	}
+	
+	/**
+	 * Configura la pestaña de activar/desactivar la miniatura del circuito original.
+	 * Incluye el listener correspondiente.
+	 */
+	private void configurarCheckboxMiniatura() {
+		chkMostrarMiniatura.setSelected(true);
+		checkboxListener=(_, _, newValue) -> {
+			if(panelAnalisisController!=null && estadoMiniaturaManaged) {
+				var contenedor=panelAnalisisController.getContenedorMiniatura();
+				contenedor.setVisible(newValue);
+				contenedor.setManaged(newValue);
+				logger.info("Visibilidad miniatura cambió: "+newValue);
+			}
+		};
+		chkMostrarMiniatura.selectedProperty().addListener(checkboxListener);
+	}
+	
+	/**
+	 * Establece el controlador principal del panel de análisis. 
+	 * 
+	 * @param controller instancia de {@link PanelAnalisisController}
+	 */
+	public void setPanelAnalisisController(PanelAnalisisController controller) {
+		this.panelAnalisisController=controller;
+		if(controller!=null) {
+			estadoMiniaturaManaged=true;
+			logger.info("Panel controlador asignado con éxito");
+		}
+	}
+	
+	/**
+	 * Carga en los ComboBox los nodos disponibles en el circuito a partir de la lista de componentes.
+	 * Solo incluye los nodos con identificadores 0 o positivos.
+	 * 
+	 * @param componentes		Lista de componentes del circuito
+	 */
+	public void cargarNodosDisponibles(List<? extends Componente> componentes) {
+		this.componentesCircuito=componentes;
+		Set<Integer> nodos=new HashSet<>();
+		if(componentes!=null) {
+			for(Componente comp : componentes) {
+				if(comp.getNodo1()>=0) {
+					nodos.add(comp.getNodo1());
+				}
+				if(comp.getNodo2()>=0) {
+					nodos.add(comp.getNodo2());
+				}
+			}
+		}
+		List<Integer> nodosOrdenados=new ArrayList<>(nodos);
+		nodosOrdenados.sort(Integer::compareTo);
+		
+		comboNodoNegativo.getItems().clear();
+		comboNodoPositivo.getItems().clear();
+		comboNodoNegativo.getItems().addAll(nodosOrdenados);
+		comboNodoPositivo.getItems().addAll(nodosOrdenados);
+		
+		if(nodosOrdenados.size()>=2) {
+			comboNodoNegativo.setValue(nodosOrdenados.get(0));
+			comboNodoPositivo.setValue(nodosOrdenados.get(1));
+		}
+		logger.info("Nodos disponibles cargados: "+nodosOrdenados);
+		actualizarModoSeleccionCarga();
+	}
+	
+	/**
+	 * Valida que el usuario haya seleccionado dos nodos diferentes en los ComboBox.
+	 * Muestra alerta en caso contrario.
+	 * 
+	 * @return {@code true} si la selección es válida; {@code false} si no
+	 */
+	private boolean validarSeleccionNodos() {
+		if(comboNodoNegativo.getValue()==null || comboNodoPositivo.getValue()==null) {
+			UIHelper.mostrarError("Debe seleccionar ambos nodos para el análisis");
+			return false;
+		}
+		if(comboNodoNegativo.getValue().equals(comboNodoPositivo.getValue())) {
+			UIHelper.mostrarError("Los nodos positivo y negativo deben ser diferentes");
+			return false;
+		}
+		return true;
+	}
+	
+	/**
+	 * Comprueba si la miniatura está activa.
+	 * 
+	 * @return {@code true} si está activa, {@code false} si no
+	 */
+	public boolean isMiniaturaActiva() {
+		return chkMostrarMiniatura!=null && chkMostrarMiniatura.isSelected();
+	}
+	
+	/**
+	 * Asegura que la miniatura del circuito original siga siendo visible después de
+	 * realizar el análisis.
+	 */
+	private void asegurarMiniaturaVisibleDespuesAnalisis() {
+		if(chkMostrarMiniatura.isSelected() && panelAnalisisController!=null) {
+			var contenedor=panelAnalisisController.getContenedorMiniatura();
+			contenedor.setVisible(true);
+			contenedor.setManaged(true);
+			logger.info("Miniatura sigue siendo visible después del análisis");
+		}
+	}
+	
+	/**
+	 * Actualiza el estado de la miniatura del circuito original según la activación
+	 * del checkbox.
+	 * 
+	 * @param visible		{@code true} o {@code false}
+	 */
+	public void actualizarCheckMiniatura(boolean visible) {
+		if(chkMostrarMiniatura.isSelected()!=visible) {
+			estadoMiniaturaManaged=false;
+			chkMostrarMiniatura.setSelected(visible);
+			estadoMiniaturaManaged=true;
+		}
+	}
+}

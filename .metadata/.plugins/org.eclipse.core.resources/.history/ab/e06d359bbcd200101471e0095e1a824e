@@ -1,0 +1,223 @@
+package com.circuitos.temporal.gui.service.analisis;
+
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.Resistencia;
+
+/**
+ * Clase que se encarga de hacer los resúmenes de los análisis realizados para el panel
+ * de propiedades de la pestaña de Análisis para Thévenin o Norton.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public final class ResumenAnalisisService {
+	private ResumenAnalisisService() { /* No instanciable */ }
+	
+	/**
+	 * Realiza el resumen para un circuito analizado por el teorema de Thévenin.
+	 * Tiene en cuenta el caso de rth=0Ω.
+	 * 
+	 * @param original			Circuito original completo
+	 * @param rth				Resistencia equivalente de Thevenin
+	 * @return Resumen para mostrar en el panel de propiedades
+	 */
+	public static String resumirTh(Circuito original, double rth) {
+		InfoCargas info=analizarCargas(original);
+		return construirResumenTh(original, rth, info);
+	}
+	
+	/**
+	 * Realiza el resumen para un circuito analizado por el teorema de Thévenin.
+	 * 
+	 * @param original			Circuito original completo
+	 * @return Resumen para mostrar en el panel de propiedades
+	 */
+	public static String resumirTh(Circuito original) {
+		InfoCargas info=analizarCargas(original);
+		return construirResumenTh(original, Double.NaN, info);
+	}
+	
+	/**
+	 * Realiza el resumen para un circuito analizado por el teorema de Norton.
+	 * Tiene en cuenta el caso de rn=0Ω.
+	 * 
+	 * @param original			Circuito original completo
+	 * @param rn				Resistencia equivalente de Norton
+	 * @return Resumen para mostrar en el panel de propiedades
+	 */
+	public static String resumirNo(Circuito original, double rn) {
+		InfoCargas info=analizarCargas(original);
+		return construirResumenNo(original, rn, info);
+	}
+	
+	/**
+	 * Realiza el resumen para un circuito analizado por el teorema de Norton.
+	 * 
+	 * @param original			Circuito original completo
+	 * @return Resumen para mostrar en el panel de propiedades
+	 */
+	public static String resumirNo(Circuito original) {
+		InfoCargas info=analizarCargas(original);
+		return construirResumenNo(original, Double.NaN, info);
+	}
+	
+	/**
+	 * Registro auxiliar para no repetir cálculos de cargas.
+	 */
+	private record InfoCargas(long totalCargas, long resisCargas, boolean unicaResistenciaCarga) { }
+	
+	/**
+	 * Analiza cuántas cargas hay y cuántas son resistencias.
+	 * 
+	 * @param original			Circuito original
+	 * @return {@link InfoCargas} con información sobre las cargas que hay en el circuito
+	 */
+	private static InfoCargas analizarCargas(Circuito original) {
+		long totalCargas=original.getComponentes().stream()
+				.filter(Componente::isCarga)
+				.count();
+		long resisCargas=original.getComponentes().stream()
+				.filter(c -> c.isCarga() && c instanceof Resistencia)
+				.count();
+		boolean unicaRCarga=(totalCargas==1 && resisCargas==1);
+		return new InfoCargas(totalCargas, resisCargas, unicaRCarga);
+	}
+	
+	/**
+	 * Construye el resumen para un análisis de Thévenin teniendo en cuenta todos los casos.
+	 * 
+	 * @param original				Circuito original
+	 * @param rth					Resistencia equivalente de Thévenin
+	 * @param info					Información de cargas en el circuito
+	 * @return Resumen del análisis realizado
+	 */
+	private static String construirResumenTh(Circuito original, double rth, InfoCargas info) {
+		//Caso especial: Rth=0Ω
+		if(!Double.isNaN(rth) && rth==0.0) {
+			return """
+					La resistencia equivalente entre los nodos seleccionados es Rth=0Ω.
+					
+					Esto significa que, visto desde los nodos elegidos, el circuito se comporta como
+					un cortocircuito ideal y que, aunque es posible determinar una tensión de Thévenin Vth,
+					no tiene sentido físico formar el circuito equivalente con esta fuente de tensión en serie
+					con una Rth nula (fuente ideal en cortocircuito).
+					
+					Sería recomendable que revise la configuración del circuito original o seleccionar
+					otros nodos para obtener un equivalente de Thévenin que tenga sentido físico.
+					""";
+		}
+		if(info.unicaResistenciaCarga()) {
+			//Caso una sola resistencia de carga que se dibuja en el circuito analizado
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por
+					una fuente de tensión Vth en serie con una resistencia Rth.
+					
+					En este caso, existe una única resistencia marcada como carga entre esos nodos que,
+					visualmente, se ha añadido en el esquema del circuito equivalente.
+					
+					Esa resistencia de carga conectada entre esos nodos tendrá la misma tensión y corriente \
+					que en el circuito original, pero el análisis consigue simplificarlo drásticamente.
+					""";
+		} else if(info.totalCargas()>0) {
+			//Hay varios componentes de carga o alguno no es una resistencia
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por
+					una fuente de tensión Vth en serie con una resistencia Rth.
+					
+					A estos componentes se le conectan varios elementos de carga (o cargas no puramente resistivas) \
+					que formaban parte del circuito original. Por claridad, en la representación del circuito \
+					equivalente se han dejado los bornes de salida abiertos para conectar el resto 
+					del circuito que no había formado parte del cálculo de Vth y Rth.
+					
+					La parte analizada del circuito se ha reducido a su equivalente de Thévenin, 
+					simplificando significativamente el estudio de tensiones y corrientes.
+					""";
+		} else {
+			//Ningún componente marcado como carga
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por 
+					una fuente de tensión Vth en serie con una resistencia Rth.
+					
+					En el circuito original no había ningún componente marcado explícitamente como 
+					carga entre estos nodos, por lo que el análisis toma simplemente el conjunto de 
+					elementos comprendidos entre ellos incluidos los componentes que hubiera entre
+					los nodos seleccionados y lo reduce a su equivalente de Thévenin.
+					
+					Los bornes abiertos del equivalente permiten volver a conectar el resto del
+					circuito que no ha sido objeto de cálculo, manteniendo el mismo comportamiento
+					eléctrico visto desde los nodos seleccionados, pero reducido drásticamente.
+					""";
+		}
+	}
+	
+	/**
+	 * Construye el resumen para un análisis de Norton teniendo en cuenta todos los casos.
+	 * 
+	 * @param original				Circuito original
+	 * @param rn					Resistencia equivalente de Norton
+	 * @param info					Información de cargas en el circuito
+	 * @return Resumen del análisis realizado
+	 */
+	public static String construirResumenNo(Circuito original, double rn, InfoCargas info) {
+		//Caso especial: Rn=0Ω
+		if(!Double.isNaN(rn) && rn==0.0) {
+			return """
+					La resistencia equivalente entre los nodos seleccionados es Rn=0Ω.
+					
+					Esto implica que, visto desde esos nodos, el circuito se comporta como un
+					cortocircuito ideal. Esto quiere decir que, en estas condiciones, la corriente de
+					Norton In tendería, teóricamente a infinito ya que, según la Ley de Ohm In=Vth/Rn
+					y, al existir una tensión teórica, el resultado de esta ecuación sería, 
+					matemáticamente, infinito y, por tanto, el modelo equivalente de una fuente de corriente
+					en paralelo con Rn es, físicamente, imposible.
+					
+					Por esta razón, la aplicación no ha generado el diagrama del circuito equivalente
+					de Norton. Se recomienda revisar el circuito original o seleccionar otros nodos
+					para obtener un equivalente de Norton bien definido.
+					""";
+		}
+		if(info.unicaResistenciaCarga()) {
+			//Caso una sola resistencia de carga que se dibuja en el circuito analizado
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por 
+					una fuente de corriente In en paralelo con una resistencia Rn.
+					
+					Existe una única resistencia marcada como carga entre esos nodos que se ha
+					mantenido conectada en paralelo en la representación del equivalente de Norton.
+					Esta carga conectada entre los bornes del equivalente tendrá la misma tensión y
+					corriente que en el circuito original, pero el cálculo de corrientes y tensiones
+					se ha simplificado drásticamente.
+					""";
+		} else if(info.totalCargas()>0) {
+			//Hay varios componentes de carga o alguno no es una resistencia
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por 
+					una fuente de corriente In en paralelo con una resistencia Rn.
+					
+					Entre esos nodos existían varios componentes de carga, o no eran puramente
+					resistivos. Por claridad, en el equivalente de Norton se han dejado los bornes
+					de salida abiertos para poder reconectar el resto del circuito que no ha sido 
+					objeto de cálculo de In y Rn.
+					
+					 La parte analizada del circuito queda reducida a su equivalente de Norton, 
+					 facilitando el estudio de corrientes y tensiones en el circuito. 
+					""";
+		} else {
+			//Ningún componente marcado como carga
+			return """
+					El circuito original entre los nodos seleccionados se puede sustituir por 
+					una fuente de corriente In en paralelo con una resistencia Rn.
+					
+					En el circuito original no había ningún componente marcado explícitamente como 
+					carga entre estos nodos y, por tanto, se han seleccionado dos nodos concretos del 
+					circuito. Todo lo que estaba entre esos nodos ha quedado reducido al equivalente 
+					de Norton.
+					
+					Entre los bornes abiertos se puede conectar el resto del circuito 
+					que no ha sido objeto de cálculo de In y Rn, manteniendo el mismo comportamiento
+					eléctrico visto desde los nodos seleccionados, pero con un esquema mucho más simple.
+					""";
+		}
+	}
+}

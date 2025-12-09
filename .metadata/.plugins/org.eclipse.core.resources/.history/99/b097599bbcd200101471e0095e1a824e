@@ -1,0 +1,255 @@
+package com.circuitos.temporal.dominio.util;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.LUDecomposition;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
+import org.apache.commons.math3.linear.SingularMatrixException;
+
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+
+/**
+ * Utilidad para resolver circuitos por análisis nodal:
+ * construye las matrices necesarias y sus ampliadas para manejo de supernodos.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class MatrixUtil {
+	private static final Logger logger=Logger.getLogger(MatrixUtil.class.getName());
+	
+	private MatrixUtil() { /* No instanciable */ }
+	
+	/**
+	 * Resuelve un circuito por nodos. Calcula la tensión en cada uno de los nodos.
+	 * 
+	 * @param c		circuito para resolver
+	 * @return V	lista de tensiones en cada nodo.
+	 */
+	public static double[] resolverCircuitoNodal(Circuito c) {
+		Objects.requireNonNull(c, "Circuito no puede ser null");
+		logger.log(Level.INFO, "Iniciando análisis nodal");
+		int ref=prepararNodosConexiones(c);
+		Map<Integer, Integer> nodos=c.getNodos();
+		int N=nodos.size();						
+		List<Componente> fV=CircuitUtil.obtenerFuentesTension(c);
+		RealMatrix G=construirMatrizG(c, nodos, ref);
+		RealVector I=construirVectorI(c, nodos, ref);
+		return fV.isEmpty()
+			? resolverSinFuentes(G, I, ref, N)
+			: resolverConSupernodos(c, G, I, fV, nodos, ref);
+	}
+	
+	/**
+	 * Actualiza el mapeo de nodos y obtiene el nodo de referencia.
+	 * 
+	 * @param c							circuito original
+	 * @throws IllegalStateException	si el circuito no es conexo
+	 * @return ref						referencia (nodo)
+	 */
+	private static int prepararNodosConexiones(Circuito c) {
+		NodeMapUtil.actualizarMapaNodos(c.getNodos(), c.getComponentes());
+		int ref=CircuitUtil.obtenerNodoReferencia(c);
+		if(!CircuitUtil.esConexo(c)) {
+			throw new IllegalStateException("El circuito no es conexo.");
+		}
+		logger.log(Level.FINE, "Nodo de referencia: {0}", ref);
+		return ref;
+	}
+	
+	/**
+	 * Construye la matriz G (matriz de conductancias).
+	 * 
+	 * @param c							circuito original
+	 * @param nodos						mapa de nodos
+	 * @param ref						referencia
+	 * @return matriz G					matriz G de conductancias
+	 */
+	private static RealMatrix construirMatrizG(Circuito c, Map<Integer, Integer> nodos, int ref) {
+		int M=nodos.size() - 1;
+		RealMatrix G=new Array2DRowRealMatrix(M, M);
+		for(Componente comp : c.getComponentes()) {
+			int n1=nodos.get(comp.getNodo1());
+			int n2=nodos.get(comp.getNodo2());
+			if(comp instanceof Resistencia r) {
+				double g=1.0/r.getValor();
+				StampUtil.stampG(G,  n1, n1, g, ref);
+				StampUtil.stampG(G, n2, n2, g, ref);
+				StampUtil.stampG(G, n1, n2, -g, ref);
+				StampUtil.stampG(G, n2, n1, -g, ref);
+			} else if(comp instanceof FuenteCorrienteDependiente fcd) {
+				StampUtil.stampSelectFuenteCorriente(G, fcd, nodos, ref, c);
+			}
+		}
+		logger.log(Level.FINE, "Matriz G construida (dim={0}x{0}", M);
+		return G;
+	}
+	
+	/**
+	 * Construye el vector I (vector de corrientes).
+	 * 
+	 * @param c						circuito original
+	 * @param nodos					mapa de nodos
+	 * @param ref					referencia
+	 * @return vector I				vector I de corrientes				
+	 */
+	private static RealVector construirVectorI(Circuito c, Map<Integer, Integer> nodos, int ref) {
+		int M=nodos.size() - 1;
+		RealVector I=new ArrayRealVector(M);
+		for(Componente comp : c.getComponentes()) {
+			int n1=nodos.get(comp.getNodo1());
+			int n2=nodos.get(comp.getNodo2());
+			if(comp instanceof FuenteCorrienteInd fci) {
+				double i0=fci.getValor();
+				StampUtil.stampI(I, n1, -i0, ref);
+				StampUtil.stampI(I, n2, +i0, ref);
+			}
+		}
+		logger.log(Level.FINE,"Vector I construido (dim={0})", M);
+		return I;
+	}
+	
+	/**
+	 * Resuelve G·V=I cuando no hay fuentes de tensión y reconstruye el array V con V[ref]=0.
+	 * 
+	 * @param G						matriz de conductancias G
+	 * @param I						vector de corrientes I
+	 * @param ref					nodo de referencia
+	 * @param N						número de nodos
+	 * @return V					array de voltajes
+	 */
+	private static double[] resolverSinFuentes(RealMatrix G, RealVector I, int ref, int N) {
+		RealVector sol=new LUDecomposition(G).getSolver().solve(I);
+		double[] V=new double[N];
+		V[ref]=0;
+		for(int i=0; i<N; i++) {
+			if(i==ref) continue;
+			int idx=StampUtil.comprimir(i, ref);
+			V[i]=sol.getEntry(idx);
+		}
+		logger.log(Level.FINE, "Solución sin fuentes calculada");
+		return V;
+	}
+	
+	/**
+	 * Resuelve el sistema ampliado con supernodos para F fuentes de tensión.
+	 * 
+	 * @param c							circuito original
+	 * @param G							matriz de conductancias G
+	 * @param I							vector de corrientes I
+	 * @param fV						lista de fuentes de tensión
+	 * @param nodos						mapa de nodos
+	 * @param ref						nodo de referencia
+	 * @throws IllegalStateException	matriz A ampliada singular	
+	 * @return V						array de voltajes
+	 */
+	private static double[] resolverConSupernodos(Circuito c, RealMatrix G, RealVector I, 
+			List<Componente> fV, Map<Integer, Integer> nodos, int ref) {
+		int N=nodos.size();
+		int F=fV.size();
+		int M=N-1;
+		
+		//Construir B, C, D, E
+		RealMatrix B=new Array2DRowRealMatrix(M, F);
+		RealMatrix C=new Array2DRowRealMatrix(F, M);
+		RealMatrix D=new Array2DRowRealMatrix(F, F);
+		RealVector E=new ArrayRealVector(F);
+		for(int j=0; j<F; j++) {
+			Componente comp=fV.get(j);
+			int p=nodos.get(comp.getNodo2());
+			int n=nodos.get(comp.getNodo1());
+			StampUtil.stampB(B, p, j, +1.0, ref);
+			StampUtil.stampB(B, n, j, -1.0, ref);
+			StampUtil.stampC(C, j, p, +1.0, ref);
+			StampUtil.stampC(C, j, n, -1.0, ref);
+			if(comp instanceof FuenteTensionInd fti) {
+				E.setEntry(j, fti.getValor());
+			} else {
+				StampUtil.stampSelectFuenteTension(C, D, j, (FuenteTensionDependiente) comp, nodos, ref, fV, c);
+			}
+		}
+		
+		//Construir A y Z (matriz y vector ampliados)
+		RealMatrix A=construirMatrizAmpliada(G, B, C, D);
+		RealVector Z=construirVectorZ(I, E);
+		
+		//Resolver y extraer tensiones
+		RealVector X;
+		try {
+			X=new LUDecomposition(A).getSolver().solve(Z);
+		} catch (SingularMatrixException e) {
+			throw new IllegalStateException("Matriz ampliada singular", e);
+		}
+		logger.log(Level.FINE, "Sistema ampliado resuelto (dim={0})", M+F);
+		return extraerVoltajes(X, ref, N);
+	}
+	
+	/**
+	 * Construye la matriz ampliada A de tamaño (M+F)*(M+F)
+	 * 
+	 * @param G						matriz G de conductancias
+	 * @param B						matriz B de incidencias de fuentes de tensión
+	 * @param C						matriz traspuesta de B
+	 * @param D						matriz de ceros (FxF)
+	 * @return A					matriz A para resolver sistema ampliado
+	 */
+	private static RealMatrix construirMatrizAmpliada(RealMatrix G, RealMatrix B, RealMatrix C, RealMatrix D) {
+		int M=G.getRowDimension();
+		int F=B.getColumnDimension();
+		RealMatrix A=new Array2DRowRealMatrix(M+F, M+F);
+		A.setSubMatrix(G.getData(), 0, 0);
+		A.setSubMatrix(B.getData(), 0, M);
+		A.setSubMatrix(C.getData(), M, 0);
+		A.setSubMatrix(D.getData(), M, M);
+		return A;
+	}
+	
+	/**
+	 * Construye el vector ampliado Z de longitud M+F.
+	 * 
+	 * @param I					vector I de corrientes
+	 * @param E					vector E de valores de las fuentes de tensión
+	 * @return Z				vector Z para resolver sistema ampliado
+	 */
+	private static RealVector construirVectorZ(RealVector I, RealVector E) {
+		int M=I.getDimension();
+		int F=E.getDimension();
+		RealVector Z=new ArrayRealVector(M+F);
+		Z.setSubVector(0, I);
+		Z.setSubVector(M, E);
+		return Z;
+	}
+	
+	/**
+	 * Construye el array de tensiones V de longitud N a partir del vector solución X del 
+	 * sistema nodal (simple o ampliado). Coloca V[ref]=0 y ajusta los índices comprimidos.
+	 * 
+	 * @param X					vector X solución de dimensión N-1 (N-1+F en supernodos)
+	 * @param ref				nodo de referencia
+	 * @param N					número de nodos
+	 * @return V				array V de voltajes
+	 */
+	private static double[] extraerVoltajes(RealVector X, int ref, int N) {
+		double[] V=new double[N];
+		V[ref]=0.0;
+		for(int i=0; i<N; i++) {
+			if(i==ref) continue;
+			int idxComprimido=(i>ref)?(i-1):i;
+			V[i]=X.getEntry(idxComprimido);
+		}
+		return V;
+	}
+}

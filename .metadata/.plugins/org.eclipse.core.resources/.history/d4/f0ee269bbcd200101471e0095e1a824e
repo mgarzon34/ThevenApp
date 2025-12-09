@@ -1,0 +1,77 @@
+package com.circuitos.temporal.gui.learning.manager;
+
+import java.util.IntSummaryStatistics;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import com.circuitos.temporal.analisis.Analizador;
+import com.circuitos.temporal.analisis.ResultadoNorton;
+import com.circuitos.temporal.analisis.ResultadoThevenin;
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Componente;
+
+/**
+ * Clase para calcular automáticamente las soluciones de ejercicios propuestos por el profesor.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class EjercicioSolver {
+	//Record para devolver todos los datos juntos
+	public record SolucionAuto(double vth, double rth, double in, double rn) {}
+	
+	/**
+	 * Resuelve automáticamente un circuito identificando los nodos de carga.
+	 * Para ello, usa el {@link Analizador} y devuelve un record con los valores obtenidos.
+	 * 
+	 * @param circuito			Circuito que se va a analizar
+	 * @return SolucionAuto con los valores calculados
+	 */
+	public static SolucionAuto resolverAuto(Circuito circuito) {
+		if(circuito==null) {
+			throw new IllegalArgumentException("El circuito es nulo");
+		}
+		//Busca componentes de carga
+		List<Componente> componentesCarga=circuito.getComponentes().stream()
+				.filter(Componente::isCarga)
+				.toList();
+		if(componentesCarga.isEmpty()) {
+			throw new IllegalStateException("No hay ningún componente marcado como 'Carga'.\n"+
+								"Marca al menos un componente de carga para identificar los terminales A y B.");
+		}
+		//Identificar nodos A y B
+		IntSummaryStatistics stats=componentesCarga.stream()
+				.flatMapToInt(c -> IntStream.of(c.getNodo1(), c.getNodo2()))
+				.filter(nodo -> nodo>=0) //Ignorar nodos no conectados (-1)
+				.summaryStatistics();
+		if(stats.getCount()==0) {
+			throw new IllegalStateException("Los componentes de carga no están conectados a ningún nodo válido.");
+		}
+		//El nodo menor y el mayor definen los bornes para cálculo
+		int nodoA=stats.getMin();
+		int nodoB=stats.getMax();
+		if(nodoA==nodoB) {
+			throw new IllegalStateException("La carga está en cortocircuito (conectada al mismo nodo "+nodoA+").");
+		}
+		Analizador analizador=new Analizador();
+		ResultadoThevenin th=analizador.calculaThevenin(circuito, nodoA, nodoB);
+		ResultadoNorton no=analizador.calculaNorton(circuito, nodoA, nodoB);
+		return new SolucionAuto(th.getVth(), th.getRth(), no.getIn(), no.getRn());
+	}
+	
+	/**
+	 * Resuelve el circuito usando nodos definidos manualmente (no hay carga).
+	 * 
+	 * @param circuito				Circuitg a analizar
+	 * @param nodoA					Nodo positivo
+	 * @param nodoB					Nodo negativo
+	 * @return SolucionAuto con los resultados
+	 */
+	public static SolucionAuto resolverManual(Circuito circuito, int nodoA, int nodoB) {
+		if(circuito==null) throw new IllegalArgumentException("Circuito nulo");
+		Analizador analizador=new Analizador();
+		ResultadoThevenin th=analizador.calculaThevenin(circuito, nodoA, nodoB);
+		ResultadoNorton	no=analizador.calculaNorton(circuito, nodoA, nodoB);
+		return new SolucionAuto(th.getVth(), th.getRth(), no.getIn(), no.getRn());
+	}
+}

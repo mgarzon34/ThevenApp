@@ -1,0 +1,268 @@
+package com.circuitos.temporal.dominio;
+
+import java.util.Objects;
+
+import com.circuitos.analisiscircuitos.dominio.util.FormatUtil;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
+
+/**
+ * Clase que extiende la clase abstracta Componente para definir 
+ * una fuente de tensión dependiente.
+ *  
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+public class FuenteTensionDependiente extends Componente implements FuenteDependiente {
+	private final IntegerProperty ctrlNeg=new SimpleIntegerProperty();
+	private final IntegerProperty ctrlPos=new SimpleIntegerProperty();
+	private final ObjectProperty<ControlType> controlType=new SimpleObjectProperty<>();
+	
+	/**
+	 * Constructor sin argumentos para deserialización (pedido por libreria Jackson)
+	 */
+	public FuenteTensionDependiente() {
+		super(0, 0, false);
+		this.setValor(1.0);
+	}
+	
+	/**
+	 * Constructor completo (incluye flag de carga).
+	 * 
+	 * @param ganancia		Ganancia de la fuente dependiente (V/V)
+	 * @param nodoNeg		Nodo negativo de la fuente
+	 * @param nodoPos		Nodo positivo de la fuente
+	 * @param controlType	Tipo de control de la fuente (tensión o corriente)
+	 * @param ctrlNeg		Nodo negativo de control
+	 * @param ctrlPos		Nodo positivo de control
+	 * @param carga			Flag de carga
+	 */
+	public FuenteTensionDependiente(double ganancia, int nodoNeg, int nodoPos, ControlType controlType, int ctrlNeg, int ctrlPos, boolean carga) {
+		super(nodoNeg, nodoPos, carga);
+		if(ganancia<=0.0)
+			throw new IllegalArgumentException("La ganancia µ no puede ser cero o menos.");
+		Objects.requireNonNull(controlType, "ControlType no puede ser null");
+		setValor(ganancia);
+		setControlType(controlType);
+		setCtrlNeg(ctrlNeg);
+		setCtrlPos(ctrlPos);
+	}
+	
+	/**
+	 * Constructor (no incluye flag de carga).
+	 * 
+	 * @param ganancia		Ganancia de la fuente dependiente (V/V)
+	 * @param nodoNeg		Nodo negativo de la fuente
+	 * @param nodoPos		Nodo positivo de la fuente
+	 * @param tipo			Tipo de control de la fuente (tensión o corriente)
+	 * @param ctrlNeg		Nodo negativo de control
+	 * @param ctrlPos		Nodo positivo de control
+	 */
+	public FuenteTensionDependiente(double ganancia, int nodoNeg, int nodoPos, ControlType tipo, int ctrlNeg, int ctrlPos) {
+		this(ganancia, nodoNeg, nodoPos, tipo, ctrlNeg, ctrlPos, false);
+	}
+	
+	/**
+	 * Obtiene el valor de la tensión (ganancia).
+	 * 
+	 * @return ganancia de la fuente
+	 */
+	@Override
+	@JsonProperty("valor")
+	public double getValor() {
+		return super.getValor();
+	}
+	
+	/**
+	 * Asigna el valor de la tensión (ganancia).
+	 * 
+	 * @param nuevo valor de ganancia
+	 * @throws IllegalArgumentException si {@code ganancia <=0}
+	 */
+	@Override
+	public void setValor(double ganancia) {
+		if(ganancia<=0.0) {
+			throw new IllegalArgumentException("La ganancia debe ser >0: "+ganancia);
+		}
+		super.setValor(ganancia);
+	}
+	/**
+	 * Obtiene el nodo positivo de control
+	 * 
+	 * @return ctrlPos		Nodo positivo de control
+	 */
+	@Override
+	@JsonProperty("ctrlPos")
+	public int getCtrlPos() {
+		return ctrlPos.get();
+	}
+	
+	/**
+	 * Permite modificar el nodo de control positivo.
+	 * 
+	 * @param ctrlPos		Nodo de control positivo
+	 */
+	@Override
+	public void setCtrlPos(int cp) {
+		ctrlPos.set(cp);
+	}
+	
+	/**
+	 * Obtiene la propiedad observable sobre el nodo de control positvo de la fuente de tensión dependiente.
+	 * Permite enlazar el nodo de control positivo en la interfaz JavaFX.
+	 * 
+	 * @return propiedad observable de nodo de control positivo (valor Integer)
+	 */
+	@Override
+	public IntegerProperty ctrlPosProperty() {
+		return ctrlPos;
+	}
+	
+	/**
+	 * Obtiene el nodo negativo de control
+	 * 
+	 * @return ctrlNeg		Nodo negativo de control
+	 */
+	@Override
+	@JsonProperty("ctrlNeg")
+	public int getCtrlNeg() {
+		return ctrlNeg.get();
+	}
+	
+	/**
+	 * Permite modificar el nodo de control negativo.
+	 * 
+	 * @param ctrlNeg		Nodo de control negativo
+	 */
+	@Override
+	public void setCtrlNeg(int cn) {
+		ctrlNeg.set(cn);
+	}
+	
+	/**
+	 * Obtiene la propiedad observable sobre el nodo de control negativo de la fuente de tensión dependiente.
+	 * Permite enlazar el nodo de control negativo en la interfaz JavaFX.
+	 * 
+	 * @return propiedad observable de nodo de control negativo (valor Integer)
+	 */
+	@Override
+	public IntegerProperty ctrlNegProperty() {
+		return ctrlNeg;
+	}
+	
+	/**
+	 * Devuelve el tipo de control de la fuente (Tensión o Corriente).
+	 * 
+	 * @return controltype	Tipo de control (tensión o corriente).
+	 */
+	@Override
+	@JsonProperty("controlType")
+	public ControlType getControlType() {
+		return controlType.get();
+	}
+	
+	/**
+	 * Modifica el tipo de control de la fuente (Tensión o Corriente).
+	 * 
+	 * @param controlType	Tipo de control (tensión o corriente)
+	 */
+	@Override
+	public void setControlType(ControlType ct) {
+		this.controlType.set(Objects.requireNonNull(ct, "ControlType no puede ser null"));
+	}
+	
+	/**
+	 * Obtiene la propiedad observable sobre el tipo de control de la fuente de tensión dependiente.
+	 * Permite enlazar el tipo de control en la interfaz JavaFX.
+	 * 
+	 * @return propiedad observable del tipo de control (Tensión / Corriente)
+	 */
+	@JsonIgnore
+	public ObjectProperty<ControlType> controlTypeProperty() {
+		return controlType;
+	}
+	
+	/**
+	 * Representa con un String una fuente de tensión dependiente.
+	 * 
+	 * @return "Fuente Tensión Dependiente"
+	 */
+	@Override
+	public String getTipo() {
+		return "Fuente Tensión Dependiente";
+	}
+
+	/**
+	 * Clona una fuente de tensión dependiente.
+	 * @return nueva fuente de tensión dependiente clonada
+	 */
+	@Override
+	public Componente clonar() {
+		return new FuenteTensionDependiente(getValor(), getNodo1(), getNodo2(), 
+										getControlType(), getCtrlNeg(), getCtrlPos(), isCarga());
+	}
+
+	/**
+	 * Clona una fuente de tensión dependiente con nuevos nodos.
+	 * @return nueva fuente de tensión dependiente clonada con nuevos nodos.
+	 */
+	@Override
+	public Componente clonarConNuevosNodos(int nuevoNeg, int nuevoPos) {
+		return new FuenteTensionDependiente(getValor(), nuevoNeg, nuevoPos, 
+										getControlType(), getCtrlNeg(), getCtrlPos(), isCarga());
+	}
+	
+	/**
+	 * Devuelve el prefijo "Vx" (Voltaje) para añadirlo al identificador único del componente.
+	 */
+	@Override
+	public String getPrefijo() {
+		return "Vx";
+	}
+	
+	/**
+	 * Describe una fuente de tensión dependiente.
+	 * Complementa el método describir de la clase {@link Componente}
+	 */
+	@Override
+	@JsonIgnore
+	public String describir() {
+		return String.format(
+				"%s (%s)\nNodos: %d->%d\nGanancia: %s\nControl: %s (%d->%d)",
+				getTipo(), getId(), getNodo1(), getNodo2(),
+				FormatUtil.format(getValor(), Unidades.Type.TENSION),
+				getControlType(), getCtrlNeg(), getCtrlPos());
+	}
+	
+	/**
+	 * Indica si otra fuente es igual a esta.
+	 * 
+	 * @param obj objeto a comparar
+	 * @return {@code true} si son equivalentes, {@code false} en caso contrario
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if(!super.equals(obj)) return false;
+		if(!(obj instanceof FuenteTensionDependiente)) return false;
+		FuenteTensionDependiente otro=(FuenteTensionDependiente) obj;
+		return Objects.equals(getControlType(), otro.getControlType())
+				&& getCtrlNeg()==otro.getCtrlNeg()
+				&& getCtrlPos()==otro.getCtrlPos();
+	}
+	
+	/**
+	 * Calcula el código hash.
+	 * 
+	 * @return valor de hash
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(super.hashCode(), getControlType(), getCtrlNeg(), getCtrlPos());
+	}
+}

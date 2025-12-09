@@ -1,0 +1,239 @@
+package com.circuitos.AnalisisCircuitos.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.builder.CablePuntoControlFactory;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.service.state.VisualOptionsService;
+
+import javafx.geometry.Point2D;
+import javafx.scene.Group;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Polyline;
+
+/**
+ * Clase de servicio responsable de gestionar los puntos de control visuales asociados a
+ * un cable {@link Polyline}. 
+ * Cada punto de control se representa como un {@link Circle} interactivo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CablePuntosControlManager {
+	private static final Logger logger=Logger.getLogger(CablePuntosControlManager.class.getName());
+	
+	private final List<Circle> puntosControl=new ArrayList<>();
+	private final Group contenedor;
+	private final Cable owner;
+	private boolean visibleLocal=false;
+	
+	/**
+	 * Crea un nuevo gestor de puntos de control para un cable.
+	 * 
+	 * @param cable				Referencia al {@link Polyline} que representa el cable
+	 * @param contenedor		Contenedor gráfico donde se añaden los círculos de control
+	 */
+	public CablePuntosControlManager(Polyline cable, Cable contenedor) {
+		this.contenedor=contenedor;
+		this.owner=contenedor;
+		
+		//Escuchar los cambios de visibilidad
+		VisualOptionsService.showAllControlElementsProperty().addListener((_, _, _) -> {
+			actualizarVisibilidad();
+		});
+	}
+	
+	/**
+	 * Añade una lista inicial de puntos de control al cable y los vincula al contenedor.
+	 * 
+	 * @param puntos		List de coordenadas {@link Point2D} a insertar como puntos de control
+	 */
+	public void agregarPuntosIniciales(List<Point2D> puntos) {
+		for(Point2D p : puntos) {
+			agregarPuntoControl(p);
+		}
+	}
+	
+	/**
+	 * Añade un nuevo punto de control en la posición indicada.
+	 * 
+	 * @param p 		Coordenadas del nuevo punto
+	 */
+	public void agregarPuntoControl(Point2D p) {
+		Circle circle=crearPuntoControl(p);
+		puntosControl.add(circle);
+		contenedor.getChildren().add(circle);
+		logger.fine(()->"Punto control añadido en "+p);
+	}
+	
+	/**
+	 * Crea un punto de control interactivo en la posición especificada.
+	 * 
+	 * @param p			Coordenadas del punto
+	 * @return Instancia de círculo
+	 */
+	private Circle crearPuntoControl(Point2D p) {
+		Circle circle=new Circle(p.getX(), p.getY(), CablePuntoControlFactory.RADIO_PUNTO);
+		circle.getStyleClass().add("cable-punto-control");
+		Tooltip.install(circle, new Tooltip("Arrastra para ajustar\nDoble click (botón izquierdo) para eliminar"));
+		
+		//Establecer visibilidad inicial basada en configuración actual
+		boolean mostrar=visibleLocal && VisualOptionsService.showAllControlElementsProperty().get();
+		circle.setVisible(mostrar);
+		circle.setManaged(mostrar);
+		
+		circle.setOnMousePressed(e -> {
+			if(owner!=null) owner.activarArrastreCodo();
+			e.consume();
+		});
+		circle.setOnMouseDragged(e -> {
+			double x=e.getX();
+			double y=e.getY();
+			circle.setCenterX(x);
+			circle.setCenterY(y);
+			if(owner!=null) owner.arrastrarCodo();
+			logger.log(Level.FINER, "Arrastrando punto a ({0},{1})", new Object[] {x, y});
+			e.consume();
+		});
+		circle.setOnMouseReleased(e -> {
+			if(owner!=null) owner.desactivarArrastreCodoCodo();
+			e.consume();
+		});
+		circle.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> handleDoubleClick(circle, e));
+		logger.finest(() -> String.format("Punto control creado en (%.1f,%.1f), visible=%b", p.getX(), p.getY(), mostrar));
+		
+		return circle;
+	}
+	
+	/**
+	 * Gestiona la acción de eliminar un punto de control haciendo doble click.
+	 * 
+	 * @param circle			Círculo visual que representa el punto
+	 * @param e					Evento de ratón
+	 */
+	private void handleDoubleClick(Circle circle, MouseEvent e) {
+		if(e.getButton()==MouseButton.PRIMARY && e.getClickCount()==2 && !puntosControl.isEmpty()) {
+			int idx=puntosControl.indexOf(circle);
+			if(idx>=0) {
+				puntosControl.remove(idx);
+				contenedor.getChildren().remove(circle);
+				logger.fine(() -> "Punto control "+idx+" eliminado");
+				if(owner!=null) {
+					owner.arrastrarCodo();
+				}
+				e.consume();
+			}
+		}
+	}
+	
+	/**
+	 * Ajusta los puntos de control de un cable cuando se producen cambios en su posición.
+	 * 
+	 * @param nuevosPuntos 			Nuevos puntos de control
+	 */
+	public void actualizarDesde(List<Point2D> nuevosPuntos) {
+		for(int i=puntosControl.size(); i<nuevosPuntos.size(); i++) {
+			agregarPuntoControl(nuevosPuntos.get(i));
+		}
+		while(puntosControl.size()>nuevosPuntos.size()) {
+			Circle extra=puntosControl.remove(puntosControl.size()-1);
+			contenedor.getChildren().remove(extra);
+		}
+		for(int i=0; i<nuevosPuntos.size(); i++) {
+			Point2D p=nuevosPuntos.get(i);
+			Circle c=puntosControl.get(i);
+			c.setCenterX(p.getX());
+			c.setCenterY(p.getY());
+		}
+		if(owner!=null) owner.arrastrarCodo();
+	}
+	
+	/**
+	 * Muestra u oculta los puntos de control. 
+	 * Considera tanto la configuración global como el estado de selección del cable.
+	 * 
+	 * @param visible		{@code true} para mostrarlos, {@code false} para ocultarlos
+	 */
+	public void mostrar(boolean visible) {
+		visibleLocal=visible;
+		actualizarVisibilidad();
+	}
+	
+	/**
+	 * Actualiza la visibilidad de todos los puntos de control basándose
+	 * en el estado local y la configuración global.
+	 */
+	private void actualizarVisibilidad() {
+		boolean visibleGlobal=VisualOptionsService.showAllControlElementsProperty().get();
+		//mostrar puntos de control si están activados o seleccionados
+		boolean mostrar=visibleGlobal || visibleLocal;
+		logger.finest(() -> String.format(
+				"Actualizando visibilidad puntos control: local=%b, global=%b, resultado=%b, puntos=%d",
+				visibleLocal, visibleGlobal, mostrar, puntosControl.size()));
+		//Asegurar que todos los puntos se actualizan de forma consistente
+		puntosControl.forEach(punto -> {
+			if(punto!=null) {
+				punto.setVisible(mostrar);
+				punto.setManaged(mostrar);
+			}
+		});
+	}
+	
+	/**
+	 * Obtiene una lista de los puntos de control.
+	 * 
+	 * @return Lista de puntos de control
+	 */
+	public List<Circle> getPuntosControl() {
+		return puntosControl;
+	}
+	
+	/**
+	 * Activa o desactiva la edición avanzada (visibilidad y gestión) de los puntos de control.
+	 * 
+	 * @param on {@code true} para habilitarlo; {@code false} para desactivar
+	 */
+	public void setModoEdicionAvanzada(boolean on) {
+		this.visibleLocal=on;
+		actualizarVisibilidad();
+	}
+	
+	/**
+	 * Indica si la edición avanzada local está activa para este cable.
+	 * 
+	 * @return {@code true} si está habilitada localmente; {@false} si no
+	 */
+	public boolean isModoEdicionAvanzada() {
+		return visibleLocal;
+	}
+	
+	/**
+	 * Inserta un nuevo punto de control en la trayectoria actual del cable. 
+	 * 
+	 * @param p 		Coordenadas del nuevo punto de control.
+	 */
+	public void agregarNuevoPuntoControl(Point2D p) {
+		agregarPuntoControl(p);
+		if(owner!=null)
+			owner.arrastrarCodo();
+	}
+	
+	/**
+	 * Desplaza todos los puntos de control una cantidad exacta.
+	 * 
+	 * @param dx			Desplazamiento X
+	 * @param dy			Desplazamiento Y
+	 */
+	public void desplazarPuntos(double dx, double dy) {
+		for(Circle c : puntosControl) {
+			c.setCenterX(c.getCenterX()+dx);
+			c.setCenterY(c.getCenterY()+dy);
+		}
+	}
+}

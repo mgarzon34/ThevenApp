@@ -1,0 +1,45 @@
+/* ========================================================
+ * Estilos para los puntos de conexión y avisos de error.
+ * Archivo: conexiones.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+
+/* Estilo para puntos de conexión visibles */
+.conexion-punto-conexion,
+.conexion-punto-conexion-componente {
+    -fx-fill: #ffffff;					/* Relleno blanco */
+    -fx-stroke: #00aaff;					/* Contorno azul */
+    -fx-stroke-width: 2;					/* Grosor del trazo */
+    -fx-cursor: crosshair;					/* Cursor tipo cruz para indicar conexión */
+}
+
+/* Conexión errónea (parpadeo rojo) */
+.conexion-punto-error {
+	-fx-stroke: red;					/* Contorno rojo */
+	-fx-stroke-width: 3;				/* Grosor más fuerte */
+}
+
+/* Estilo normal para recuperar error */
+.conexion-punto-normal {
+	-fx-fill: rgba(100, 149, 237, 0.3);
+	-fx-stroke: #00aaff;				/* Contorno azul */
+	-fx-stroke-width: 2;				/* Grosor del trazo */
+}
+
+/* Mensaje emergente de error */
+.conexion-aviso-error {
+	-fx-background-color: rgba(255, 53, 69, 0.95);		/* Rojo intenso con transparencia */
+	-fx-text-fill: white;
+	-fx-padding: 8 16;
+	-fx-background-radius: 8;
+	-fx-font-size: 14px;
+	-fx-font-weight: bold;
+	-fx-effect: dropshadow(gaussian, black, 6, 0.6, 2, 2);
+}
+
+/* Para pseudo-clase */
+.conexion-punto-conexion-componente:error {
+	-fx-stroke:red;
+	-fx-stroke-width: 3;
+}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de opciones de la pestaña de Análisis.
+	Contiene dos botones para elegir calcular el circuito equivalente de 
+	Thevenin o el circuito equivalente de Norton.
+	
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelAnalisisOpcionesController
+	Utiliza estilo: analisisOpciones.css
+ -->
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.Separator?>
+
+<VBox alignment="TOP_CENTER" 
+	  fx:id="panelAnalisisOpciones"
+	  xmlns="http://javafx.com/javafx"
+	  xmlns:fx="http://javafx.com/fxml"
+	  fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelAnalisisOpcionesController"
+	  prefWidth="228.0" 
+	  spacing="15.0" 
+	  styleClass="panel-analisis-background"
+	  VBox.vgrow="ALWAYS">
+            
+    <!-- Título -->
+    <Label alignment="CENTER" 
+      	   prefHeight="45.0" 
+      	   prefWidth="187.0" 
+      	   styleClass="panel-analisis-title" 
+      	   text="Circuitos equivalentes" 
+      	   underline="true" />
+
+    <!-- Zona de botones -->
+    <VBox alignment="CENTER" spacing="20.0" styleClass="panel-analisis-opciones"
+    		VBox.vgrow="ALWAYS" fillWidth="true">
+   		<Region VBox.vgrow="ALWAYS" />
+   		<!-- Mensaje para modo de selección de nodos -->
+   		<Label fx:id="lblModoSeleccion" text="Seleccione nodos de análisis" wrapText="true" styleClass="panel-analisis-label" />
+    	<HBox alignment="CENTER_LEFT" spacing="10.0">
+    		<Label text="Ctrl. Negativo" styleClass="panel-analisis-label" wrapText="true" />
+   			<ComboBox fx:id="comboNodoNegativo" maxWidth="Infinity" prefWidth="80"/>
+   		</HBox>
+   		<HBox alignment="CENTER_LEFT" spacing="10.0">
+   			<Label text="Ctrl. Positivo" styleClass="panel-analisis-label" wrapText="true" />
+   			<ComboBox fx:id="comboNodoPositivo" maxWidth="Infinity" prefWidth="80" />
+   		</HBox>
+   		<Separator />
+        <Button fx:id="btnThevenin" text="Thevenin" maxWidth="Infinity" wrapText="true" prefHeight="40"/>
+        <Button fx:id="btnNorton" text="Norton" maxWidth="Infinity" wrapText="true" prefHeight="40" />
+        <Separator />
+        <CheckBox fx:id="chkMostrarMiniatura"
+    			text="Mostrar Circuito Original"
+    			selected="true"
+    			styleClass="panel-analisis-checkbox" 
+    			maxWidth="Infinity" wrapText="true" />
+        <Region VBox.vgrow="ALWAYS" />
+    </VBox>
+</VBox>

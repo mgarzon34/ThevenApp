@@ -1,0 +1,168 @@
+package com.circuitos.temporal.gui.service.label;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteDependiente;
+import com.circuitos.analisiscircuitos.dominio.Tierra;
+import com.circuitos.analisiscircuitos.gui.util.UnidadConverter;
+
+import javafx.beans.binding.Bindings;
+import javafx.scene.control.Label;
+
+/**
+ * Clase de servicio para crear etiquetas de visualización sobre los componentes indicando
+ * su información básica como su Id, Valor o dependencia en caso de fuentes dependientes.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class EtiquetaBindingService {
+	
+	private static final Logger logger=Logger.getLogger(EtiquetaBindingService.class.getName());
+	private static final String STYLE_BASE="etiqueta-componente";
+	private static final String STYLE_CARGA="etiqueta-componente-carga";
+	private static final String STYLE_EQUIVALENTE="etiqueta-analisis-componente";
+	
+	private EtiquetaBindingService() { /* NO INSTANCIABLE */ }
+
+    /**
+     * Crea un Label con listeners explícitos que actualizan el texto al
+     * cambiar propiedades del componente (valor y nodos de control si es fuente dependiente).
+     * 
+     * @param comp 			Componente a observar
+     * @return Etiqueta con texto enlazado dinámicamente
+     */
+    public static Label construirEtiqueta(Componente comp) {
+    	Objects.requireNonNull(comp, "Componente no puede ser null");
+        Label label=new Label();
+        label.setId("etiqueta_"+comp.getId());
+        
+        updateStyle(label, comp.isCarga());
+        comp.cargaProperty().addListener((_, _, newVal) -> {
+        	updateStyle(label, newVal);
+        	logger.fine(()->"Etiqueta de "+comp.getId()+" cambió estilo de carga a "+newVal);
+        });
+        
+        if (comp instanceof FuenteDependiente) {
+        	bindFuenteDependiente(label, comp);
+        } else if(comp instanceof Tierra) {
+        	label.setText("GND");
+        } else {
+        	bindValorConUnidad(label, comp);
+        }
+        logger.fine(()->"Etiqueta creada para componente "+comp.getId());
+        return label;
+    }
+    
+    /**
+     * Actualiza el estilo de la etiqueta si el componente es de carga o no.
+     * 
+     * @param label			Etiqueta del componente
+     * @param isCarga		Indicador de carga
+     */
+    private static void updateStyle(Label label, boolean isCarga) {
+    	label.getStyleClass().removeAll(STYLE_BASE, STYLE_CARGA);
+    	label.getStyleClass().add(isCarga ? STYLE_CARGA : STYLE_BASE);
+    }
+    
+    /**
+     * Genera la etiqueta para una fuente dependiente.
+     * 
+     * @param label		Etiqueta del componente
+     * @param comp		Componente tipo Fuente Dependiente
+     */
+    private static void bindFuenteDependiente(Label label, Componente comp) {
+    	FuenteDependiente fd=(FuenteDependiente) comp;
+    	label.textProperty().bind(
+    			Bindings.createStringBinding(()->{
+    				String id=comp.getId();
+    				String suf=fd.getControlType()==FuenteDependiente.ControlType.TENSION ? "V" : "I";
+    				return String.format("%s: %.3g * %s\n(%d, %d)", id, comp.getValor(),
+    						suf, fd.getCtrlNeg(), fd.getCtrlPos());
+    			}, 
+    			comp.valorProperty(),
+    			fd.ctrlNegProperty(),
+    			fd.ctrlPosProperty(),
+    			fd.controlTypeProperty()));
+    }
+    
+    /**
+     * Genera etiqueta con el valor y la unidad correspondiente.
+     * 
+     * @param label		Etiqueta del componente
+     * @param comp		Componente al que se añade la etiqueta
+     */
+    private static void bindValorConUnidad(Label label, Componente comp) {
+    	List<String> unidades=UnidadConverter.obtenerUnidades(comp.getClass());
+    	Map<String, Double> factores=UnidadConverter.obtenerFactores(comp.getClass());
+    	label.textProperty().bind(
+    			Bindings.createStringBinding(()->{
+    				double valor=comp.getValor();
+    				String texto=formatUnidad(valor, unidades, factores);
+    				return String.format("%s: %s", comp.getId(), texto);
+    			}, comp.valorProperty()));
+    }
+    
+    /**
+     * Configura la etiqueta existente para prefijo personalizado en el panel de análisis, por ejemplo,
+     * Vth, Rth, In o Rn en lugar del ID del componente.
+     * 
+     * @param label				Etiqueta ya asociada al componente
+     * @param comp				Componente
+     * @param prefijo			Texto a mostrar antes de valor (Vth, Rth, In, Rn)
+     */
+    public static void configurarEtiquetaEquivalente(Label label, Componente comp, String prefijo) {
+    	Objects.requireNonNull(label, "Label no puede ser null");
+    	Objects.requireNonNull(comp, "Componente no puede ser null");
+    	Objects.requireNonNull(prefijo, "Prefijo no puede ser null");
+    	
+    	label.textProperty().unbind();
+    	List<String> unidades=UnidadConverter.obtenerUnidades(comp.getClass());
+    	Map<String, Double> factores=UnidadConverter.obtenerFactores(comp.getClass());
+    	label.textProperty().bind(
+    			Bindings.createStringBinding(() -> {
+    				double valor=comp.getValor();
+    				String texto=formatUnidad(valor, unidades, factores);
+    				return String.format("%s: %s", prefijo, texto);
+    			}, comp.valorProperty()));
+    	label.getStyleClass().remove(STYLE_BASE);
+    	label.getStyleClass().remove(STYLE_CARGA);
+    	label.getStyleClass().add(STYLE_BASE);		//mantener tipografía base de etiquetas
+    	label.getStyleClass().add(STYLE_EQUIVALENTE);
+    }
+    
+    /**
+     * Obtiene la unidad del componente en un valor adecuado y entendible para mostrarlo en la etiqueta.
+     * Además añade la unidad correspondiente según el tipo de componente.
+     * 
+     * @param valor					Valor del componente
+     * @param unidades				Lista de unidades posibles
+     * @param factores				Factor de multiplicación según la unidad
+     * @return	Valor formateado
+     */
+    private static String formatUnidad(double valor, List<String> unidades, Map<String, Double> factores) {
+    	if(unidades.isEmpty() || factores.isEmpty()) {
+    		return String.format("%.3g", valor);
+    	}
+    	
+    	for(String unidad : unidades) {
+    		double factor=factores.getOrDefault(unidad, 1.0);
+    		double convertido=valor/factor;
+    		
+    		if(valor==0.0) {
+    		    return "0 " + unidades.get(0); // unidad base
+    		}
+    		if(convertido>=0.95 && convertido<1000) {
+    		    return String.format("%.3g %s", convertido, unidad);
+    		}
+    	}
+    	
+    	String ultimaUnidad=unidades.get(unidades.size() -1);
+    	double factorUltimo=factores.getOrDefault(ultimaUnidad, 1.0);
+    	return String.format("%.3g %s",  valor/factorUltimo, ultimaUnidad);
+    }
+}

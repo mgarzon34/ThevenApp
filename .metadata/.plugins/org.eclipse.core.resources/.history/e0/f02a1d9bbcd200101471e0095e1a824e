@@ -1,0 +1,137 @@
+package com.circuitos.temporal.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import com.circuitos.temporal.dto.CableDto;
+import com.circuitos.temporal.dto.PuntoDto;
+
+/**
+ * Utilidad estática para reparar los nodos huérfanos (valor -1) en los extremos de {@link CableDto}.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public final class CableNodeRepairUtil {
+	private static final double EPS=10.0;
+	private CableNodeRepairUtil() { /* NO INSTANCIABLE */ }
+	
+	/**
+	 * Repara los nodos de los cables antes de guardarlos para que tenga en cuenta los que no están 
+	 * conectados a componentes sino a otros cables. 
+	 * 
+	 * @param originales		Lista de cables originales
+	 * @return	Lista de cables con los nodos reparados
+	 */
+	public static List<CableDto> repairCables(List<CableDto> originales) {
+		System.out.println(">>> repairCables llamada. size="+originales.size());
+		Objects.requireNonNull(originales, "La lista de cables originales no puede ser null");
+		Map<XY, Integer> pos2Nodo=new HashMap<>();
+		Map<Integer, XY> nodo2Pos=new HashMap<>();
+		
+		originales.forEach(dto -> {
+			registrar(dto, true, pos2Nodo, nodo2Pos);
+			registrar(dto, false, pos2Nodo, nodo2Pos);
+		});
+		
+		int nextNodo=pos2Nodo.values().stream().max(Integer::compare).orElse(-1)+1;
+		List<CableDto> reparados=new ArrayList<>();
+		
+		for(CableDto dto : originales) {
+			int oriNodo=obtenerNodo(dto, true, pos2Nodo, nodo2Pos, nextNodo);
+			if(oriNodo>=nextNodo) nextNodo=oriNodo+1;
+			int destNodo=obtenerNodo(dto, false, pos2Nodo, nodo2Pos, nextNodo);
+			if(destNodo>=nextNodo) nextNodo=destNodo+1;
+			
+			List<PuntoDto> pts=new ArrayList<>(dto.puntos());
+			pts.set(0, nodo2Pos.get(oriNodo).toPuntoDto());
+			pts.set(pts.size()-1, nodo2Pos.get(destNodo).toPuntoDto());
+			
+			reparados.add(new CableDto(dto.id(),
+					dto.origenId(), dto.origenPos(), dto.origenPositivo(), oriNodo,
+					dto.destinoId(), dto.destinoPos(), dto.destinoPositivo(), destNodo,
+					pts));
+		}
+		System.out.println(">>> reparados size="+reparados.size());
+		long neg=reparados.stream()
+				.filter(c -> c.origenNodo()<0 || c.destinoNodo()<0)
+				.peek(c -> System.out.println("NEG: "+c.id()+" ori="+c.origenNodo()+" dest="+c.destinoNodo()))
+				.count();
+		System.out.println(">>> quedan negativos? "+neg);
+		return reparados;
+	}
+	
+	/**
+	 * Registra las coordenadas del extremos de un cable. 
+	 * 
+	 * @param dto					Dto del cable
+	 * @param origen				Origen del cable
+	 * @param mapa					Mapa de coordenadas
+	 */
+	private static void registrar(CableDto dto, boolean origen, 
+								Map<XY, Integer> mapa, Map<Integer, XY> inverso) {
+		Integer nodo=origen ? dto.origenNodo() : dto.destinoNodo();
+		if(nodo!=null && nodo>=0) {
+			XY xy=obtenerXY(dto, origen);
+			mapa.put(xy, nodo);
+			inverso.putIfAbsent(nodo, xy);
+		}
+	}
+	
+	/**
+	 * Obtiene el nodo de conexión de un cable.
+	 * 
+	 * @param dto					Dto del cable
+	 * @param origen				Origen del cable
+	 * @param mapa					Mapa de coordenadas
+	 * @param defaultNodo			Nodo por defecto
+	 * @return Nodo de conexión
+	 */
+	private static int obtenerNodo(CableDto dto, boolean origen, Map<XY, Integer> mapa, 
+						Map<Integer, XY> inverso, int defaultNodo) {
+		Integer n=origen ? dto.origenNodo() : dto.destinoNodo();
+		if(n!=null && n>=0) return n;
+		XY clave=obtenerXY(dto, origen);
+		int nodo=mapa.computeIfAbsent(clave, _->defaultNodo);
+		inverso.putIfAbsent(nodo, clave);
+		return nodo;
+	}
+	
+	/**
+	 * Obtiene las coordenadas del punto origen de un cable. 
+	 * 
+	 * @param dto				Dto del cable
+	 * @param origen			Origen del cable
+	 * @return Coordenadas XY del punto
+	 */
+	private static XY obtenerXY(CableDto dto, boolean origen) {
+		List<PuntoDto> pts=dto.puntos();
+		PuntoDto p=origen ? pts.get(0) : pts.get(pts.size()-1);
+		return new XY(p.x(), p.y());
+	}
+	
+	/**
+	 * Record de coordenadas (Helper)
+	 */
+	private record XY(double x, double y) {
+		XY(double x, double y) {
+			this.x=x;
+			this.y=y;
+		}
+		PuntoDto toPuntoDto() {
+			return new PuntoDto(x, y);
+		}
+		@Override
+		public int hashCode() {
+			return (int)(Math.round(x/EPS)*31+Math.round(y/EPS));
+		}
+		@Override
+		public boolean equals(Object o) {
+			if(!(o instanceof XY xy)) return false;
+			return Math.abs(x-xy.x)<=EPS && Math.abs(y-xy.y)<=EPS;
+		}
+	}
+}

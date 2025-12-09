@@ -1,0 +1,51 @@
+package com.circuitos.analisiscircuitos.analisis;
+
+/**
+ * Contiene la corriente de Norton In y la resistencia equivalente Rn.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ResultadoNorton {
+	private final double in;
+	private final double rn;
+	
+	/**
+	 * Constructor para cálculo de Norton.
+	 * 
+	 * @param in			Corriente de Norton
+	 * @param rn			Resistencia de Norton
+	 */
+	public ResultadoNorton(double in, double rn) {
+		this.in=in;
+		this.rn=rn;
+	}
+	
+	/**
+	 * Obtiene la corriente de Norton.
+	 * 
+	 * @return in		Corriente de Norton
+	 */
+	public double getIn() {
+		return in;
+	}
+	
+	/**
+	 * Obtiene la resistencia de Norton.
+	 * 
+	 * @return rn		Resistencia de Norton
+	 */
+	public double getRn() {
+		return rn;
+	}
+	
+	/**
+	 * Devuelve un String con la información de corriente y resistencia de Norton.
+	 * 
+	 * @return String		Info de corriente y resistencia Norton.
+	 */
+	@Override
+	public String toString() {
+		return "ResultadoNorton{In="+in+", Rn="+rn+"}";
+	}
+}

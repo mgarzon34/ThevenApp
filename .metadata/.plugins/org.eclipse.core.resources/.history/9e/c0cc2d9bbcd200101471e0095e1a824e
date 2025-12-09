@@ -1,0 +1,82 @@
+package com.circuitos.temporal.dominio.util;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+
+/**
+ * Clase que define ciertas herramientas para el manejo de nodos y el mapa de nodos.
+ * Define registrar un nodo nuevo, actualizar el mapa de nodos o eliminar nodos no usados.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+public class NodeMapUtil {
+	private static final Logger logger=Logger.getLogger(NodeMapUtil.class.getName());
+	
+	private NodeMapUtil() { /* No instanciable */ }
+	
+	/**
+	 * Registra un nuevo nodo, en caso de que el mapa no lo contenga, para que tengan índice único.
+	 * 
+	 * @param nodeMap					mapa de nodos
+	 * @param nodo						nodo nuevo
+	 * @throws NullPointerException		si el mapa de nodos es null
+	 */
+	public static void registrarNodo(Map<Integer, Integer> nodeMap, int nodo) {
+		Objects.requireNonNull(nodeMap, "nodeMap no puede ser null");
+		if(!nodeMap.containsKey(nodo)) {
+			logger.log(Level.FINE, "Registrando nodo {0} con índice {1}", new Object[] {nodo, nodeMap.size()});
+			nodeMap.put(nodo, nodeMap.size());
+		}
+	}
+	
+	/**
+	 * Actualiza el mapa de nodos en caso de modificación.
+	 * 
+	 * @param nodeMap					mapa de nodos
+	 * @param comps						lista de componentes
+	 * @throws NullPointerException		si el mapa de nodos es null
+	 */
+	public static void actualizarMapaNodos(Map<Integer, Integer> nodeMap, Collection<? extends Componente> comps) {
+		Objects.requireNonNull(nodeMap, "nodeMap no puede ser null");
+		Objects.requireNonNull(comps, "comps no puede ser null");
+		//Agrupar y ordenar todos los nodos
+		TreeSet<Integer> nodosOrdenados=new TreeSet<>();
+		for(Componente c : comps) {
+			nodosOrdenados.add(c.getNodo1());
+			nodosOrdenados.add(c.getNodo2());
+		}
+		nodeMap.clear(); //Limpiar mapa actual
+		//Volver a añadir en orden natural
+		int idx=0;
+		for(Integer raw : nodosOrdenados) {
+			nodeMap.put(raw, idx++);
+		}
+		logger.log(Level.FINE, "Mapa de nodos actualizados: {0}", nodeMap);
+	}
+	
+	/**
+	 * Elimina un nodo de la lista en caso de no ser usado.
+	 * 
+	 * @param nodeMap					mapa de nodos
+	 * @param comps						lista de componentes
+	 * @param nodo						nodo a eliminar
+	 * @throws NullPointerException		si el mapa de nodos es null
+	 */
+	public static void eliminarNodoNoUsado(Map<Integer, Integer> nodeMap, Collection<? extends Componente> comps, int nodo) {
+		Objects.requireNonNull(nodeMap, "nodeMap no puede ser null");
+		Objects.requireNonNull(comps, "comps no puede ser null");
+		boolean usado=comps.stream()
+				.anyMatch(c->c.getNodo1()==nodo || c.getNodo2()==nodo);
+		if(!usado) {
+			logger.log(Level.FINE, "Nodo {0} no usado, reindexando mapa.", nodo);
+			actualizarMapaNodos(nodeMap, comps);
+		}
+	}
+}

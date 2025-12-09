@@ -1,0 +1,151 @@
+package com.circuitos.temporal.gui.util;
+
+import java.util.*;
+
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.gui.dialog.PropiedadesActions;
+
+/**
+ * Clase auxiliar que gestiona las unidades y sus factores de conversión
+ * para los distintos tipos de componentes del dominio.
+ * <br> Es utilizada por {@link PropiedadesActions} para sus operaciones.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class UnidadConverter {
+
+	private UnidadConverter() { /* No instanciable */ }
+	
+	/**
+	 * Obtiene la lista de unidades posibles según el tipo de componente.
+	 * 
+	 * @param tipo				Clase del componente
+	 * @return Lista de sufijos de unidad aplicables
+	 */
+	public static List<String> obtenerUnidades(Class<?> tipo) {
+		if (tipo.isAssignableFrom(Resistencia.class)) {
+			return Arrays.asList("Ω", "kΩ", "MΩ");
+		} else if (tipo.isAssignableFrom(FuenteTensionInd.class)) {
+			return Arrays.asList("V", "kV", "mV");
+		} else if (tipo.isAssignableFrom(FuenteCorrienteInd.class)) {
+			return Arrays.asList("A", "mA");
+		} else {
+			return Collections.emptyList();
+		}
+	}
+
+	/**
+	 * Devuelve un mapa con los factores de conversión para las unidades del tipo de componente.
+	 * 
+	 * @param tipo			Clase del componente
+	 * @return Mapa de factores de conversión
+	 */
+	public static Map<String, Double> obtenerFactores(Class<?> tipo) {
+		Map<String, Double> factores = new HashMap<>();
+		if (tipo.isAssignableFrom(Resistencia.class)) {
+			factores.put("MΩ", 1e6);
+			factores.put("kΩ", 1e3);
+			factores.put("Ω", 1.0);
+		} else if (tipo.isAssignableFrom(FuenteTensionInd.class)) {
+			factores.put("kV", 1e3);
+			factores.put("V", 1.0);
+			factores.put("mV", 1e-3);
+		} else if (tipo.isAssignableFrom(FuenteCorrienteInd.class)) {
+			factores.put("A", 1.0);
+			factores.put("mA", 1e-3);
+		}
+		return factores;
+	}
+
+	/**
+	 * Extrae el sufijo de la unidad de una cadena de texto (número + unidad ej. "1,5 kΩ")
+	 * 
+	 * @param texto						Texto a evaluar
+	 * @param unidades					Lista de unidades posibles
+	 * @return Unidad encontrada o null si no hay coincidencia
+	 */
+	public static String extraerSufijo(String texto, List<String> unidades) {
+		if (texto == null || unidades.isEmpty()) return null;
+		String t = texto.trim();
+		for (String suf : unidades) {
+			if (t.endsWith(suf)) {
+				return suf;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Separa una cadena en la parte numérica y el sufijo de unidad ("1,5 kΩ").
+	 * 
+	 * @param texto					Texto a dividir
+	 * @return Array con número en posición 0 y sufijo en posición 1
+	 */
+	public static String[] separarNumeroUnidad(String texto) {
+		if (texto == null) return null;
+		String t = texto.trim();
+		int idx = 0;
+		while (idx < t.length() && (Character.isDigit(t.charAt(idx)) || t.charAt(idx) == '.' || t.charAt(idx) == '-')) {
+			idx++;
+		}
+		if (idx == 0 || idx >= t.length()) return null;
+		return new String[]{t.substring(0, idx), t.substring(idx)};
+	}
+	
+	/**
+	 * Convierte una expresión fraccionaria tipo "5/3" en un valor numérico tipo Double.
+	 * 
+	 * @param texto					Expresión numérica
+	 * @return número convertido
+	 */
+	public static Optional<Double> evaluarTexto(String texto) {
+		if (texto == null || texto.isBlank()) return Optional.empty();
+		String t = texto.trim();
+		if (t.contains("/")) {
+			String[] partes = t.split("/");
+			if (partes.length != 2) return Optional.empty();
+			try {
+				double num = Double.parseDouble(partes[0].trim());
+				double den = Double.parseDouble(partes[1].trim());
+				if (den == 0) return Optional.empty();
+				return Optional.of(num / den);
+			} catch (NumberFormatException e) {
+				return Optional.empty();
+			}
+		}
+		try {
+			return Optional.of(Double.parseDouble(t));
+		} catch (NumberFormatException e) {
+			return Optional.empty();
+		}
+	}
+	
+	/**
+	 * Calcula el valor base (sin sufijo) de una cadena usando los factores de conversión.
+	 * 
+	 * @param texto							Texto de entrada con el valor
+	 * @param unidades						Lista de unidades posibles
+	 * @param factores						Factores de conversión asociados a las unidades
+	 * @param valorPorDefecto				Valor devuelto si no se puede evaluar
+	 * @return Valor convertido en base o el valor por defecto si hay error
+	 */
+	public static double calcularValorBase(String texto, List<String> unidades, Map<String, Double> factores, double valorPorDefecto) {
+		if (unidades.isEmpty()) {
+			return UnidadConverter.evaluarTexto(texto).orElse(valorPorDefecto);
+		}
+		String[] partes = UnidadConverter.separarNumeroUnidad(texto);
+		if (partes == null) return valorPorDefecto;
+		String numero = partes[0];
+		String sufijo = partes[1];
+		if (!unidades.contains(sufijo)) return valorPorDefecto;
+		try {
+			double num = Double.parseDouble(numero);
+			return num * factores.getOrDefault(sufijo, 1.0);
+		} catch (NumberFormatException e) {
+			return valorPorDefecto;
+		}
+	}
+}

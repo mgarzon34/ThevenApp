@@ -1,0 +1,185 @@
+package com.circuitos.analisiscircuitos.dominio;
+
+import java.util.Objects;
+
+import com.circuitos.analisiscircuitos.dominio.util.FormatUtil;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+
+/**
+ * Clase que extiende la clase abstracta Componente para definir una 
+ * fuente de tensión independiente.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+public class FuenteTensionInd extends Componente {
+	private final DoubleProperty tension=new SimpleDoubleProperty();
+	
+	/**
+	 * Constructor sin argumentos para deserialización (pedido por libreria Jackson)
+	 */
+	public FuenteTensionInd() {
+		super(0, 0, false);
+		this.tension.set(0.0);
+	}
+	
+	/**
+	 * Constructor completo (con flag de carga).
+	 * 
+	 * @param tension 		valor de tensión de la fuente (voltios)
+	 * @param nodoNeg		nodo negativo de la fuente
+	 * @param nodoPos		nodo positivo de la fuente
+	 * @param carga			flag de carga (true si es de carga, si no false)
+	 */
+	public FuenteTensionInd(double tension, int nodoNeg, int nodoPos, boolean carga) {
+		super(nodoNeg, nodoPos, carga);
+		if(nodoNeg==nodoPos)
+			throw new IllegalArgumentException("El nodo positivo y negativo de la fuente de tensión no puede ser el mismo.");
+		this.tension.set(tension);
+	}
+	
+	/**
+	 * Constructor sin flag de carga.
+	 * 
+	 * @param tension		valor de tensión de la fuente (voltios)
+	 * @param nodoNeg		nodo negativo de la fuente
+	 * @param nodoPos		nodo positivo de la fuente
+	 */
+	public FuenteTensionInd(double tension, int nodoNeg, int nodoPos) {
+		this(tension, nodoNeg, nodoPos, false);
+	}
+	
+	/**
+	 * Constructor que acepta un string con sufijo multiplicador (con flag de carga).
+	 * 
+	 * @param tensionUnidad	valor de tensión de la fuente (voltios, con sufijo)
+	 * @param nodoNeg		nodo negativo de la fuente
+	 * @param nodoPos		nodo positivo de la fuente
+	 * @param carga			flag de carga
+	 */
+	public FuenteTensionInd(String tensionUnidad, int nodoNeg, int nodoPos, boolean carga) {
+		this(Unidades.parsear(tensionUnidad), nodoNeg, nodoPos, carga);
+	}
+	
+	/**
+	 * Constructor que acepta un string con sufijo multiplicador (sin flag de carga).
+	 * 
+	 * @param tensionUnidad	valor de tensión de la fuente (voltios, con sufijo)
+	 * @param nodoNeg		nodo negativo de la fuente
+	 * @param nodoPos		nodo positivo de la fuente
+	 */
+	public FuenteTensionInd(String tensionUnidad, int nodoNeg, int nodoPos) {
+		this(Unidades.parsear(tensionUnidad), nodoNeg, nodoPos, false);
+	}
+	
+	/**
+	 * Obtiene el valor de tensión de la fuente.
+	 * 
+	 * @return tension
+	 */
+	@Override
+	@JsonProperty("valor")
+	public double getValor() {
+		return tension.get();
+	}
+	
+	/**
+	 * Asigna el valor de tensión de la fuente.
+	 * 
+	 * @param tension Nuevo valor de tensión
+	 */
+	@Override
+	public void setValor(double tension) {
+		this.tension.set(tension);
+	}
+	
+	/**
+	 * Propiedad observable de la tensión.
+	 * 
+	 * @return DoubleProperty de tensión
+	 */
+	@JsonIgnore
+	public DoubleProperty valorProperty() {
+		return tension;
+	}
+	
+	/**
+	 * Clona una fuente de tensión independiente de un circuito a otro.
+	 * 
+	 * @return nueva fuente de tensión independiente clonada
+	 */
+	@Override
+	public Componente clonar() {
+		return new FuenteTensionInd(getValor(), getNodo1(), getNodo2(), isCarga());
+	}
+	
+	/**
+	 * Clona una fuente de tensión independiente de un circuito a otro con nuevos nodos.
+	 * 
+	 * @return nueva fuente de tensión independiente clonada con nuevos nodos
+	 */
+	@Override
+	public Componente clonarConNuevosNodos(int nNeg, int nPos) {
+		return new FuenteTensionInd(getValor(), nNeg, nPos, isCarga());
+	}
+	
+	/**
+	 * Representa con un String una fuente de tensión independiente.
+	 * 
+	 * @return "Fuente Tensión Independiente"
+	 */
+	@Override
+	public String getTipo() {
+		return "Fuente Tensión Independiente";
+	}
+	
+	/**
+	 * Devuelve el prefijo "V" (Voltaje) para añadirlo al identificador único del componente.
+	 */
+	@Override
+	public String getPrefijo() {
+		return "V";
+	}
+	
+	/**
+	 * Describe una fuente de tensión independiente.
+	 * Complementa el método describir de la clase {@link Componente}
+	 */
+	@Override
+	@JsonIgnore
+	public String describir() {
+		return String.format(
+				"%s (%s)\nNodos: %d->%d\nTensión: %s",
+				getTipo(), getId(), getNodo1(), getNodo2(),
+				FormatUtil.format(getValor(), Unidades.Type.TENSION));
+	}
+	
+	/**
+	 * Compara esta fuente con otro objeto.
+	 * 
+	 * @param obj objeto a comparar
+	 * @return {@code true} si son equivalentes, {@code false} si no
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if(!super.equals(obj)) return false;
+		if(!(obj instanceof FuenteTensionInd)) return false;
+		FuenteTensionInd otro=(FuenteTensionInd) obj;
+		return Double.compare(getValor(), otro.getValor())==0;
+	}
+	
+	/**
+	 * Calcula el código hash.
+	 * 
+	 * @return código hash
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(super.hashCode(), getValor());
+	}
+}

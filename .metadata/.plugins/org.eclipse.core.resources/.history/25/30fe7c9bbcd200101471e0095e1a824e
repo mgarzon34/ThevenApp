@@ -1,0 +1,251 @@
+package com.circuitos.temporal.gui.controller;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.util.UnidadConverter;
+
+import javafx.animation.PauseTransition;
+import javafx.animation.TranslateTransition;
+import javafx.fxml.FXML;
+import javafx.geometry.Point2D;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
+import javafx.scene.control.Tooltip;
+import javafx.stage.Window;
+import javafx.util.Duration;
+
+/**
+ * Controlador para el diálogo de edición de valor de un componente. 
+ * Permite establecer y recuperar el valor ingresado, incluyendo su unidad.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DialogEditarValorController {
+	private static final Logger logger=Logger.getLogger(DialogEditarValorController.class.getName());
+	
+	@FXML private TextField valorField;
+	@FXML private ComboBox<String> unidadCombo;
+	@FXML private Label labelUnidad, labelValor;
+	
+	private boolean confirmado=false;
+	private List<String> unidadesDisponibles;
+	private Map<String, Double> factores;
+	
+	@FXML
+	public void initialize() {
+		var filter=new TextFormatter<String>(cambio -> {
+			String texto=cambio.getControlNewText();
+			if(texto.isEmpty() || texto.equals("-") || texto.equals("+")) {
+				return cambio;
+			}
+			if(texto.matches("[-+]?[0-9]*([.,][0-9]*)?([eE][-+]?[0-9]+)?(\\/[-+]?[0-9]*([.,][0-9]*)?)?")) {
+				return cambio;
+			}
+			return null;
+		});
+		valorField.setTextFormatter(filter);
+	}
+	
+	/**
+	 * Establece las unidades disponibles y sus factores de conversión según el componente.
+	 * Si no hay unidades, se ocultan los controles relacionados.
+	 * 
+	 * @param unidades			Lista de unidades según componente
+	 * @param factores			Factores de conversión para cada unidad
+	 */
+	public void setUnidadesDisponibles(List<String> unidades, Map<String, Double> factores) {
+		this.unidadesDisponibles=unidades;
+		this.factores=factores;
+		if(unidades==null || unidades.isEmpty()) {
+			//Ocultar label y comboBox
+			mostrarCajaUnidades(false);
+			logger.log(Level.FINE, "Sin unidades disponibles, ocultando combo");
+		} else {
+			//Mostrar el label y llenar el comboBox
+			mostrarCajaUnidades(true);
+			unidadCombo.getItems().setAll(unidades);
+			unidadCombo.setValue(unidades.get(0));
+			logger.log(Level.FINE, "Unidades asignadas: {0}", unidades);
+		}
+	}
+	
+	/**
+	 * Establece el valor inicial mostrado, incluyendo la unidad si está disponible.
+	 * 
+	 * @param valorBase					Valor actual del componente (antes de modificar)
+	 * @param sufijoActual				Unidad actual (si es {@code null} se usa la unidad base por defecto)
+	 */
+	public void setValorInicial(double valorBase, String sufijoActual) {
+		if(unidadesDisponibles==null || unidadesDisponibles.isEmpty()) {
+			valorField.setText(String.valueOf(valorBase));
+			return;
+		}
+		
+		if(sufijoActual==null || !unidadesDisponibles.contains(sufijoActual)) {
+			logger.log(Level.WARNING, "Sufijo inicial inválido: {0}, usando el primero", sufijoActual);
+			sufijoActual=unidadesDisponibles.get(0);
+		}
+		
+		Double factor=factores.getOrDefault(sufijoActual, 1.0);
+		double mostrado=valorBase/factor;
+		valorField.setText(String.valueOf(mostrado));
+		unidadCombo.setValue(sufijoActual);
+	}
+	
+	/**
+	 * Devuelve el valor introducido convertido a la unidad base.
+	 * 
+	 * @return Optional con valor base si es válido, si no vacío.
+	 */
+	public Optional<Double> getValorBase() {
+		String texto=valorField.getText().trim();
+		if(texto.isEmpty()) return Optional.empty();
+		
+		try {
+			double numero=parsearNumero(texto);
+			if(unidadesDisponibles==null || unidadesDisponibles.isEmpty()) {
+				return UnidadConverter.evaluarTexto(texto);
+			}
+			String sufijo=unidadCombo.getValue();
+			if(sufijo==null) return Optional.empty();
+			Double factor=factores!=null ? factores.getOrDefault(sufijo, 1.0) : 1.0;
+			return Optional.of(numero*factor);
+		} catch (NumberFormatException ex) {
+			logger.log(Level.FINE, "Texto no numérico: {0}", texto);
+			return Optional.empty();
+		} catch (Exception e) {
+			logger.log(Level.WARNING, "Error al convertir texto: "+texto, e);
+			return Optional.empty();
+		}
+	}
+	
+	/**
+	 * Parsea el string permitiendo fracciones.
+	 * 
+	 * @param texto				Texto a parsear
+	 * @return número double parseado
+	 * @throws NumberFormatException División por cero
+	 */
+	private double parsearNumero(String texto) throws NumberFormatException {
+		String limpio=texto.replace(',', '.');
+		if(limpio.contains("/")) {
+			String[] partes=limpio.split("/");
+			if(partes.length==2) {
+				double numerador=Double.parseDouble(partes[0]);
+				double denominador=Double.parseDouble(partes[1]);
+				if(denominador==0) throw new NumberFormatException("División por cero");
+				return numerador/denominador;
+			} else if(partes.length==1 && limpio.endsWith("/")) {
+				return Double.parseDouble(partes[0]);
+			}
+		}
+		return Double.parseDouble(limpio);
+	}
+	
+	/**
+	 * Permite modificar el valor de la etiqueta de "Valor"
+	 * 
+	 * @param texto				Texto a modificar
+	 */
+	public void setLabel(String texto) {
+		labelValor.setText(texto);
+	}
+	
+	/**
+	 * Indica si el usuario ha confirmado el diálogo
+	 * 
+	 * @return true si se ha confirmado, false si no 
+	 */
+	public boolean isConfirmado() {
+		return confirmado;
+	}
+	
+	/**
+	 * Acción una vez que se pulsa "Aceptar" en la ventana.
+	 */
+	@FXML
+	private void onAceptar() {
+		try {
+			parsearNumero(valorField.getText());
+			confirmado=true;
+			cerrarVentana();
+			logger.log(Level.FINE, "Diálogo aceptado con valor: "+valorField.getText());
+		} catch(NumberFormatException e) {
+			logger.fine("Error de validación en diálogo: "+e.getMessage());
+			animarError();
+			if(e.getMessage().contains("cero")) {
+				mostrarTooltipError("No se puede dividir por cero");
+			}
+		}
+	}
+	
+	/**
+	 * Acción una vez que se pulsa "Cancelar" en el diálogo.
+	 */
+	@FXML
+	private void onCancelar() {
+		confirmado=false;
+		cerrarVentana();
+		logger.log(Level.FINE, "Diálogo cancelado");
+	}
+	
+	/**
+	 * Cierra la ventana que contiene este controlador.
+	 */
+	private void cerrarVentana() {
+		var scene=valorField.getScene();
+		if(scene==null) return;
+		Window w=scene.getWindow();
+		if(w!=null) w.hide();
+	}
+	
+	/**
+	 * Muestra la caja de unidades dentro de la ventana o no, según el componente.
+	 * 
+	 * @param mostrar		true para mostrar, false para ocultar
+	 */
+	private void mostrarCajaUnidades(boolean mostrar) {
+		labelUnidad.setVisible(mostrar);
+		labelUnidad.setManaged(mostrar);
+		unidadCombo.setVisible(mostrar);
+		unidadCombo.setManaged(mostrar);
+	}
+	
+	/**
+	 * Realiza una pequeña animación visual en caso de error al introducir valores en 
+	 * el diálogo.
+	 */
+	private void animarError() {
+		TranslateTransition tt=new TranslateTransition(Duration.millis(60), valorField);
+		tt.setByX(10f);
+		tt.setCycleCount(4);
+		tt.setAutoReverse(true);
+		tt.play();
+		String originalStyle=valorField.getStyle();
+		valorField.setStyle("-fx-border-color: red; -fx-border-width: 2px; -fx-text-fill: red;");
+		valorField.textProperty().addListener((_, _, _) -> {
+			valorField.setStyle(originalStyle);
+		});
+	}
+	
+	/**
+	 * Muestra un pequeño mensaje en caso de error al introducir valores en el diálogo.
+	 * 
+	 * @param mensaje			Mensaje de error
+	 */
+	private void mostrarTooltipError(String mensaje) {
+		Tooltip tt=new Tooltip(mensaje);
+		tt.setStyle("-fx-background-color: #ffcccc; -fx-text-fill: red;");
+		Point2D p=valorField.localToScreen(valorField.getLayoutBounds().getMinX(), valorField.getLayoutBounds().getMaxY());
+		tt.show(valorField, p.getX(), p.getY()+5);
+		tt.setAutoHide(true);
+		new PauseTransition(Duration.seconds(2)).setOnFinished(_->tt.hide());
+	}
+}

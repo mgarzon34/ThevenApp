@@ -1,0 +1,33 @@
+package com.circuitos.analisiscircuitos.gui.model;
+
+/**
+ * Enumerado que contiene los tipos de nodos diferentes para aplicar los cambios.
+ */
+public enum NodeField {
+	NEGATIVO("Modificar el número de nodo negativo:", "Nodo negativo:", false),
+	POSITIVO("Modificar el número de nodo positivo:", "Nodo positivo:", false),
+	CONTROL_NEG("Modificar el nodo de control negativo:", "Control negativo:", true),
+	CONTROL_POS("Modificar el nodo de control positivo:", "Control positivo:", true),
+	TIERRA("Modificar el nodo de tierra:", "Nodo Tierra:", true);
+	
+	private final String header, content;
+	private final boolean confirm;
+	
+	/**
+	 * Constructor del enumerado.
+	 * 
+	 * @param header			Encabezado
+	 * @param content			Contenido del diálogo
+	 * @param confirmation		Confirmacion
+	 */
+	NodeField(String header, String content, boolean confirmation) {
+		this.header=header;
+		this.content=content;
+		this.confirm=confirmation;
+	}
+	
+	/* Getters */
+	public String getHeader() { return header; }
+	public String getContent() { return content; }
+	public boolean confirmation() { return confirm; }
+}

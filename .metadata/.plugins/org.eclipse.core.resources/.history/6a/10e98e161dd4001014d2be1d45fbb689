@@ -1,0 +1,676 @@
+package com.circuitos.analisiscircuitos.gui.controller;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.util.GestorIds;
+import com.circuitos.analisiscircuitos.gui.builder.ComponenteVisualFactory;
+import com.circuitos.analisiscircuitos.gui.commands.AddComponentCommand;
+import com.circuitos.analisiscircuitos.gui.commands.CompositeCommand;
+import com.circuitos.analisiscircuitos.gui.commands.RemoveCableCommand;
+import com.circuitos.analisiscircuitos.gui.commands.RemoveComponentCommand;
+import com.circuitos.analisiscircuitos.gui.commands.RemoveConnectionPointCommand;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.cable.CableManager;
+import com.circuitos.analisiscircuitos.gui.service.design.DisenoCircuitoService;
+import com.circuitos.analisiscircuitos.gui.service.design.NodoProximidadValidator;
+import com.circuitos.analisiscircuitos.gui.service.io.CircuitoDeserializerService;
+import com.circuitos.analisiscircuitos.gui.service.nodes.NodoManager;
+import com.circuitos.analisiscircuitos.gui.service.state.VisualOptionsService;
+import com.circuitos.analisiscircuitos.gui.service.undo.UndoRedoManager;
+import com.circuitos.analisiscircuitos.gui.util.CircuitDesignUtil;
+import com.circuitos.analisiscircuitos.gui.util.CircuitoRender;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil;
+import com.circuitos.analisiscircuitos.gui.util.MensajesUI;
+import com.circuitos.analisiscircuitos.gui.util.SeleccionManager;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil.Contexto;
+
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.SplitPane;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.util.Duration;
+
+/**
+ * Controlador del área de diseño del circuito.
+ * Permite arrastrar componentes, conectarlos, mostrarlos gráficamente, 
+ * eliminar componentes, seleccionar para edición y mostrar sus propiedades.
+ * 
+ * @author Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class PanelDisenoController {
+	private static final Logger logger=Logger.getLogger(PanelDisenoController.class.getName());
+	
+	@FXML private SplitPane splitPane;
+	@FXML private AnchorPane rootDiseno;
+	@FXML private Pane zonaDibujo;
+	@FXML private AnchorPane panelPropiedadesContainer;
+	@FXML private PanelPropiedadesController panelPropiedadesController;
+
+	private CableManager cableManager;
+	private CircuitDesignUtil circuitUtil;
+	private DisenoCircuitoService disenoService;
+	private Consumer<Componente> onSeleccionarComponente;
+	private SeleccionManager selManager;
+	private Circuito circuitoActual;
+	private ConectorPuntos conector;
+	private final NodoManager nodoManager=new NodoManager(); //Gestor de nodos eléctricos
+	
+	private final javafx.beans.property.BooleanProperty hayContenido=new javafx.beans.property.SimpleBooleanProperty(false);
+	private final javafx.beans.property.BooleanProperty haySeleccion=new javafx.beans.property.SimpleBooleanProperty(false);
+	
+	/**
+	 * Inicializa el área de diseño. Recibe arrastre, selección y eliminación.
+	 */
+	@FXML
+	public void initialize() {
+		logger.info("Inicializando PanelDisenoController");
+		configurarControladoresEventos();
+		inicializarServicios();
+		InteraccionComponenteUtil.setSeleccionSupplier(() -> selManager.getSeleccionados());
+		zonaDibujo.setFocusTraversable(true);
+		VisualOptionsService.setAllOptions(true, true, true); 	//En diseño, las etiquetas se muestran por defecto
+		ocultarPropiedadesPanel();
+		this.circuitoActual=new Circuito();
+	}
+	
+	/**
+	 * Inicia los servicios que se van a utilizar en el controlador.
+	 */
+	private void inicializarServicios() {
+		logger.fine("Inicializando servicios de interfaz de usuario");
+		conector=new ConectorPuntos(zonaDibujo, nodoManager);
+		cableManager=new CableManager(zonaDibujo, conector, nodoManager, UndoRedoManager.getInstance());
+		circuitUtil=new CircuitDesignUtil(zonaDibujo, cableManager, onSeleccionarComponente);
+		disenoService=new DisenoCircuitoService(zonaDibujo, nodoManager, circuitUtil);
+		selManager=new SeleccionManager(zonaDibujo);
+		selManager.setNormalizador(this::resolverNodoSeleccionable);
+		zonaDibujo.getChildren().addListener((javafx.collections.ListChangeListener<Node>) _ -> {
+			hayContenido.set(!zonaDibujo.getChildren().isEmpty());
+		});
+		hayContenido.set(!zonaDibujo.getChildren().isEmpty());
+		actualizarHaySeleccion();
+	}
+	
+	/**
+	 * Registra todos los controladores de eventos.
+	 */
+	private void configurarControladoresEventos() {
+		logger.fine("Configurando enventos UI");
+		configurarPropiedadesListener();
+		configurarEventosSeleccion();
+		configurarEventosTeclado();
+		configurarDropTarget();
+	}
+	
+	/**
+	 * Configura el panel de propiedades de los componentes.
+	 * Aparece cuando se selecciona un componente.
+	 */
+	private void configurarPropiedadesListener() {
+		InteraccionComponenteUtil.setListener(Contexto.DISENO, obj -> {
+			if(obj instanceof Componente comp) {
+				logger.log(Level.FINE, "Componente seleccionado: {0}", comp.getId());
+				panelPropiedadesController.mostrarPropiedades(comp);
+				mostrarPropiedadesPanel();
+			} else if(obj instanceof Cable cable) {
+				logger.log(Level.FINE, "Cable seleccionado: {0}", cable.getId());
+				panelPropiedadesController.mostrarPropiedades(cable);
+				mostrarPropiedadesPanel();
+			} else {
+				logger.fine("Selección vacía, ocultando panel de propiedades");
+				ocultarPropiedadesPanel();
+			}
+		});
+	}
+	
+	/**
+	 * Muestra u oculta el panel de propiedades de los componentes.
+	 * 
+	 * @param s			Valor booleano para decidir si mostrar u ocultar el panel
+	 */
+	public void mostrarPanelPropiedades(boolean mostrar) {
+		panelPropiedadesContainer.setVisible(mostrar);
+		panelPropiedadesContainer.setManaged(mostrar);
+		if(mostrar)
+			splitPane.setDividerPositions(0.75);
+		else
+			splitPane.setDividerPositions(1.0);
+	}
+	
+	/**
+	 * Configura el comportamiento al hacer click fuera de los componentes.
+	 */
+	private void configurarEventosSeleccion() {
+		zonaDibujo.setOnMousePressed(e -> {
+			Node target=resolverNodoSeleccionable((Node) e.getTarget());
+			boolean multi=e.isMetaDown() || e.isControlDown(); //Cmd(Mac) / Ctrl(Win)
+			zonaDibujo.requestFocus();
+			if(target==zonaDibujo || target==null) {
+				//Click/drag en vacío inicia caja.
+				if(!multi) {
+					boolean hayAlgoSeleccionado=!selManager.getSeleccionados().isEmpty() ||
+														InteraccionComponenteUtil.getSeleccionado()!=null;
+					if(hayAlgoSeleccionado) {
+						selManager.limpiarSeleccion();
+						InteraccionComponenteUtil.seleccionar(null);
+						mostrarPanelPropiedades(false);
+						actualizarHaySeleccion();
+					}
+				}
+				selManager.iniciarCaja(e.getX(), e.getY());
+				return;
+			}
+			if(multi) {
+				selManager.toggleSeleccion(target);
+				if(selManager.getSeleccionados().contains(target)) {
+					InteraccionComponenteUtil.seleccionar(target);
+					if(target.getUserData() instanceof Componente comp) {
+						panelPropiedadesController.mostrarPropiedades(comp);
+						mostrarPanelPropiedades(true);
+					} else if(target instanceof Cable cable) {
+						panelPropiedadesController.mostrarPropiedades(cable);
+						mostrarPanelPropiedades(true);
+					}
+				} else {
+					if(InteraccionComponenteUtil.getSeleccionado()==target) {
+						InteraccionComponenteUtil.seleccionar(null);
+						mostrarPanelPropiedades(false);
+					}
+				}
+				actualizarHaySeleccion();
+			} else {
+				if(!selManager.getSeleccionados().contains(target)) {
+					selManager.limpiarSeleccion();
+					selManager.seleccionar(target);
+				}
+				if(target.getUserData() instanceof Componente comp) {
+					InteraccionComponenteUtil.seleccionar(target);
+					panelPropiedadesController.mostrarPropiedades(comp);
+					mostrarPanelPropiedades(true);
+				} else if(target instanceof Cable cable) {
+					InteraccionComponenteUtil.seleccionar(target);
+					panelPropiedadesController.mostrarPropiedades(cable);
+					mostrarPanelPropiedades(true);
+				} else {
+					InteraccionComponenteUtil.seleccionar(null);
+					mostrarPanelPropiedades(false);
+				}
+				actualizarHaySeleccion();
+			}
+		});
+		zonaDibujo.setOnMouseDragged(e -> selManager.actualizarCaja(e.getX(), e.getY()));
+		zonaDibujo.setOnMouseReleased(_ -> {
+			if(selManager.finalizarCaja()) {
+				if(InteraccionComponenteUtil.getSeleccionado()!=null) {
+					InteraccionComponenteUtil.seleccionar(null);
+				}
+				mostrarPanelPropiedades(false);
+				actualizarHaySeleccion();
+			}
+			NodoProximidadValidator.fusionarNodosCercanos(zonaDibujo, conector);
+		});
+	}
+	
+	/**
+	 * Configura el teclado para eliminación de un componente con la tecla retroceso.
+	 * Muestra un mensaje de advertencia al eliminar componente.
+	 */
+	private void configurarEventosTeclado() {
+		zonaDibujo.setOnKeyPressed(e -> {
+			if(e.getCode()==KeyCode.BACK_SPACE || e.getCode()==KeyCode.DELETE) {
+				if(!selManager.getSeleccionados().isEmpty()) {
+					eliminarSeleccionados();		//múltiple
+				} else {
+					eliminarSeleccionado();		//simple
+				}
+				actualizarHaySeleccion();
+			}
+		});
+	}
+	
+	/**
+	 * Elimina todos los elementos actualmente seleccionados (componentes, cables y puntos).
+	 */
+	private void eliminarSeleccionados() {
+		var seleccion=selManager.getSeleccionados();
+		if(seleccion.isEmpty()) return;
+		
+		CompositeCommand macro=new CompositeCommand("Eliminar "+seleccion.size()+ " elemento(s)");
+		var objetivos=new ArrayList<>(seleccion); //copia defensiva
+		for(Node n : objetivos) {
+			try {
+				if(n instanceof Cable c) {
+					macro.add(new RemoveCableCommand(c, zonaDibujo, getCablesCircuito()));
+				} else if(n.getUserData() instanceof Componente comp) {
+					macro.add(new RemoveComponentCommand(this, comp));
+				} else if(n instanceof PuntoConexion pc) {
+					if(pc.getComponente()==null) {
+						macro.add(new RemoveConnectionPointCommand(pc, zonaDibujo, cableManager));
+					} else {
+						logger.fine("Punto de componente ignorado en eliminación múltiple: "+pc);
+					}
+				}
+			} catch(Exception ex) {
+				logger.log(Level.WARNING, "Error eliminando seleccionado: "+n, ex);
+			}
+		}
+		UndoRedoManager.getInstance().ejecutarComando(macro);
+		cableManager.limpiarPuntosConexionHuerfanosGlobal();
+		cableManager.limpiarPuntosConexionHuerfanosEscena();
+		cableManager.fusionarCables(null);
+		selManager.limpiarSeleccion();
+		InteraccionComponenteUtil.seleccionar(null);
+		mostrarPanelPropiedades(false);
+		UndoRedoManager.getInstance().limpiarComandosInvalidos();
+		actualizarHaySeleccion();
+		
+		logger.info("Eliminación múltiple completada.");
+	}
+	
+	/**
+	 * Sube por el árbol de nodos hasta encontrar algo seleccionable ya sea un 
+	 * cable, un stackPane con componente o un punto de conexión.
+	 * 
+	 * @param n				Nodo de partida
+	 * @return nodo seleccionable o {@code null} si no encuentra.
+	 */
+	private Node resolverNodoSeleccionable(Node n) {
+		Node p=n;
+		while(p!=null) {
+			if(p instanceof Cable) return p;
+			if(p instanceof PuntoConexion) return p;
+			if(p instanceof StackPane sp && sp.getUserData() instanceof Componente) return sp;
+			if(p==zonaDibujo) break;
+			p=p.getParent();
+		}
+		return null;
+	}
+	
+	/**
+	 * Configura el área de dibujo para aceptar elementos arrastrados desde el panel de componentes.
+	 */
+	private void configurarDropTarget() {
+		rootDiseno.setOnDragOver(event -> {
+			if(event.getGestureSource()!=rootDiseno && event.getDragboard().hasImage()) {
+				event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+			}
+			event.consume();
+		});
+		rootDiseno.setOnDragDropped(this::manejarDrop);
+	}
+	
+	/**
+	 * Permite manejar la acción de "soltar" un componente en la zona de dibujo creando su copia visual
+	 * en el área de dibujo. 
+	 * 
+	 * @param event			Evento que gestiona la acción de "soltar"
+	 */
+	private void manejarDrop(DragEvent event) {
+		logger.log(Level.FINE, "Evento drop detectado en posicion({0}, {1})", new Object[] {event.getX(), event.getY()});
+		if(this.circuitoActual==null) {
+			crearNuevoCircuito();
+		}
+		var db=event.getDragboard();
+		boolean exito=false;
+		
+		if(db.hasImage() && db.hasString()) {
+			String tipo=db.getString();
+			if("tierra.png".equals(tipo) && disenoService.existeTierra()) {
+				logger.warning("Intento de añadir segunda Tierra");
+				MensajesUI.mostrarMensaje(zonaDibujo, 
+						"¡Sólo puede haber una Tierra en el circuito!", 
+						MensajesUI.TipoMensaje.INFO, 
+						MensajesUI.PosicionMensaje.TOP, 
+						Duration.seconds(2));
+				event.setDropCompleted(false);
+				event.consume();
+				return;
+			}
+			try {
+				UndoRedoManager.getInstance().ejecutarComando(
+						new AddComponentCommand(this, tipo, event.getX(), event.getY()));
+				exito=true;
+				MensajesUI.mostrarMensaje(
+						zonaDibujo, 
+						"Componente añadido al circuito", 
+						MensajesUI.TipoMensaje.EXITO, 
+						MensajesUI.PosicionMensaje.TOP, 
+						Duration.seconds(2));
+				NodoProximidadValidator.fusionarNodosCercanos(zonaDibujo, conector);
+			} catch(Exception ex) {
+				logger.log(Level.SEVERE, "Error al ejecutar AddComponentCommand", ex);
+				exito=false;
+				MensajesUI.mostrarMensaje(
+						zonaDibujo, 
+						"Error añadiendo componente", 
+						MensajesUI.TipoMensaje.ERROR, 
+						MensajesUI.PosicionMensaje.TOP, 
+						Duration.seconds(2));
+			}
+		}
+		event.setDropCompleted(exito);
+		event.consume();
+		logger.log(Level.FINE, "Drop procesado con éxito -> "+exito);
+	}
+	
+	/**
+	 * Elimina el componente seleccionado y actualiza el modelo
+	 */
+	private void eliminarSeleccionado() {
+		Node seleccionado = InteraccionComponenteUtil.getSeleccionado();
+		if(seleccionado==null) return;
+		/* Para eliminar cables */
+		if(seleccionado instanceof Cable cable) {
+			UndoRedoManager.getInstance().ejecutarComando(
+					new RemoveCableCommand(cable, zonaDibujo, getCablesCircuito()));
+			logger.log(Level.INFO, "Cable eliminado (undo/redo): {0}", cable.getCableId());
+			actualizarHaySeleccion();
+			return;
+		}
+		Object dato=seleccionado.getUserData();
+		/* Para eliminar puntos de conexión intermedios */
+		if(seleccionado instanceof PuntoConexion pc && pc.getComponente()==null) {
+			UndoRedoManager.getInstance().ejecutarComando(
+					new RemoveConnectionPointCommand(pc, zonaDibujo, cableManager));
+			logger.info("Punto de conexión intermedio eliminado (undo/redo).");
+			actualizarHaySeleccion();
+			return;
+		}
+		/* Para eliminar componente */
+		if(dato instanceof Componente comp) {
+			UndoRedoManager.getInstance().ejecutarComando(
+					new RemoveComponentCommand(this,comp));
+			logger.log(Level.INFO, "Componente eliminado (undo/redo): {0}", comp.getId());
+			actualizarHaySeleccion();
+			return;
+		}
+		try {
+			disenoService.eliminarSeleccionado(seleccionado);
+		    InteraccionComponenteUtil.seleccionar(null);
+		    panelPropiedadesController.mostrarPropiedades((Componente) null);
+		    panelPropiedadesController.mostrarPropiedades((Cable) null);
+		    UndoRedoManager.getInstance().limpiarComandosInvalidos();
+		    actualizarHaySeleccion();
+		} catch(Exception ex) {
+			logger.log(Level.WARNING, "Error eliminando nodo genérico", ex);
+		}
+	}
+	
+	/**
+	 * Crea una copia del componente visual así como el componente del dominio. 
+	 * Para ello usa la clase {@link ComponenteVisualFactory}.
+	 * 
+	 * @param tipo				Tipo de componente a crear
+	 * @param x					Coordenada X donde se creará
+	 * @param y					Coordenada Y donde se creará
+	 * @return Panel con el componente creado
+	 */
+	public StackPane crearComponenteVisual(String tipo, double x, double y) {
+		return ComponenteVisualFactory.crearVisual(tipo, x, y, conector, rootDiseno, onSeleccionarComponente,
+				(comp) -> {
+					if(cableManager!=null) {
+						cableManager.actualizarConexiones(comp);
+					}
+				}
+			);
+	}
+	
+	/**
+	 * Define una acción que se ejecuta cuando se selecciona un componente.
+	 * 
+	 * @param listener		Escuchador de componente seleccionado o null
+	 */
+	public void setOnSeleccionarComponente(Consumer<Componente> listener) {
+		this.onSeleccionarComponente=listener;
+		if(circuitoActual!=null) {
+			inicializarServicios();
+		}
+		logger.fine("Listener de selección de componente actualizado");
+	}
+	
+	/**
+	 * Obtiene la zona de dibujo.
+	 * 
+	 * @return Zona de dibujo
+	 */
+	public Pane getZonaDibujo() {
+		return zonaDibujo;
+	}
+
+	/**
+	 * Obtiene el gestor de puntos de conexión del circuito.
+	 * 
+	 * @return {@link ConectorPuntos} asociado al área de diseño
+	 */
+	public ConectorPuntos getConector() {
+		return conector;
+	}
+	
+	/**
+	 * Obtiene el nodo raíz del área de diseño (AnchorPane superior).
+	 * 
+	 * @return Contenedor raíz del área de diseño
+	 */
+	public AnchorPane getRootDiseno() {
+		return rootDiseno;
+	}
+	
+	/**
+	 * Devuelve el listener que se invoca al seleccionar un componente.
+	 * 
+	 * @return Listener de componente seleccionado.
+	 */
+	public Consumer<Componente> getOnSeleccionarComponente() {
+		return onSeleccionarComponente;
+	}
+	
+	/**
+	 * Devuelve el gestor de cables visuales.
+	 * 
+	 * @return {@link CableManager} gestor de cables.
+	 */
+	public CableManager getCableManager() {
+		return cableManager;
+	}
+	
+	/**
+	 * Crea un nuevo circuito vacío y reinicia el área de diseño.
+	 */
+	public void crearNuevoCircuito() {
+		logger.info("Creando nuevo circuito");
+		this.circuitoActual=new Circuito();
+		nodoManager.reset();
+		inicializarServicios();
+		disenoService.reiniciar();
+		if(cableManager!=null) {
+			cableManager.limpiarTodos();
+		}
+		GestorIds.reset();
+		panelPropiedadesController.mostrarPropiedades((Componente) null);
+		panelPropiedadesController.mostrarPropiedades((Cable) null);
+		mostrarPanelPropiedades(false);
+		MensajesUI.mostrarMensaje(
+				zonaDibujo, 
+				"Nuevo circuito creado", 
+				MensajesUI.TipoMensaje.EXITO, 
+				MensajesUI.PosicionMensaje.TOP, 
+				Duration.seconds(2)
+		);
+		logger.info("Nuevo circuito creado correctamente");
+	}
+	
+	/**
+	 * Obtiene el circuito actual.
+	 * 
+	 * @return circuito		Circuito actual
+	 */
+	public Circuito getCircuitoActual() {
+		return circuitoActual;
+	}
+	
+	/**
+	 * Indica si el área de diseño está vacía.
+	 * 
+	 * @return true si no hay circuito o no hay elementos visibles
+	 */
+	public boolean estaVacio() {
+		return circuitoActual==null || zonaDibujo.getChildren().isEmpty();
+	}
+	
+	/**
+	 * Actualiza los puntos de conexión del diseño tras reasignación de nodos 
+	 * realizada por {@link NodoManager#reordenarTierra}
+	 * 
+	 * @param reasignacion		Mapa que contiene para cada nodo su nueva asignación (Nodo tierra valor 0)
+	 */
+	public void actualizarPuntosConexion(Map<Integer, Integer> reasignacion) {
+		disenoService.actualizarNodos(reasignacion);
+		logger.fine("Nodos reasignados");
+	}
+	
+	/**
+	 * Carga un circuito guardado en el área de diseño. 
+	 * Previamente elimina elementos visuales y reinicia servicios.
+	 * 
+	 * @param Circuito a cargar
+	 */
+	public void cargarCircuito(Circuito circuito) {
+		logger.log(Level.INFO, "Cargando circuito existente: "+circuito.hashCode());
+	    this.circuitoActual=circuito;
+	    nodoManager.reset();
+	    disenoService.reiniciar();
+	    inicializarServicios();
+	    zonaDibujo.getChildren().clear();
+	    panelPropiedadesController.mostrarPropiedades((Componente) null);
+	    mostrarPanelPropiedades(false);
+	    logger.info("Circuito cargado con éxito");
+	}
+	
+	/**
+	 * Carga un circuito directamente desde una cadena (String) JSON (se usa en ejercicios).
+	 * 
+	 * @param json			Cadena de texto JSON
+	 */
+	public void cargarCircuitoDesdeJson(String json) {
+		try {
+			var deserializer=new CircuitoDeserializerService();
+			var renderer=new CircuitoRender(this);
+			var dto=deserializer.cargarCircuitoTexto(json);
+			renderer.renderizarDesdeDTO(dto);
+			logger.info("Circuito cargado desde JSON correctamente");
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error cargando circuito desde JSON", e);
+			MensajesUI.mostrarMensaje(zonaDibujo, "Error al cargar el ejercicio", 
+					MensajesUI.TipoMensaje.ERROR, MensajesUI.PosicionMensaje.TOP, Duration.seconds(3));
+		}
+	}
+	
+	/**
+	 * Muestra el panel de propiedades.
+	 */
+	private void mostrarPropiedadesPanel() {
+		panelPropiedadesContainer.setVisible(true);
+		panelPropiedadesContainer.setManaged(true);
+		splitPane.setDividerPositions(0.75);
+	}
+	
+	/**
+	 * Oculta el panel de propiedades.
+	 */
+	private void ocultarPropiedadesPanel() {
+		panelPropiedadesContainer.setVisible(false);
+		panelPropiedadesContainer.setManaged(false);
+		splitPane.setDividerPositions(1.0);
+	}
+	
+	/**
+	 * Obtiene la lista de cables del circuito.
+	 * 
+	 * @return Lista de cables del circuito
+	 */
+	public List<Cable> getCablesCircuito() {
+		if(cableManager==null) {
+			logger.warning("CableManager aún no inicializado - devolviendo lista vacía.");
+			return Collections.emptyList();
+		}
+		return cableManager.getCables();
+	}
+	
+	/**
+	 * Permite seleccionar todos los elementos del área de dibujo.
+	 */
+	public void seleccionarTodo() {
+		if(selManager==null) return;
+		selManager.limpiarSeleccion();
+		for(Node n : zonaDibujo.getChildren()) {
+			Node t=resolverNodoSeleccionable(n);
+			if(t==null) continue;
+			selManager.seleccionar(t);
+		}
+		InteraccionComponenteUtil.seleccionar(null);
+		mostrarPanelPropiedades(false);
+		zonaDibujo.requestFocus();
+		actualizarHaySeleccion();
+	}
+	
+	/**
+	 * Limpia cualquier selección actual y oculta el panel de propiedades.
+	 */
+	public void deseleccionarTodo() {
+		if(selManager==null) return;
+		selManager.limpiarSeleccion();
+		InteraccionComponenteUtil.seleccionar(null);
+		mostrarPanelPropiedades(false);
+		zonaDibujo.requestFocus();
+		actualizarHaySeleccion();
+	}
+	
+	/**
+	 * Elimina todo lo que haya en el área de dibujo.
+	 */
+	public void limpiarAreaDibujo() {
+		seleccionarTodo();
+		eliminarSeleccionados();
+		nodoManager.reset();
+		disenoService.reiniciar();
+		actualizarHaySeleccion();
+		logger.info("Área de dibujo limpia y nodos resetados.");
+	}
+	
+	/**
+	 * Propiedad observable sobre si hay elementos en el área de dibujo.
+	 */
+	public javafx.beans.property.BooleanProperty hayContenidoProperty() {
+		return hayContenido;
+	}
+	
+	/**
+	 * Propiedad observable sobre si hay algún elemento seleccionado.
+	 */
+	public javafx.beans.property.BooleanProperty haySeleccionProperty() {
+		return haySeleccion;
+	}
+	
+	/**
+	 * Actualiza la propiedad observable de haySeleccion cuando hay algún elemento seleccionado.
+	 */
+	private void actualizarHaySeleccion() {
+		boolean seleccionado=selManager!=null && !selManager.getSeleccionados().isEmpty();
+		haySeleccion.set(seleccionado);
+	}
+}

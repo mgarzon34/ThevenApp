@@ -1,0 +1,58 @@
+package com.circuitos.analisiscircuitos.dto;
+
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
+/**
+ * Clase que crea una serie de metadatos para introducir en los archivos creados
+ * por la aplicación de formato JSON.
+ * Incluye nombre de la aplicación, su versión y fecha y hora de creación del archivo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class Metadata {
+	private static final DateTimeFormatter FECHA_HORA=
+			DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss z (XXX)");
+	private final String app;
+	private final String version;
+	private final String creacion;
+	
+	/**
+	 * Constructor.
+	 */
+	public Metadata() {
+		ZonedDateTime ahora=ZonedDateTime.now(ZoneId.systemDefault());
+		this.app="ThevenApp";
+		this.version="1.0";
+		this.creacion=ahora.format(FECHA_HORA);
+	}
+	
+	/**
+	 * Obtiene el nombre de la aplicación.
+	 * 
+	 * @return app Nombre de la aplicación
+	 */
+	public String getApp() {
+		return app;
+	}
+	
+	/**
+	 * Obtiene la versión de la aplicación.
+	 * 
+	 * @return version Versión de la aplicación
+	 */
+	public String getVersion() {
+		return version;
+	}
+	
+	/**
+	 * Obtiene la fecha y hora de creación del archivo.
+	 * 
+	 * @return creacion Fecha y hora de creación
+	 */
+	public String getCreacion() {
+		return creacion;
+	}
+}

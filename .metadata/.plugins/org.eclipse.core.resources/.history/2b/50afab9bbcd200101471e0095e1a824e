@@ -1,0 +1,149 @@
+package com.circuitos.temporal.gui.service.label;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.state.VisualOptionsService;
+
+import javafx.beans.value.ChangeListener;
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.Pane;
+
+/**
+ * Servicio para crear y actualizar etiquetas visuales asociadas
+ * a los nodos de los puntos de conexión del circuito.
+ * Muestra un pequeño label con el número de nodo junto al punto de conexión.
+ * Se actualiza automáticamente al moverse o cambiar el nodo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class EtiquetaNodoService {
+	
+	private static final Logger logger=Logger.getLogger(EtiquetaNodoService.class.getName());
+	private static final double OFFSET_X=8.0;
+	private static final double OFFSET_Y=-10.0;
+	
+	private EtiquetaNodoService() { /* NO INSTANCIABLE */ }
+
+    /**
+     * Crea una etiqueta con el número de nodo asociado a un {@link PuntoConexion}.
+     *
+     * @param punto       PuntoConexion al que se asocia la etiqueta
+     * @param zonaDibujo  Pane sobre el que se añade la etiqueta
+     */
+    public static Label crearEtiquetaNodo(PuntoConexion punto, Pane zonaDibujo) {
+    	Label etiqueta=new Label();
+    	etiqueta.setId("etiqueta_nodo_"+punto.hashCode());
+        etiqueta.getStyleClass().add("etiqueta-nodo");
+        etiqueta.visibleProperty().bind(VisualOptionsService.showNodesProperty());
+        
+        Runnable updateText=() -> {
+        	int nodoActual=punto.getNodo(); 			//Prioridad 1: nodo explícito
+        	String texto;
+        	if(nodoActual>=0) {
+        		texto="n"+nodoActual;
+        	} else if(punto.getNet()!=null) {		//Prioridad 2: id de Net
+        		texto="n"+punto.getNet().getId();
+        	} else {
+        		texto="n-";
+        	}
+        	etiqueta.setText(texto);
+        };
+        
+        Runnable updatePos=() -> actualizarPosicion(etiqueta, punto, zonaDibujo);
+        //Cambio del nodo explícito
+        punto.nodoProperty().addListener((_, _, _) -> updateText.run());
+        //Cambios de Net y del id de Net
+        punto.netProperty().addListener((_, oldNet, newNet) -> {
+        	var props=punto.getProperties();
+        	@SuppressWarnings("unchecked")
+			var oldListener=(ChangeListener<Number>) props.get("netIdListener");
+        	if(oldNet!=null && oldListener!=null) {
+        		oldNet.idProperty().removeListener(oldListener);
+        		props.remove("netIdListener");
+        	}
+        	if(newNet!=null) {
+        		ChangeListener<Number> l=(_, _, _) -> updateText.run();
+        		newNet.idProperty().addListener(l);
+        		props.put("netIdListener", l);
+        	}
+        	updateText.run();
+        });
+        if(punto.getNet()!=null) {
+        	ChangeListener<Number> l=(_, _, _) -> updateText.run();
+        	punto.getNet().idProperty().addListener(l);
+        	punto.getProperties().put("netIdListener", l);
+        }
+        updateText.run();
+        updatePos.run();
+        //Reposicionar cuando se mueve
+        punto.sceneProperty().addListener((_, _, s) -> { if(s!=null) updatePos.run();});
+        punto.boundsInParentProperty().addListener((_, _, _) -> updatePos.run());
+        
+        //Añade al panel (una vez)
+        if(etiqueta.getParent()==null) {
+        	zonaDibujo.getChildren().add(etiqueta);
+        }
+        punto.setEtiquetaNodo(etiqueta);
+        return etiqueta;
+    }
+    
+    /**
+     * Actualiza la posición de una etiqueta visual junto al {@link PuntoConexion}
+     * 
+     * @param etiqueta			Etiqueta a posicionar
+     * @param punto				Punto de conexión	
+     * @param zonaDibujo		Área de dibujo donde se encuentra el punto
+     */
+    private static void actualizarPosicion(Label etiqueta, PuntoConexion punto, Pane zonaDibujo) {
+    	try {
+    		Point2D coordsEscena=punto.localToScene(
+    				punto.getBoundsInLocal().getMinX(), 
+    				punto.getBoundsInLocal().getMinY());
+    		Point2D coordsPane=zonaDibujo.sceneToLocal(coordsEscena);
+    		etiqueta.setLayoutX(coordsPane.getX()+OFFSET_X);
+    		etiqueta.setLayoutY(coordsPane.getY()-OFFSET_Y);
+    	} catch(Exception e) {
+    		logger.log(Level.FINER, "No se pudo actualizar posición de etiqueta: "+e.getMessage(), e);
+    	}
+    }
+    
+    /**
+     * Actualiza posición de etiqueta asociada a un punto, si la etiqueta ya existe.
+     * 
+     * @param punto				Punto de conexión
+     * @param zonaDibujo		Área de dibujo donde se encuentra la etiqueta
+     */
+    public static void actualizarEtiquetaNodo(PuntoConexion punto, Pane zonaDibujo) {
+    	Label etiqueta=punto.getEtiquetaNodo();
+    	if(etiqueta==null) return;
+    	int nodoActual=punto.getNodo();
+    	if(nodoActual>=0) {
+    		etiqueta.setText("n"+nodoActual);
+    	} else if(punto.getNet()!=null) {
+    		etiqueta.setText("n"+punto.getNet().getId());
+    	} else {
+    		etiqueta.setText("n-");
+    	}
+    	actualizarPosicion(etiqueta, punto, zonaDibujo);
+    }
+    
+    /**
+     * Actualiza la posición de todas las etiquetas de nodo asociadas a un componente completo.
+     * 
+     * @param componente		Componente cuyos nodos se deben actualizar
+     * @param zonaDibujo		Área de dibujo donde se encuentran las etiquetas
+     */
+    public static void actualizarEtiquetaComponente(Componente componente, Pane zonaDibujo) {
+    	for(Node n : zonaDibujo.getChildren()) {
+    		if(n instanceof PuntoConexion punto && punto.getComponente()==componente) {
+    			actualizarEtiquetaNodo(punto, zonaDibujo);
+    		}
+    	}
+    }
+}

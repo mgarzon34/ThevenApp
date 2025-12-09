@@ -1,0 +1,703 @@
+package com.circuitos.temporal.gui.model;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.service.cable.CableFusionService;
+import com.circuitos.temporal.gui.service.cable.CableGeometriaUtil;
+import com.circuitos.temporal.gui.service.cable.CableInteraccionHandler;
+import com.circuitos.temporal.gui.service.cable.CablePuntosControlManager;
+import com.circuitos.temporal.gui.service.cable.CableSegmentacionService;
+import com.circuitos.temporal.gui.service.cable.CableTrayectoriaCalculator;
+import com.circuitos.temporal.gui.service.label.EtiquetaNodoService;
+import com.circuitos.temporal.gui.util.InteraccionComponenteUtil;
+
+import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.geometry.Point2D;
+import javafx.scene.Group;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.Pane;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Polyline;
+
+/**
+ * Clase que representa un cable gráfico entre dos puntos de conexión.
+ * Permite editar visualmente su trayectoria mediante puntos de control, 
+ * reacciona dinámicamente al movimiento de los componentes conectados y 
+ * cambia su estilo si está seleccionado o desconectado.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class Cable extends Group {
+	private static final Logger logger=Logger.getLogger(Cable.class.getName());
+	private static final String ESTILO_SELECCIONADO="cable-seleccionado";
+	private static final String ESTILO_CONECTADO="cable-conectado";
+	
+	private String id;
+	private final Pane zonaDibujo;
+	private final Polyline cable=new Polyline();
+	private final CablePuntosControlManager puntosControlManager;
+	private final List<PuntoConexion> puntosConexionIntermedios=new ArrayList<>();
+	private final CableInteraccionHandler interaccionHandler;
+	private final List<Label> etiquetasNodo=new ArrayList<>();
+	
+	private final PuntoConexion inicio, fin;
+	private final ConectorPuntos conector;
+	private boolean seleccionado=false;
+	private boolean arrastrandoCodo=false;
+	
+	//Sincronización para actualización de cables
+	private final Object updateLock=new Object();
+	private volatile boolean isUpdating=false;
+	
+	
+	/**
+	 * Crea un cable entre dos puntos de conexión y lo añade al área de dibujo.
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 * @param zonaDibujo		Pane sobre el que se dibuja el cable
+	 * @param conector			Objeto para gestionar la lógica de conexión
+	 */
+	protected Cable(PuntoConexion inicio, 
+				 PuntoConexion fin, 
+				 Pane zonaDibujo, 
+				 ConectorPuntos conector) {
+		this.setPickOnBounds(false);
+		this.inicio=inicio;
+		this.fin=fin;
+		this.conector=conector;
+		this.zonaDibujo=zonaDibujo;
+		this.puntosControlManager=new CablePuntosControlManager(cable, this);
+		this.interaccionHandler=new CableInteraccionHandler(this);
+		interaccionHandler.configurarEventos();
+		this.cable.setFill(null);
+		this.cable.setPickOnBounds(false);
+		this.cable.setMouseTransparent(false);
+		cable.getStyleClass().add(ESTILO_CONECTADO);
+		getChildren().add(cable);
+		crearTrayectoriaInicial(inicio, fin);
+		bindListeners(inicio, fin);
+		insertarPuntoControl();
+		etiquetasNodo.add(EtiquetaNodoService.crearEtiquetaNodo(inicio, zonaDibujo));
+		etiquetasNodo.add(EtiquetaNodoService.crearEtiquetaNodo(fin, zonaDibujo));
+		configurarAutoLimpieza(zonaDibujo);
+		logger.fine("Cable inicializado: "+id);
+	}
+	
+	/**
+	 * Crea un cable entre dos puntos de conexión y lo añade al área de dibujo.
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 * @param zonaDibujo		Pane sobre el que se dibuja el cable
+	 * @param conector			Objeto para gestionar la lógica de conexión
+	 * @param puntosXY			Lista de puntos por donde va el cable
+	 */
+	protected Cable(PuntoConexion inicio, 
+			 	 PuntoConexion fin, 
+			 	 Pane zonaDibujo,
+			 	 ConectorPuntos conector,
+			 	 List<Double> puntosXY) {
+		this.setPickOnBounds(false);
+		this.inicio=inicio;
+		this.fin=fin;
+		this.conector=conector;
+		this.zonaDibujo=zonaDibujo;
+		this.puntosControlManager=new CablePuntosControlManager(cable, this);
+		this.interaccionHandler=new CableInteraccionHandler(this);
+		interaccionHandler.configurarEventos();
+		this.cable.setFill(null);
+		this.cable.setPickOnBounds(false);
+		this.cable.setMouseTransparent(false);
+		cable.getPoints().addAll(puntosXY);
+		cable.getStyleClass().add(ESTILO_CONECTADO);
+		getChildren().add(cable);
+		for(int i=2; i<=puntosXY.size()-4; i+=2) {
+			Point2D p=new Point2D(puntosXY.get(i), puntosXY.get(i+1));
+			puntosControlManager.agregarPuntoControl(p);
+		}
+		puntosControlManager.mostrar(false);
+		bindListeners(inicio, fin);
+		insertarPuntoControl();
+		etiquetasNodo.add(EtiquetaNodoService.crearEtiquetaNodo(inicio, zonaDibujo));
+		etiquetasNodo.add(EtiquetaNodoService.crearEtiquetaNodo(fin, zonaDibujo));
+		configurarAutoLimpieza(zonaDibujo);
+		logger.fine("Cable inicializado: "+id);
+	}
+	
+	/**
+	 * Crea la trayectoria visual inicial del cable a partir de los puntos de conexión.
+	 * Añade los puntos de control y aplica el estilo correspondiente.
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 */
+	private void crearTrayectoriaInicial(PuntoConexion inicio, PuntoConexion fin) {
+		Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+		List<Point2D> puntos=CableTrayectoriaCalculator.calcularTrayectoria(extremos[0], extremos[1], inicio, fin);
+		//Calcula intermedios y crea los codos
+		List<Point2D> intermedios=(puntos!=null && puntos.size()>2)
+				? puntos.subList(1, puntos.size()-1)
+				: Collections.emptyList();	
+		puntosControlManager.agregarPuntosIniciales(intermedios);
+
+		List<Double> ruta=new ArrayList<>();
+		ruta.add(extremos[0].getX());
+		ruta.add(extremos[0].getY());
+		for(Circle c : puntosControlManager.getPuntosControl()) {
+			ruta.add(c.getCenterX());
+			ruta.add(c.getCenterY());
+		}
+		ruta.add(extremos[1].getX());
+		ruta.add(extremos[1].getY());
+		cable.getPoints().setAll(ruta);
+	
+		if(!getChildren().contains(cable))
+			getChildren().add(cable);
+		if(!cable.getStyleClass().contains(ESTILO_CONECTADO))
+			cable.getStyleClass().add(ESTILO_CONECTADO);
+		puntosControlManager.mostrar(false);
+	}
+	
+	/**
+	 * Asocia listeners (escuchadores) a los nodos conectados para que el cable se actualice
+	 * automáticamente cuando cambien de posición, escala o rotación.
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 */
+	private void bindListeners(PuntoConexion inicio, PuntoConexion fin) {
+		ChangeListener<Number> listener=(_, _, _) -> actualizarCable(inicio, fin);
+		
+		Node nodoInicio=inicio.getParent();
+		Node nodoFin=fin.getParent();
+		if(nodoInicio!=null) {
+			addListenersToNode(nodoInicio, listener);
+		}
+		if(nodoFin!=null) {
+			addListenersToNode(nodoFin, listener);
+		}
+	}
+	
+	/**
+	 * Añadir listener a un nodo.
+	 * 
+	 * @param node			Nodo al que se le añade un listener
+	 * @param listener		Listener que se añade al nodo
+	 */
+	private void addListenersToNode(Node node, ChangeListener<Number> listener) {
+		if(node==null) return;
+		node.layoutXProperty().addListener(listener);
+		node.layoutYProperty().addListener(listener);
+		node.scaleXProperty().addListener(listener);
+		node.scaleYProperty().addListener(listener);
+		node.rotateProperty().addListener(listener);
+	}
+	
+	/**
+	 * Actualiza gráficamente la trayectoria del cable, detectando cambios en la posición
+	 * de sus extremos.
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 */
+	public void actualizarCable(PuntoConexion inicio, PuntoConexion fin) {
+		synchronized(updateLock) {
+			if(isUpdating) {
+				logger.fine("Evitando actualización concurrente del cable: "+id);
+				return;
+			}
+			isUpdating=true;
+			
+			try {
+				//Verificar conectividad antes de actualizar
+				if(!CableConectividad.verificarConectividad(inicio, fin)) {
+					logger.warning("Conectividad perdida durante actualización del cable: "+id);
+					CableConectividad.restaurarConectividad(conector, inicio, fin, id);
+				}
+				Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+				Point2D pInicio=extremos[0];
+				Point2D pFin=extremos[1];
+				List<Double> nuevosPuntos;
+				if(arrastrandoCodo || puntosControlManager.getPuntosControl().size()>=1) {
+					nuevosPuntos=CableGeometriaUtil.generarPuntosConCodos(pInicio, pFin, puntosControlManager.getPuntosControl());
+				} else {
+					nuevosPuntos=CableGeometriaUtil.generarPuntosSimple(pInicio, pFin, inicio, fin);
+				}
+				cable.getPoints().setAll(nuevosPuntos);
+				//Mantener conectividad después de la actualización visual
+				CableConectividad.mantenerConectividad(conector, puntosConexionIntermedios);
+				limpiarPuntosConexionHuerfanos();
+			} finally {
+				isUpdating=false;
+			}
+		}
+	}
+	
+	/**
+	 * Activa el arrastre de los puntos de control (codos) del cable para modificar trayectoria.
+	 */
+	public void activarArrastreCodo() {
+		arrastrandoCodo=true;
+	}
+	
+	/**
+	 * Recalcula la trayectoria del cable a partir de la posición actual de los codos mientras se arrastra.
+	 */
+	public void arrastrarCodo() {
+		Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+		List<Double> nuevosPuntos=CableGeometriaUtil.generarPuntosConCodos(extremos[0], extremos[1], puntosControlManager.getPuntosControl());
+		cable.getPoints().setAll(nuevosPuntos);
+	}
+	
+	/**
+	 * Desactiva el arrastre de codos del cable.
+	 */
+	public void desactivarArrastreCodoCodo() {
+		arrastrandoCodo=false;
+	}
+	
+	/**
+	 * Devuelve el objeto Polyline que representa la trayectoria del cable.
+	 * 
+	 * @return Polyline asociado al cable
+	 */
+	public Polyline getCablePolyline() {
+		return cable;
+	}
+	
+	/**
+	 * Devuelve la lista de etiquetas de nodo asociadas al cable. 
+	 * 
+	 * @return Lista de etiquetas de nodo asociadas al cable
+	 */
+	public List<Label> getListaEtiquetas() {
+		return etiquetasNodo;
+	}
+	
+	/**
+	 * Devuelve el punto de conexión inicial del cable.
+	 * 
+	 * @return Punto inicial
+	 */
+	public PuntoConexion getInicio() {
+		return inicio;
+	}
+	
+	/**
+	 * Devuelve el punto de conexión final del cable.
+	 * 
+	 * @return Punto final
+	 */
+	public PuntoConexion getFin() {
+		return fin;
+	}
+	
+	/**
+	 * Obtiene el id del cable.
+	 * 
+	 * @return Id del cable.
+	 */
+	public String getCableId() {
+		return id;
+	}
+	
+	/**
+	 * Devuelve el objeto de conexión asociado al cable.
+	 * 
+	 * @return ConectorPuntos correspondiente
+	 */
+	public ConectorPuntos getConector() {
+		return this.conector;
+	}
+	
+	
+	/**
+	 * Marca este cable como seleccionado visualmente y muestra los puntos de control.
+	 */
+	public void seleccionar() {
+		seleccionado=true;
+		cable.getStyleClass().add(ESTILO_SELECCIONADO);
+		puntosControlManager.mostrar(true);
+	}
+	
+	/**
+	 * Deselecciona visualmente el cable y oculta los puntos de control.
+	 */
+	public void deseleccionar() {
+		seleccionado=false;
+		cable.getStyleClass().remove(ESTILO_SELECCIONADO);
+		puntosControlManager.mostrar(false);
+	}
+	
+	/**
+	 * Indica si el cable está actualmente seleccionado.
+	 * 
+	 * @return true si está seleccionado
+	 */
+	public boolean estaSeleccionado() {
+		return seleccionado;
+	}
+	
+	/**
+	 * Modifica el Id del cable.
+	 * 
+	 * @param id nuevo id para el cable
+	 */
+	public void setCableId(String id) {
+		this.id=id;
+	}
+	
+	/**
+	 * Comprueba si un cable conecta dos puntos específicos.
+	 * 
+	 * @param a			Punto de conexión inicial
+	 * @param b			Punto de conexión final
+	 * @return {@code true} si el cable conecta los puntos, {@code false} si no
+	 */
+	public boolean conecta(PuntoConexion a, PuntoConexion b) {
+		return (inicio==a && fin==b) || (inicio==b && fin==a);
+	}
+	
+	/**
+	 * Devuelve la lista de puntos de conexión intermedios en el cable.
+	 * 
+	 * @return Lista de puntos de conexión intermedios en el cable
+	 */
+	public List<PuntoConexion> getPuntosConexionIntermedios() {
+		return puntosConexionIntermedios;
+	}
+	
+	/**
+	 * Devuelve el manager de los puntos de control del cable.
+	 * 
+	 * @return	Manager de los puntos de control del cable
+	 */
+	public CablePuntosControlManager getPuntosControlManager() {
+		return puntosControlManager;
+	}
+	
+	/**
+	 * Devuelve los puntos actuales de la trayectoria del cable.
+	 * 
+	 * @return Lista de puntos en orden
+	 */
+	public List<Point2D> getPuntos() {
+		List<Point2D> puntos=new ArrayList<>();
+		for(int i=0; i<cable.getPoints().size(); i+=2) {
+			double x=cable.getPoints().get(i);
+			double y=cable.getPoints().get(i+1);
+			puntos.add(new Point2D(x, y));
+		}
+		return puntos;
+	}
+	
+	/**
+	 * Devuelve una descripción de los componentes conectados en ambos extremos.
+	 * 
+	 * @return Descripción de los componentes conectados
+	 */
+	public String getDescripcionConexiones() {
+		String izq=descripcionPunto(inicio);
+		String dch=descripcionPunto(fin);
+		return izq+ "\n <-> \n" +dch;
+	}
+	
+	/**
+	 * Devuelve una descripción de un punto de conexión.
+	 * 
+	 * @param punto			Punto a describir
+	 * @return Nombre del componente o número de nodo
+	 */
+	private String descripcionPunto(PuntoConexion punto) {
+		if(punto==null) return "Sin conexión";
+		if(punto.getComponente()!=null) {
+			return punto.getComponente().toString();
+		}
+		List<String> idsCablesConectados=new ArrayList<>();
+		for (Node node : zonaDibujo.getChildren()) {
+			if(node instanceof Cable cable && cable!=this) {
+				if(cable.getInicio()==punto || cable.getFin()==punto) {
+					idsCablesConectados.add(cable.getCableId());
+				}
+			}
+		}
+		if(idsCablesConectados.isEmpty()) {
+			return "Nodo "+ punto.getNodo();
+		} else {
+			return "Nodo "+punto.getNodo() + "\nConectado a cables: "+String.join(",\n",  idsCablesConectados);
+		}
+	}
+	
+	/**
+	 * Intenta fusionar dos cables si se ha eliminado un componente.
+	 * 
+	 * @param otrosCables  			Cables que intenta fusionar
+	 */
+	public void fusionarSiPosible(List<Cable> otrosCables) {
+		CableFusionService.intentarFusion(this, otrosCables, zonaDibujo);
+	}
+	
+	/**
+	 * Gestiona la división del cable y la inserción de un punto intermedio al hacer click sobre él.
+	 * Delega en el servicio {@link CableSegmentacionService}.
+	 * 
+	 * @param origen				Punto origen desde donde se va a conectar al cable
+	 * @param x						Coordenada X del punto intermedio
+	 * @param y						Coordenada Y del punto intermedio
+	 */
+	public List<Cable> gestionClickConector(PuntoConexion origen, double x, double y) {
+		return CableSegmentacionService.dividirCable(this, origen, x, y, zonaDibujo, conector, true);
+	}
+	
+	/**
+	 * Añade un nuevo punto de control al hacer click derecho sobre el cable.
+	 */
+	private void insertarPuntoControl() {
+		cable.setOnMouseClicked(e -> {
+			if(e.getClickCount()==2 && estaSeleccionado()) {
+				double x=e.getX();
+				double y=e.getY();
+				Point2D nuevo=new Point2D(x, y);
+				
+				int index=cable.getPoints().size()-2;
+				cable.getPoints().add(index, x);
+				cable.getPoints().add(index+1, y);
+				
+				puntosControlManager.agregarPuntoControl(nuevo);
+			}
+		});
+	}
+	
+	/**
+	 * Añade un punto de control manualmente en las coordenadas especificadas.
+	 * 
+	 * @param x				Coordenada X
+	 * @param y				Coordenada Y
+	 */
+	public void addPunto(double x, double y) {
+		if(puntosControlManager.getPuntosControl().isEmpty()) return;
+		int pointIndex=cable.getPoints().size()-2;
+		if(pointIndex<0) return;
+		
+		Point2D nuevo=new Point2D(x, y);
+		cable.getPoints().add(pointIndex, x);
+		cable.getPoints().add(pointIndex+1, y);
+		puntosControlManager.agregarPuntoControl(nuevo);
+	}	
+	
+	/**
+	 * Inserta un punto de conexión (sobre un cable) nuevo y lo registra.
+	 * 
+	 * @param x				Coordenada X del punto de conexión
+	 * @param y				Coordenada Y del punto de conxión
+	 */
+	public void insertarPuntoConexion(double x, double y) {
+		PuntoConexion punto=new PuntoConexion(null, false);
+		punto.setLayoutX(x-punto.getRadius());
+		punto.setLayoutY(y-punto.getRadius());
+		punto.setPosicion(null);
+		punto.setPickOnBounds(true);
+		punto.setOnMousePressed(e -> {
+			zonaDibujo.requestFocus();
+			InteraccionComponenteUtil.seleccionar(punto);
+			e.consume();
+		});
+		puntosConexionIntermedios.add(punto);
+		zonaDibujo.getChildren().add(punto);
+		conector.registrarPunto(punto);
+	}
+	
+	/**
+	 * Mueve los puntos de control del cable una cantidad exacta.
+	 * 
+	 * @param dx			Desplazamiento X
+	 * @param dy			Desplazamiento Y
+	 */
+	public void moverPuntosControl(double dx, double dy) {
+		if(puntosControlManager!=null) {
+			puntosControlManager.desplazarPuntos(dx, dy);
+			arrastrarCodo();
+		}
+	}
+	
+	/**
+	 * Obtiene el nombre del componente conectado al inicio.
+	 * 
+	 * @return Nombre de la clase del componente o null
+	 */
+	public String getComponenteInicio() {
+		if(inicio!=null && inicio.getComponente()!=null) {
+			return inicio.getComponente().getClass().getSimpleName();
+		}
+		return null;
+	}
+	
+	/**
+	 * Obtiene el nombre del componente conectado al final.
+	 * 
+	 * @return Nombre de la clase del componente o null
+	 */
+	public String getComponenteFin() {
+		if(fin!=null && fin.getComponente()!=null) {
+			return fin.getComponente().getClass().getSimpleName();
+		}
+		return null;
+	}
+	
+	/**
+	 * Registra un listener para que cuando el cable sea eliminado del panel,
+	 * limpie también las etiquetas de nodo asociadas.
+	 * 
+	 * @param zonaDibujo    Zona dibujo donde está el cable y las etiquetas
+	 */
+	private void configurarAutoLimpieza(Pane zonaDibujo) {
+		parentProperty().addListener((_, oldParent, newParent) -> {
+			if(oldParent instanceof Pane pane && newParent==null) {
+				Platform.runLater(() -> {
+					pane.getChildren().removeAll(etiquetasNodo);
+					etiquetasNodo.clear();
+					for(PuntoConexion pc : new ArrayList<>(puntosConexionIntermedios)) {
+						if(pc.getParent() instanceof Pane pPane) {
+							pPane.getChildren().remove(pc);
+						}
+					}
+					puntosConexionIntermedios.clear();
+				});
+				logger.fine("Eliminando cable y limpiando etiquetas: "+id);
+			}
+		});
+	}
+	
+	/**
+	 * Elimina los puntos de conexión intermedios que han quedado sin componente asociado o sin net.
+	 */
+	public void limpiarPuntosConexionHuerfanos() {
+		puntosConexionIntermedios.removeIf(pc -> {
+			boolean sinComponente=pc.getComponente()==null;
+			int numPins=0;
+			if(pc.getNet()!=null && pc.getNet().getPins()!=null) {
+				numPins=pc.getNet().getPins().size();
+			}
+			boolean sinNet=(pc.getNet()==null) || (numPins<=1);
+			if(sinComponente && sinNet) {
+				if(pc.getParent() instanceof Pane pPane) {
+					pPane.getChildren().remove(pc);
+				}
+				return true;
+			}
+			return false;
+		});
+	}
+	
+	/**
+	 * Actualiza la trayectoria de un cable según una lista de coordenadas.
+	 * 
+	 * @param puntos	Lista de coordenadas de la trayectoria
+	 */
+	public void actualizarTrayectoria(List<Point2D> puntos) {
+		cable.getPoints().clear();
+		for(Point2D p : puntos) {
+			cable.getPoints().addAll(p.getX(), p.getY());
+		}
+	}
+	
+	/**
+	 * Fusiona el cable conectando un extremo con el punto de conexión indicado.
+	 * 
+	 * @param otroExtremo punto de conexión con el que se fusiona
+	 */
+	public void fusionarCon(PuntoConexion otroExtremo) {
+		if(otroExtremo==null || otroExtremo.getComponente()==null) {
+			logger.warning("No se puede fusionar con un punto nulo o sin componente.");
+			return;
+		}
+		if(otroExtremo.getComponente().equals(inicio.getComponente())) {
+			logger.info("Fusionando con el inicio del cable: "+id);
+			inicio.setPosicion(PuntoConexion.Posicion.INICIO);
+			conector.conectarPuntos(inicio, otroExtremo);
+		} else if(otroExtremo.getComponente().equals(fin.getComponente())) {
+			logger.info("Fusionando con el fin del cable: "+id);
+			fin.setPosicion(PuntoConexion.Posicion.FIN);
+			conector.conectarPuntos(fin, otroExtremo);
+		} else {
+			logger.warning("El punto de conexión no coincide con los extremos del cable.");
+		}
+	}
+	
+	/**
+	 * Obtiene el número de puntos de control (codos) actuales del cable sin incluir extremos.
+	 */
+	public int getNumControlPoints() {
+		return puntosControlManager.getPuntosControl()!=null
+				? puntosControlManager.getPuntosControl().size() : 0;
+	}
+	
+	/**
+	 * Actualiza la posición de un punto de control existente.
+	 * 
+	 * @param controlIndex		Índice del punto de control
+	 * @param x					Nueva X
+	 * @param y					Nueva Y
+	 */
+	public void setControlPoint(int controlIndex, double x, double y) {
+		var codos=puntosControlManager.getPuntosControl();
+		if(codos==null || controlIndex<0 || controlIndex>=codos.size()) return;
+		Circle c=codos.get(controlIndex);
+		c.setCenterX(x);
+		c.setCenterY(y);
+		
+		//Reconstruye polyline desde los codos
+		Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+		List<Double> nuevosPuntos=CableGeometriaUtil.generarPuntosConCodos(extremos[0], extremos[1], puntosControlManager.getPuntosControl());
+		cable.getPoints().setAll(nuevosPuntos);
+	}
+	
+	/**
+	 * Inserta un nuevo punto de control en el índice indicado (antes).
+	 * Si el índice es mayor que el tamaño, se inserta al final.
+	 * 
+	 * @param controlIndex		Índice donde insertar
+	 * @param x					X de nuevo punto
+	 * @param y					Y de nuevo punto
+	 */
+	public void addControlPoint(int controlIndex, double x, double y) {
+		Point2D nuevo=new Point2D(x, y);
+		puntosControlManager.agregarPuntoControl(nuevo);
+		var codos=puntosControlManager.getPuntosControl();
+		if(codos==null || codos.isEmpty()) return;
+		int size=codos.size();
+		int idx=Math.max(0, Math.min(controlIndex, size-1));	  //posición de inserción
+		Circle reciente=codos.get(size-1);
+		if(idx!=size-1) {
+			codos.remove(size-1);
+			codos.add(idx, reciente);
+		}
+		Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+		List<Double> nuevosPuntos=CableGeometriaUtil.generarPuntosConCodos(extremos[0], extremos[1], puntosControlManager.getPuntosControl());
+		cable.getPoints().setAll(nuevosPuntos);
+	}
+	
+	/**
+	 * Elimina el punto de control en el índice indicado.
+	 *
+	 * @param controlIndex		Índice del punto a eliminar
+	 */
+	public void removeControlPoint(int controlIndex) {
+		var codos=puntosControlManager.getPuntosControl();
+		if(codos==null  || controlIndex<0 || controlIndex>=codos.size()) return;
+		Circle c=codos.remove(controlIndex);
+		if(c!=null && c.getParent() instanceof Pane p) {
+			p.getChildren().remove(c);
+		}
+		Point2D[] extremos=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zonaDibujo);
+		List<Double> nuevosPuntos=CableGeometriaUtil.generarPuntosConCodos(extremos[0], extremos[1], puntosControlManager.getPuntosControl());
+		cable.getPoints().setAll(nuevosPuntos);
+	}
+}

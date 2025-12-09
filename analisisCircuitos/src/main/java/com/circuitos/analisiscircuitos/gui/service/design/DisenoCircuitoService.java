@@ -1,0 +1,135 @@
+package com.circuitos.analisiscircuitos.gui.service.design;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.Tierra;
+import com.circuitos.analisiscircuitos.dominio.util.ComponenteUtil;
+import com.circuitos.analisiscircuitos.dominio.util.GestorIds;
+import com.circuitos.analisiscircuitos.gui.service.nodes.NodoManager;
+import com.circuitos.analisiscircuitos.gui.util.CircuitDesignUtil;
+import com.circuitos.analisiscircuitos.gui.util.MensajesUI;
+
+import javafx.scene.Node;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.util.Duration;
+
+/**
+ * Servicio que contiene operaciones sobre el diseño del circuito, como eliminación 
+ * de elementos, reasignación de nodos y limpieza del área de dibujo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DisenoCircuitoService {
+	private static final Logger logger=Logger.getLogger(DisenoCircuitoService.class.getName());
+	private final Pane zonaDibujo;
+	private final NodoManager nodoManager;
+	private final CircuitDesignUtil circuitUtil;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param zonaDibujo			Zona de dibujo
+	 * @param nodoManager			Gestor de nodos
+	 * @param circuitUtil			Utilidades de circuito
+	 */
+	public DisenoCircuitoService(Pane zonaDibujo, NodoManager nodoManager, 
+								 CircuitDesignUtil circuitUtil) {
+		this.zonaDibujo=zonaDibujo;
+		this.nodoManager=nodoManager;
+		this.circuitUtil=circuitUtil;
+	}
+	
+	/**
+	 * Elimina el nodo o componente seleccionado y muestra un mensaje de confirmación.
+	 * 
+	 * @param seleccionado		Componente seleccionado
+	 */
+	public void eliminarSeleccionado(Node seleccionado) {
+		Objects.requireNonNull(seleccionado, "Debe proporcionar un nodo a eliminar");
+		String mensaje=mensajeEliminacion(seleccionado);
+		circuitUtil.eliminarElemento(seleccionado);
+		zonaDibujo.getChildren().remove(seleccionado);
+		logger.info(()->"Elemento eliminado: "+seleccionado);
+		
+		if(areaVacia()) {
+			nodoManager.reset();
+			logger.fine("Gestor de nodos reiniciado tras eliminación de último elemento");
+		}
+			
+		MensajesUI.mostrarMensaje(zonaDibujo, 
+				mensaje, 
+				MensajesUI.TipoMensaje.ADVERTENCIA, 
+				MensajesUI.PosicionMensaje.TOP, 
+				Duration.seconds(2));
+	}
+	
+	/**
+	 * Genera el mensaje de eliminación de un nodo.
+	 * 
+	 * @param node		Nodo que se elimina
+	 * @return String con el mensaje de eliminación
+	 */
+	private String mensajeEliminacion(Node node) {
+		if(node instanceof StackPane sp &&
+				sp.getUserData() instanceof Componente comp) {
+			GestorIds.getInstance().liberarId(comp);
+			String tipo=ComponenteUtil.nombreNice(comp);
+			String id=comp.getId();
+			return String.format("Componente (%s %s) eliminado", tipo, id);
+		}
+		return "Elemento eliminado";
+	}
+	
+	/**
+	 * Comprueba si el area de dibujo está vacía.
+	 * 
+	 * @return {@code true} si está vacía, {@code false} si no
+	 */
+	private boolean areaVacia() {
+		return zonaDibujo.getChildren().isEmpty();
+	}
+
+	/**
+	 * Comprueba si ya existe el componente de conexión a tierra en el circuito.
+	 * 
+	 * @return {@code true} si ya hay tierra, {@code false} si no
+	 */
+	public boolean existeTierra() {
+		return zonaDibujo.getChildren().stream()
+				.filter(n -> n instanceof StackPane)
+				.map(n -> ((StackPane) n).getUserData())
+				.anyMatch(d -> d instanceof Tierra);
+	}
+	
+	/**
+	 * Actualiza todos los nodos de los componentes según un mapa de reasignación. 
+	 * 
+	 * @param reasignacion			Mapa de nodos nuevos
+	 */
+	public void actualizarNodos(Map<Integer, Integer> reasignacion) {
+		zonaDibujo.getChildren().stream()
+			.filter(StackPane.class::isInstance)
+			.map(StackPane.class::cast)
+			.filter(sp->sp.getUserData() instanceof Componente)
+			.forEach(sp -> {
+				Componente comp=(Componente) sp.getUserData();
+				circuitUtil.actualizarPuntosRecursivo(sp, reasignacion);
+				circuitUtil.actualizarNodosControl(comp, reasignacion);
+				logger.fine(()->"Nodos actualizados para componente "+comp.getId());
+			});
+	}
+	
+	/**
+	 * Limpia el area de dibujo y reinicia el gestor de nodos.
+	 */
+	public void reiniciar() {
+		zonaDibujo.getChildren().clear();
+		nodoManager.reset();
+		logger.info("Área de diseño reiniciada completamente");
+	}
+}

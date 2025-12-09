@@ -1,0 +1,219 @@
+package com.circuitos.analisiscircuitos.gui.learning.view;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import com.circuitos.analisiscircuitos.gui.learning.model.Ejercicio;
+
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+
+/**
+ * Clase que gestiona la ventana flotante de resolución de ejercicios.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class VentanaResolucion {
+	private final Ejercicio ejercicio;
+	private final Stage stage;
+	private final Label lblResultado;
+	private final Button btnVerificar;
+	private final Button btnVolver;
+	private final Runnable onVolver;
+	private final Runnable onExito;
+	private final Map<String, TextField> inputs=new HashMap<>();
+	private final Map<String, ComboBox<String>> units=new HashMap<>();
+	
+	/**
+	 * Constructor.
+	 */
+	public VentanaResolucion(Ejercicio ejercicio, Runnable onVolver, Runnable onExito) {
+		this.ejercicio=ejercicio;
+		this.onVolver=onVolver;
+		this.onExito=onExito;
+		this.stage=new Stage();
+		this.lblResultado=new Label("");
+		this.btnVerificar=new Button("✅ Verificar Respuestas");
+		this.btnVolver=new Button("🔙 Volver a E-Learning");
+		this.btnVolver.setVisible(false);
+		this.btnVolver.setManaged(false);
+		this.btnVolver.getStyleClass().add("ventana-resolucion-boton-volver");
+		this.btnVolver.setMaxWidth(Double.MAX_VALUE);
+		this.btnVolver.setOnAction(_ -> {
+			stage.close();
+			if(this.onVolver!=null) {
+				this.onVolver.run();
+			}
+		});
+		inicializarVentana();
+	}
+	
+	/**
+	 * Crea la ventana de resolución de ejercicios pidiendo los valores a calcular según
+	 * el tipo de análisis pedido en el enunciado (Thevenin, Norton o ambos).
+	 */
+	private void inicializarVentana() {
+		stage.setTitle("Resolviendo: "+ejercicio.getTitulo());
+		stage.initModality(Modality.NONE); 		//Permite tocar la ventana de atrás
+		stage.setAlwaysOnTop(true); 	//Siempre visible
+		
+		VBox root=new VBox(15);
+		root.setPadding(new Insets(20));
+		root.setStyle("-fx-background-color: white; -fx-border-color: #0078d7; -fx-border-width: 2;");
+		
+		String textoInstruccion="Introduce los valores calculados";
+		if(ejercicio.tieneNodosManuales()) {
+			textoInstruccion+="\n(Visto desde nodos "+ejercicio.getNodoAnalisisA()+" y "+ejercicio.getNodoAnalisisB()+")";
+		}
+		Label lblInstruccion=new Label(textoInstruccion);
+		lblInstruccion.getStyleClass().add("ventana-resolucion");
+		
+		GridPane grid=new GridPane();
+		grid.setHgap(10);
+		grid.setVgap(10);
+		int row=0;
+		
+		String tipo=ejercicio.getTipoAnalisis();
+		if("THEVENIN".equals(tipo) || "AMBOS".equals(tipo)) {
+			agregarFilaInput(grid, row++, "Vth", "Vth", new String[] {"V", "kV", "mV"});
+			agregarFilaInput(grid, row++, "Rth", "Rth", new String[] {"Ω", "kΩ", "MΩ"});
+		}
+		if("NORTON".equals(tipo) || "AMBOS".equals(tipo)) {
+			agregarFilaInput(grid, row++, "In", "I Norton", new String[] {"A", "mA"});
+			agregarFilaInput(grid, row++, "Rn", "R Norton", new String[] {"Ω", "kΩ", "MΩ"});
+		}
+		btnVerificar.setMaxWidth(Double.MAX_VALUE);
+		btnVerificar.getStyleClass().add("ventana-resolucion-button");
+		btnVerificar.setOnAction(_ -> validarRespuestas());
+		root.getChildren().addAll(lblInstruccion, grid, new Separator(), btnVerificar, btnVolver, lblResultado);
+		Scene scene=new Scene(root, 320, row*40+175);
+		stage.setScene(scene);
+	}
+	
+	/**
+	 * Crea una fila en la tabla (GridPane) con etiqueta, cuadro de texto y selector de opciones.
+	 * 
+	 * @param grid					Tabla donde se crea la fila (GridPane)
+	 * @param row					Integer con el número de la fila
+	 * @param key					Clave o tipo de valor (Vth, Rth, In, Rn)
+	 * @param labelText				Etiqueta (Label) del cuadro de texto
+	 * @param unidades				String con las unidades según el tipo de valor
+	 */
+	private void agregarFilaInput(GridPane grid, int row, String key, String labelText, String[] unidades) {
+		Label label=new Label(labelText+":");
+		
+		TextField txt=new TextField();
+		txt.setPromptText("Valor");
+		txt.setPrefWidth(80);
+		
+		ComboBox<String> combo=new ComboBox<>();
+		combo.getItems().addAll(unidades);
+		combo.getSelectionModel().selectFirst();
+		combo.setPrefWidth(70);
+		
+		grid.add(label, 0, row);
+		grid.add(txt, 1, row);
+		grid.add(combo, 2, row);
+		
+		//Guardar referencias para recuperar valores
+		inputs.put(key, txt);
+		units.put(key, combo);
+	}
+	
+	/**
+	 * Valida las respuestas dadas por el usuario con los valores reales de resolución del circuito.
+	 */
+	private void validarRespuestas() {
+		try {
+			boolean ok=true;
+			//Validar Thevenin
+			if(inputs.containsKey("Vth")) {
+				if(!comprobar("Vth", ejercicio.getSolucionVth())) ok=false;
+				if(!comprobar("Rth", ejercicio.getSolucionRth())) ok=false;
+			}
+			//Validar Norton
+			if(inputs.containsKey("In")) {
+				if(!comprobar("In", ejercicio.getSolucionIn())) ok=false;
+				if(!comprobar("Rn", ejercicio.getSolucionRn())) ok=false;
+			}
+			if(ok) {
+				lblResultado.setText("¡CORRECTO! 🎉 Ejercicio resuelto.");
+				lblResultado.getStyleClass().removeAll("ventana-resolucion-incorrecto");
+				lblResultado.getStyleClass().add("ventana-resolucion-correcto");
+				if(this.onExito!=null) this.onExito.run();
+				btnVerificar.setDisable(true);
+				btnVolver.setVisible(true);
+				btnVolver.setManaged(true);
+				stage.getScene().getRoot().applyCss();
+				stage.getScene().getRoot().layout();
+				stage.sizeToScene();
+				stage.centerOnScreen();
+			} else {
+				lblResultado.setText("Incorrecto. Revisa unidades y cálculos.");
+				lblResultado.getStyleClass().add("ventana-resolucion-incorrecto");
+				stage.sizeToScene();
+			}
+		} catch(NumberFormatException e) {
+			lblResultado.setText("Error: Introduce números válidos.");
+			lblResultado.getStyleClass().removeAll("ventana-resolucion-correcto");
+			lblResultado.getStyleClass().add("ventana-resolucion-incorrecto");
+			stage.sizeToScene();
+		}
+	}
+	
+	/**
+	 * Comprueba el valor dado por el alumno con la solución real después de convertir
+	 * el valor dado por el alumno a factor 1 (V, A, Ω) con un error <0.1 o <5%.
+	 * 
+	 * @param key						Tipo de valor (Vth, Rth, In, Rn)
+	 * @param solucionReal				Solución real
+	 * @return {@code true} si coinciden, {@code false} si no
+	 */
+	private boolean comprobar(String key, double solucionReal) {
+		TextField txt=inputs.get(key);
+		ComboBox<String> cmb=units.get(key);
+		
+		String valStr=txt.getText().replace(",", ".");
+		if(valStr.isEmpty()) return false;
+		
+		double valorUser=Double.parseDouble(valStr);
+		double factor=obtenerFactorConversion(cmb.getValue());
+		double valorFinal=valorUser*factor; //Convertir a unidad base
+		
+		//Tolerancia 5% o 0.1
+		double diff=Math.abs(valorFinal-solucionReal);
+		return diff<0.1 || diff<(Math.abs(solucionReal)*0.05);
+	}
+	
+	/**
+	 * Obtiene el factor de conversión según la unidad (kilo, Mega o mili).
+	 * 
+	 * @param unidad			Unidad que se quiere convertir
+	 * @return	 Factor de conversión
+	 */
+	private double obtenerFactorConversion(String unidad) {
+		return switch(unidad) {
+			case "kV", "kΩ"->1000.0;
+			case "MΩ" -> 1_000_000.0;
+			case "mV", "mA"->0.001;
+			default->1.0;
+		};
+	}
+	
+	/**
+	 * Muestra la ventana de resolución de ejercicios.
+	 */
+	public void mostrar() {
+		stage.show();
+	}
+}

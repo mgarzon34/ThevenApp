@@ -1,0 +1,45 @@
+package com.circuitos.AnalisisCircuitos.dto;
+
+import java.util.List;
+import java.util.Objects;
+
+import com.circuitos.temporal.gui.model.PuntoConexion;
+
+/**
+ * DTO (Data Transfer Object) que representa un cable entre dos puntos de conexión
+ * en el circuito. Se utiliza para guardar y cargar circuitos en formato JSON.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public record CableDto (
+	String id,
+	String origenId,
+	PuntoConexion.Posicion origenPos,
+	boolean origenPositivo,
+	Integer origenNodo,
+	String destinoId,
+	PuntoConexion.Posicion destinoPos,
+	boolean destinoPositivo,
+	Integer destinoNodo,
+	List<PuntoDto> puntos
+	) { 
+	
+	/**
+	 * Constructor completo.
+	 * 
+	 * @param id					ID único del cable
+	 * @param origenId				ID del componente origen
+	 * @param origenPos				Posicion del punto de conexión de origen
+	 * @param origenPositivo		El nodo es positivo (true o false)
+	 * @param origenNodo			Nodo eléctrico de origen
+	 * @param destinoId				ID del componente destino
+	 * @param destinoPos			Posición del punto de conexión de destino
+	 * @param destinoPositivo		El nodo es positivo (true o false)
+	 * @param destinoNodo			Nodo eléctrico de destino
+	 * @param puntos				Lista de puntos de control del cable
+	 */
+	public CableDto {
+		Objects.requireNonNull(id, "CableDto.id no puede ser nulo");
+	}
+}

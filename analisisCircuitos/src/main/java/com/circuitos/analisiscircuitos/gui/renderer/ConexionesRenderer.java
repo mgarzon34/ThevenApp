@@ -1,0 +1,421 @@
+package com.circuitos.analisiscircuitos.gui.renderer;
+
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.model.CableBuilder;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion.Posicion;
+import com.circuitos.analisiscircuitos.gui.renderer.CircuitoEquivalenteRenderer.PinesComponente;
+import com.circuitos.analisiscircuitos.gui.service.cable.CableTrayectoriaCalculator;
+
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Line;
+
+/**
+ * Clase auxiliar que se usa para trazar los cables de los circuitos equivalentes.
+ * Es usada por {@link CircuitoEquivalenteRenderer}.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ConexionesRenderer {
+	private static final Logger logger=Logger.getLogger(ConexionesRenderer.class.getName());
+	
+	private static final String IND_CONEXION="analisis-indicador-conexion-equivalente";
+	private static final String TAG_BORNE="etiqueta-analisis-borne";
+	private static final String TAG_CIRCUITO="etiqueta-analisis-resto-circuito";
+	
+	private static final double MARGEN_INF=40.0;
+	private static final double MARGEN_SUP=60.0;
+	
+	private final Pane zona;
+	private final ConectorPuntos conector;
+	private PinesComponente pinesFuente, pinesR, pinesCarga;
+	
+	//Record para pares de puntos ordenados (Arriba/Abajo o Izq/der)
+	private record ParPuntos(PuntoConexion primero, PuntoConexion segundo, Point2D p1, Point2D p2) {}
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param zona				Panel donde se dibujan los cables
+	 * @param conector			Gestor de conexiones
+	 */
+	public ConexionesRenderer(Pane zona, ConectorPuntos conector) {
+		this.zona=zona;
+		this.conector=conector;
+	}
+	
+	/**
+	 * Establece los pines de los componentes del circuito equivalente.
+	 * 
+	 * @param f				Pines de la fuente
+	 * @param r				Pines de la resistencia equivalente
+	 * @param c				Pines de la carga
+	 */
+	public void setPines(PinesComponente f, PinesComponente r, PinesComponente c) {
+		this.pinesFuente=f;
+		this.pinesR=r;
+		this.pinesCarga=c;
+	}
+	
+	/**
+	 * Conecta todos los componentes visuales del circuito equivalente de Thevenin.
+	 * 
+	 * @param vFuente			Visual de la fuente
+	 * @param vThev				Visual de la resistencia Thevenin
+	 * @param vCarga			Visual de la resistencia de carga
+	 */
+	public void conectarThevenin(StackPane vFuente, StackPane vR, StackPane vCarga) {
+		try {
+			var fuente=obtenerParesVerticales(vFuente, pinesFuente);
+			var rThev=obtenerParesHorizontales(vR, pinesR);
+			var carga=obtenerParesVerticales(vCarga, pinesCarga);
+			cableDirecto(fuente.primero, rThev.primero); 		//Fuente arriba -> R izq
+			cableDirecto(rThev.segundo, carga.primero);			//R der -> carga arriba
+			double yFondo=Math.max(fuente.p2.getY(), carga.p2.getY())+MARGEN_INF;
+			cableU(fuente.segundo, carga.segundo, yFondo);
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error al conectar Thevenin", e);
+		}
+	}
+	
+	/**
+	 * Conecta la fuente y la resistencia de Thevenin en el modo sin carga dejando los
+	 * bornes de salida abiertos.
+	 * 
+	 * @param vFuente				Visual de la fuente
+	 * @param vR					Visual de la resistencia equivalente
+	 */
+	public void conectarSinCarga(StackPane vFuente, StackPane vR) {
+		try {
+			var fuente=obtenerParesVerticales(vFuente, pinesFuente);
+			var rThev=obtenerParesHorizontales(vR, pinesR);
+			cableDirecto(fuente.primero, rThev.primero);
+			etiquetarBornesTh("Out-A", rThev.segundo, "Out-B", fuente.segundo);
+			dibujarIndicadorConexionTh(rThev.segundo, fuente.segundo);
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error al conectar Thevenin en modo sin carga");
+		}
+	}
+	
+	/**
+	 * Realiza las conexion del análisis de Norton: fuente de corriente con Rn paralelo y carga paralelo.
+	 * 
+	 * @param vFuente				Visual de In
+	 * @param vR					Visual de Rn
+	 * @param vCarga				Visual de Rcarga
+	 */
+	public void conectarNorton(StackPane vFuente, StackPane vR, StackPane vCarga) {
+		try {
+			var f=obtenerParesVerticales(vFuente, pinesFuente);
+			var rn=obtenerParesVerticales(vR, pinesR);
+			var rc=obtenerParesVerticales(vCarga, pinesCarga);
+			double yTop=minY(f.p1, rn.p1, rc.p1)-MARGEN_SUP;
+			double yBottom=maxY(f.p2, rn.p2, rc.p2)+MARGEN_INF;
+			conectarParalelo(yTop, f.primero, rn.primero, rc.primero);
+			conectarParalelo(yBottom, f.segundo, rn.segundo, rc.segundo);
+			logger.info("Norton conectado en paralelo correctamente");
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error al conectar Norton", e);
+		}
+	}
+	
+	/**
+	 * Conecta la fuente de Norton y la resistencia Rn en paralelo para el caso sin carga.
+	 * 
+	 * @param vFuente				Visual de la fuente
+	 * @param vR					Visual de la resistencia
+	 */
+	public void conectarNortonSinCarga(StackPane vFuente, StackPane vR) {
+		try {
+			var f=obtenerParesVerticales(vFuente, pinesFuente);
+			var rn=obtenerParesVerticales(vR, pinesR);
+			double yTop=Math.min(f.p1.getY(), rn.p1.getY())-MARGEN_SUP;
+			double yBottom=Math.max(f.p2.getY(), rn.p2.getY())+MARGEN_INF;
+			conectarParalelo(yTop, f.primero, rn.primero);
+			conectarParalelo(yBottom, f.segundo, rn.segundo);
+			etiquetarBornesNo("Out-A", rn.primero, "Out-B", rn.segundo, yTop, yBottom);
+			dibujarIndicadorConexionNo(rn.primero, rn.segundo, yTop, yBottom);
+			logger.info("Norton sin carga conectado en paralelo correctamente");
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error al conectar Norton sin carga", e);
+		}
+	}
+	
+	/**
+	 * Extrae dos puntos y los ordena verticalmente (primero arriba y segundo abajo).
+	 * 
+	 * @param visual			StackPane de un componente
+	 * @param pines				Pines del componente
+	 * @return Par de puntos ordenados
+	 */
+	private ParPuntos obtenerParesVerticales(StackPane visual, PinesComponente pines) {
+		PuntoConexion p1=extraerPunto(visual, pines.pin1());
+		PuntoConexion p2=extraerPunto(visual, pines.pin2());
+		Point2D[] coords=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(p1, p2, zona);
+		if(coords[0].getY()<=coords[1].getY()) {
+			return new ParPuntos(p1, p2, coords[0], coords[1]);		//p1 arriba
+		} else {
+			return new ParPuntos(p2, p1, coords[1], coords[0]);		//p2 arriba
+		}
+	}
+	
+	/**
+	 * Extrae dos puntos y los ordena horizontalmente (primero izquierda y segundo derecha).
+	 * 
+	 * @param visual			StackPane de un componente
+	 * @param pines				Pines del componente
+	 * @return Par de puntos ordenados
+	 */
+	private ParPuntos obtenerParesHorizontales(StackPane visual, PinesComponente pines) {
+		PuntoConexion p1=extraerPunto(visual, pines.pin1());
+		PuntoConexion p2=extraerPunto(visual, pines.pin2());
+		Point2D[] coords=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(p1, p2, zona);
+		if(coords[0].getY()<=coords[1].getY()) {
+			return new ParPuntos(p1, p2, coords[0], coords[1]);		//p1 izquierda
+		} else {
+			return new ParPuntos(p2, p1, coords[1], coords[0]);		//p2 derecha
+		}
+	}
+	
+	/**
+	 * Extrae un {@link PuntoConexion} de un {@link StackPane} en una posición determinada.
+	 * 
+	 * @param panel			StackPane del que extraemos el punto de conexión
+	 * @param pos			Posición del StackPane
+	 * @return Punto de conexión
+	 */
+	private PuntoConexion extraerPunto(StackPane panel, Posicion pos) {
+		for(Node n : panel.getChildren()) {
+			if(n instanceof PuntoConexion pc && pc.getPosicion()==pos)
+				return pc;
+		}
+		throw new IllegalStateException("No se encontró PuntoConexion en posición: "+pos);
+	}
+	
+	/**
+	 * Obtiene el mínimo de un conjunto de puntos.
+	 * 
+	 * @param points		Conjunto de puntos 
+	 * @return Mínimo
+	 */
+	private double minY(Point2D... points) {
+		double min=Double.MAX_VALUE;
+		for(Point2D p : points) min=Math.min(min,  p.getY());
+		return min;
+	}
+	
+	/**
+	 * Obtiene el máximo de un conjunto de puntos.
+	 * 
+	 * @param points		Conjunto de puntos 
+	 * @return Máximo
+	 */
+	private double maxY(Point2D... points) {
+		double max=Double.MIN_VALUE;
+		for(Point2D p : points) max=Math.max(max, p.getY());
+		return max;
+	}
+	
+	/**
+	 * Traza un cable directo entre dos puntos de conexión.
+	 * 
+	 * @param inicio			Punto de inicio
+	 * @param fin				Punto final
+	 */
+	private void cableDirecto(PuntoConexion inicio, PuntoConexion fin) {
+		zona.getChildren().add(
+				new CableBuilder().desde(inicio).hasta(fin).en(zona).usando(conector).construir());
+	}
+	
+	/**
+	 * Traza un cable con trayectoria en U entre dos puntos de conexión.
+	 * 
+	 * @param inicio			Punto de inicio
+	 * @param fin				Punto final
+	 * @param yFondo			Fondo de fuga del cable
+	 */
+	private void cableU(PuntoConexion inicio, PuntoConexion fin, double yFondo) {
+		Point2D[] pts=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(inicio, fin, zona);
+		List<Double> trayectoria=List.of(pts[0].getX(), pts[0].getY(), pts[0].getX(), yFondo,
+										pts[1].getX(), yFondo, pts[1].getX(), pts[1].getY());
+		zona.getChildren().add(
+				new CableBuilder().desde(inicio).hasta(fin).en(zona).usando(conector)
+								.conTrayectoria(trayectoria).construir());
+	}
+	
+	/**
+	 * Traza un cable para trayectoria en paralelo (U o U invertida).
+	 * 
+	 * @param yFuga				Punto de fuga que sube o baja el cable
+	 * @param puntos			Puntos que une la conexión
+	 */
+	private void conectarParalelo(double yFuga, PuntoConexion... puntos) {
+		for(int i=0; i<puntos.length-1; i++) {
+			PuntoConexion p1=puntos[i];
+			PuntoConexion p2=puntos[i+1];
+			Point2D[] coords=CableTrayectoriaCalculator.obtenerCoordenadasExtremos(p1, p2, zona);
+			List<Double> trayectoria=List.of(coords[0].getX(), coords[0].getY(), 	//sale de p1
+											coords[0].getX(), yFuga,				//sube/baja a fuga
+											coords[1].getX(), yFuga,				//horizontal
+											coords[1].getX(), coords[1].getY());	//bajar/subir a p2
+			zona.getChildren().add(
+					new CableBuilder().desde(p1).hasta(p2).en(zona).usando(conector)
+									.conTrayectoria(trayectoria).construir());
+		}
+	}
+	
+	/**
+	 * Crea las etiquetas de los bornes de salida para el equivalente de Thevenin.
+	 * 
+	 * @param etiquetaA				Texto de la etiqueta del nodo A
+	 * @param a						Punto de conexión del nodo A
+	 * @param etiquetaB				Texto de la etiqueta del nodo B
+	 * @param b						Punto de conexión del nodo B
+	 */
+	public void etiquetarBornesTh(String etiquetaA, PuntoConexion a,
+								String etiquetaB, PuntoConexion b) {
+		crearEtiqueta(etiquetaA, a, 16, -28);
+		crearEtiqueta(etiquetaB, b, 16, 6);
+	}
+	
+	/**
+	 * Crea las etiquetas de los bornes de salida para el equivalente de Norton.
+	 * Usa las coordenadas de los codos superior e inferior.
+	 * 
+	 * @param etiquetaA				Texto de la etiqueta del nodoA
+	 * @param a						Punto de conexión del nodo A
+	 * @param etiquetaB				Texto de la etiqueta del nodo B
+	 * @param b						Punto de conexión del nodo B
+	 * @param top					Coordenada Y de la rama superior
+	 * @param bottom				Coordenada Y de la rama inferior
+	 */
+	public void etiquetarBornesNo(String etiquetaA, PuntoConexion a, 
+			String etiquetaB, PuntoConexion b, double top, double bottom) {
+		crearEtiquetaAbs(etiquetaA, a, top, 16, -28);
+		crearEtiquetaAbs(etiquetaB, b, bottom, 16, 4);
+	}
+	
+	/**
+	 * Crea una etiqueta para un punto de conexión (para Thevenin).
+	 * 
+	 * @param texto					Texto de la etiqueta
+	 * @param ref					Punto de conexión
+	 * @param offX					Desplazamiento X
+	 * @param offY					Desplazamiento Y
+	 */
+	private void crearEtiqueta(String texto, PuntoConexion ref, double offX, double offY) {
+		Point2D p=zona.sceneToLocal(ref.localToScene(0, 0));
+		Label l=new Label(texto);
+		l.getStyleClass().add(TAG_BORNE);
+		l.setLayoutX(p.getX()+offX);
+		l.setLayoutY(p.getY()+offY);
+		zona.getChildren().add(l);
+	}
+	
+	/**
+	 * Crea una etiqueta para un punto de conexión desplazada una cantidad fija (para Norton).
+	 * 
+	 * @param texto					Texto de la etiqueta
+	 * @param refX					Punto de conexión (referencia X)
+	 * @param fixY					Desplazamiento respecto del punto de conexión
+	 * @param offX					Desplazamiento X
+	 * @param offY					Desplazamiento Y
+	 */
+	private void crearEtiquetaAbs(String texto, PuntoConexion refX, double fixY, double offX, double offY) {
+		Point2D p=zona.sceneToLocal(refX.localToScene(0, 0));
+		Label l=new Label(texto);
+		l.getStyleClass().add(TAG_BORNE);
+		l.setLayoutX(p.getX()+offX);
+		l.setLayoutY(fixY+offY);
+		zona.getChildren().add(l);
+	}
+	/**
+	 * Dibuja un corchete en el lugar donde iría el resto del circuito y añade una 
+	 * etiqueta indicativa de "Resto del circuito" para un equivalente de Thevenin.
+	 * 
+	 * @param a					Punto de conexión A
+	 * @param b					Punto de conexión B
+	 */
+	public void dibujarIndicadorConexionTh(PuntoConexion a, PuntoConexion b) {
+		dibujarIndicadorGenerico(a, b, null, null, 70.0, 55.0, 235.0);
+	}
+
+	/**
+	 * Dibuja un corchete en el lugar donde iría el resto del circuito y añade una 
+	 * etiqueta indicativa de "Resto del Circuito" para un equivalente de Norton.
+	 * 
+	 * @param a						Punto de conexión A
+	 * @param b						Punto de conexión B
+	 * @param yTopCodo				Coordenada Y de la rama superior
+	 * @param yBottomCodo			Coordenada Y de la rama inferior
+	 */
+	public void dibujarIndicadorConexionNo(PuntoConexion a, PuntoConexion b, 
+												double yTop, double yBottom) {
+		dibujarIndicadorGenerico(a, b, yTop, yBottom, 15.0, 150.0, 150.0);
+	}
+	
+	/**
+	 * Dibuja un corchete para indicar el resto del circuito. Método genérico aplicable
+	 * tanto a Thévenin como a Norton.
+	 * 
+	 * @param a						Punto de conexión A
+	 * @param b						Punto de conexión B
+	 * @param top					Coordenada superior
+	 * @param bottom				Coordenada inferior
+	 * @param offsetX				Desplazamiento X
+	 * @param profTop				Profundidad del corchete arriba
+	 * @param profBottom			Profundidad del corchete abajo
+	 */
+	private void dibujarIndicadorGenerico(PuntoConexion a, PuntoConexion b, Double top, Double bottom,
+										double offsetX, double profTop, double profBottom) {
+	    Point2D pA=zona.sceneToLocal(a.localToScene(0, 0));
+	    Point2D pB=zona.sceneToLocal(b.localToScene(0, 0));
+	    double yTop=(top!=null) ? top : Math.min(pA.getY(), pB.getY());
+	    double yBottom=(bottom!=null) ? bottom : Math.max(pA.getY(), pB.getY());
+	    double baseX=Math.max(pA.getX(), pB.getX())+offsetX;
+	    double xVertical=baseX + ((top!=null) ? 150 : 0);	//Ajuste Norton si es necesario
+	    if(top==null) xVertical=baseX;		//Ajuste Thevenin
+	    double xCodoTop=xVertical-profTop;
+	    double xCodoBottom=xVertical-profBottom;
+	    if(top!=null) {						//Norton
+	    	xCodoTop=baseX;
+	    	xCodoBottom=baseX;
+	    }
+	    //Crear corchete para indicar donde va el resto del circuito
+	    crearLineaPuntos(xVertical, yTop, xVertical, yBottom);
+	    crearLineaPuntos(xVertical, yTop, xCodoTop, yTop);
+	    crearLineaPuntos(xVertical, yBottom, xCodoBottom, yBottom);
+	    
+	    Label label=new Label("Resto del circuito");
+	    label.getStyleClass().add(TAG_CIRCUITO);
+	    label.setLayoutX(xVertical-20);
+	    label.setLayoutY((yTop+yBottom)/2.0-10);
+	    label.setRotate(90);
+	    zona.getChildren().addAll(label);
+	}
+	
+	/**
+	 * Crea una línea punteada con un estilo aplicado para indicaciones en el circuito 
+	 * equivalente.
+	 * 
+	 * @param x1					Coordenada X del punto 1
+	 * @param y1					Coordenada Y del punto 1
+	 * @param x2					Coordenada X del punto 2
+	 * @param y2					Coordenada Y del punto 2
+	 */
+	private void crearLineaPuntos(double x1, double y1, double x2, double y2) {
+		Line l=new Line(x1, y1, x2, y2);
+		l.getStrokeDashArray().addAll(10.0, 6.0);
+		l.getStyleClass().add(IND_CONEXION);
+		zona.getChildren().add(l);
+	}
+}

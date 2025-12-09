@@ -1,0 +1,16 @@
+package com.circuitos.analisiscircuitos.dto;
+
+/**
+ * DTO (Data Transfer Object) que representa un punto (x, y) en un cable. 
+ * Se usa para definir esquinas o puntos intermedios de un cable.
+ * 
+ * @param x Coordenada X del punto
+ * @param y Coordenada Y del punto
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public record PuntoDto (
+	double x,
+	double y
+) { }

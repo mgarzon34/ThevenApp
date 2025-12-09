@@ -1,0 +1,107 @@
+package com.circuitos.analisiscircuitos.gui.learning.database;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.learning.model.PdfDocument;
+
+public class PdfData {
+	
+	private static final Logger logger=Logger.getLogger(PdfData.class.getName());
+	private final DatabaseService db;
+	
+	public PdfData(DatabaseService db) {
+		this.db=db;
+	}
+	
+	/**
+	 * Guarda un documento PDF en la base de datos.
+	 * 
+	 * @param pdf 			Documento PDF
+	 * @return {@code true} si logra guardarlo, {@code false} si no
+	 */
+	public boolean guardarDocumentoPdf(PdfDocument pdf) {
+		String sql="INSERT INTO documentos_pdf (titulo, descripcion, nombre_archivo, path_archivo, tamano_archivo, subido_por) VALUES (?, ?, ?, ?, ?, ?)";
+		try(Connection conn=db.getConnection();
+			PreparedStatement pstmt=conn.prepareStatement(sql)) {
+			pstmt.setString(1, pdf.getTitulo());
+			pstmt.setString(2, pdf.getDescripcion());
+			pstmt.setString(3, pdf.getNombreArchivo());
+			pstmt.setString(4, pdf.getPathArchivo());
+			pstmt.setLong(5, pdf.getTamanoArchivo());
+			pstmt.setInt(6, pdf.getSubidoPor());
+			return pstmt.executeUpdate()>0;
+		} catch(SQLException e) {
+			logger.log(Level.WARNING, "Error guardando documento PDF", e);
+			return false;
+		}
+	}
+	
+    /**
+     * Obtiene todos los documentos PDF.
+     * 
+     * @return Lista de documentos pdf
+     */
+    public List<PdfDocument> getPdfs() {
+        List<PdfDocument> pdfs=new ArrayList<>();
+        String sql= """
+            SELECT p.id, p.titulo, p.descripcion, p.nombre_archivo, p.path_archivo, p.tamano_archivo, 
+                   p.fecha_subida, p.subido_por, 
+                   (u.nombre || ' ' || COALESCE(u.apellido1, '') || ' ' || COALESCE(u.apellido2, '')) as uploader_nombre
+            FROM documentos_pdf p
+            LEFT JOIN users u ON p.subido_por=u.id
+            ORDER BY p.fecha_subida DESC
+        """;
+        try (Connection conn=db.getConnection();
+             PreparedStatement pstmt=conn.prepareStatement(sql);
+             ResultSet rs=pstmt.executeQuery()) {
+
+            while(rs.next()) {
+                PdfDocument pdf=new PdfDocument();
+                pdf.setId(rs.getInt("id"));
+                pdf.setTitulo(rs.getString("titulo"));
+                pdf.setDescripcion(rs.getString("descripcion"));
+                pdf.setNombreArchivo(rs.getString("nombre_archivo"));
+                pdf.setPathArchivo(rs.getString("path_archivo"));
+                pdf.setTamanoArchivo(rs.getLong("tamano_archivo"));
+                pdf.setSubidoPor(rs.getInt("subido_por"));
+                pdf.setUploaderNombre(rs.getString("uploader_nombre"));
+
+                Timestamp fechaSubida=rs.getTimestamp("fecha_subida");
+                if (fechaSubida!=null) {
+                    pdf.setFechaSubida(fechaSubida.toLocalDateTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                }
+                pdfs.add(pdf);
+            }
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Error obteniendo documentos PDF", e);
+        }
+        return pdfs;
+    }
+    
+    /**
+     * Elimina un documento PDF de la base de datos.
+     * 
+     * @param pdfId				Identificador único del PDF
+     * @return {@code true} si lo elimina, {@code false} si no
+     */
+    public boolean eliminarDocumentoPdf(int pdfId) {
+        String sql="DELETE FROM documentos_pdf WHERE id=?";
+        try (Connection conn=db.getConnection();
+            PreparedStatement pstmt=conn.prepareStatement(sql)) {
+            pstmt.setInt(1, pdfId);
+            return pstmt.executeUpdate()>0;
+        } catch(SQLException e) {
+            logger.log(Level.WARNING, "Error eliminando documento PDF", e);
+            return false;
+        }
+    }
+}

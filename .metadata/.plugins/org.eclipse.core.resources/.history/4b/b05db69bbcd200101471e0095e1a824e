@@ -1,0 +1,94 @@
+package com.circuitos.temporal.gui.util;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dto.CircuitoFileDto;
+import com.circuitos.analisiscircuitos.gui.controller.PanelDisenoController;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.design.NodoProximidadValidator;
+import com.circuitos.analisiscircuitos.gui.service.io.CircuitoDeserializerService;
+import com.circuitos.analisiscircuitos.gui.service.label.EtiquetaNodoService;
+
+import javafx.util.Duration;
+
+/**
+ * Clase que se encarga de renderizar visualmente un circuito sobre una zona de dibujo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitoRender {
+	private static final Logger logger=Logger.getLogger(CircuitoRender.class.getName());
+	
+	private final PanelDisenoController panel;
+	private final CircuitoDeserializerService deserializerService;
+	private final ComponenteRender componenteRender;
+	private final CableRender cableRender;
+	
+	public CircuitoRender(PanelDisenoController panel) {
+		this.panel=panel;
+		this.deserializerService=new CircuitoDeserializerService();
+		this.componenteRender=new ComponenteRender(panel);
+		this.cableRender=new CableRender(panel);			
+	}
+	
+	/**
+	 * Carga y renderiza un circuito desde un archivo JSON. 
+	 * 
+	 * @param fichero			Archivo JSON que contiene el circuito serializado
+	 * @throws IOException		Si ocurre un error al leer el archivo
+	 */
+	public void cargarArchivo(File fichero) throws IOException {
+		Objects.requireNonNull(fichero, "El fichero no puede ser null");
+		if(!fichero.exists()) {
+			String msg="No existe el fichero: "+fichero.getAbsolutePath();
+			logger.log(Level.WARNING, msg);
+			throw new FileNotFoundException(msg);
+		}
+		try {
+			CircuitoFileDto dto=deserializerService.cargarCircuitoArchivo(fichero);
+			renderizarDesdeDTO(dto);
+			logger.log(Level.INFO, "Circuito cargado con éxito desde {0}", fichero.getAbsolutePath());
+		} catch(IOException e) {
+			logger.log(Level.SEVERE, "Error cargando circuito desde "+fichero.getAbsolutePath(), e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * Renderiza el circuito a partir de un DTO cargado en memoria.
+	 * 
+	 * @param dto		DTO del circuito a renderizar
+	 */
+	public void renderizarDesdeDTO(CircuitoFileDto dto) {
+		panel.crearNuevoCircuito();
+		panel.cargarCircuito(dto.circuito());
+		componenteRender.render(dto.posiciones());
+		cableRender.renderCables(dto.cables());
+		actualizarEtiquetasNodos();
+		NodoProximidadValidator.fusionarNodosCercanos(panel.getZonaDibujo(), panel.getConector());
+		MensajesUI.mostrarMensaje(panel.getZonaDibujo(), 
+				"Circuito y cables cargados", 
+				MensajesUI.TipoMensaje.EXITO, 
+				MensajesUI.PosicionMensaje.TOP, 
+				Duration.seconds(2));
+	}
+	
+	/**
+	 * Recorre todos los puntos de conexión presentes en el panel de diseño
+	 * y actualiza sus etiquetas de nodo si son visibles.
+	 */
+	private void actualizarEtiquetasNodos() {
+		panel.getZonaDibujo().getChildren().stream()
+		.filter(n -> n instanceof PuntoConexion)
+		.map(PuntoConexion.class::cast)
+		.forEach(pc ->
+			EtiquetaNodoService.actualizarEtiquetaNodo(pc, panel.getZonaDibujo())
+		);
+	}
+}

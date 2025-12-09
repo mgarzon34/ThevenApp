@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de bienvenida de ThevenApp.
+	Muestra mensaje de entrada, enlaces para comenzar y logo de la aplicación.
+	
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelBienvenidaController
+	Utiliza estilo: PanelBienvenida.css
+ -->
+ 
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.geometry.Insets?>
+
+<HBox fx:id="panelBienvenida" 
+	  prefHeight="600.0"
+	  prefWidth="800.0"
+	  xmlns="http://javafx.com/javafx" 
+	  xmlns:fx="http://javafx.com/fxml/" 
+	  fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelBienvenidaController">
+	  
+	<!-- Caja lateral con opciones -->
+	<VBox prefWidth="200" 
+		  prefHeight="600" 
+		  alignment="CENTER" 
+		  spacing="20" 
+		  styleClass="bienvenida-caja">
+		<Label text="¡Bienvenido a ThevenApp!" styleClass="bienvenida-label-text" />
+		<Hyperlink fx:id="enlaceNuevo" text="Crear circuito nuevo" />
+		<Hyperlink fx:id="enlaceCargar" text="Cargar circuito" />
+		<Separator prefWidth="180" />
+		<VBox.margin>
+			<Insets top="20" bottom="10" />
+		</VBox.margin>
+		<Label text="Archivos recientes:" styleClass="bienvenida-recientes" />
+		<VBox fx:id="contenedorRecientes" spacing="10.0" alignment="CENTER" layoutX="0" layoutY="0" />
+		<Hyperlink fx:id="borrarHistorial" text="Borrar historial" alignment="CENTER" styleClass="bienvenida-borrar-historial" />
+	</VBox>
+	
+	<!-- Imagen del logo de la app y botón para E-Learning -->
+	<AnchorPane HBox.hgrow="ALWAYS">
+		<ImageView fx:id="imagenLogo" fitWidth="600" fitHeight="600" 
+			   preserveRatio="true" smooth="true" pickOnBounds="true" 
+			   AnchorPane.topAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.bottomAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+		<Button fx:id="botonElearning" text="E-Learning >>>" AnchorPane.bottomAnchor="30.0" AnchorPane.rightAnchor="30.0"
+				styleClass="bienvenida-button-elearning" />
+	</AnchorPane>
+</HBox>

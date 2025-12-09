@@ -1,0 +1,80 @@
+/* =======================================================================
+ * Estilos para la representación visual del panel de componentes.
+ * Archivo: componentes.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ====================================================================== */
+
+/* Estilo aplicado para el fondo del panel */
+.comp-panel-background {
+	-fx-background-color:  #0085C5;			/* Color azul */
+}
+
+/* Estilo aplicado para el fondo del panel en la zona del título */
+.comp-panel-title-background {
+	-fx-background-color:  #002C55;			/* Color azul oscuro */
+}
+
+/* Estilo aplicado al título del panel de componentes */
+.comp-panel-title {
+	-fx-text-fill: white;				/* Color de letra blanco */
+	-fx-font-family: "Arial";			/* Tipo de letra */
+	-fx-font-size: 18px;				/* Tamaño de letra */
+	-fx-font-weight: bold;				/* Estilo "negrita" */
+}
+
+/* Estilo aplicado al texto de los componentes */
+.comp-white-text {
+	-fx-text-fill: white;				/* Color de letra blanco */
+	-fx-font-family: "Arial";			/* Tipo de letra */
+	-fx-font-size: 13px;				/* Tamaño de letra */
+}
+
+/* Estilo aplicado al cuadro de componente seleccionado */
+.comp-seleccionado {
+	-fx-border-color: #00aaff;						/* Cuadro borde azul */
+	-fx-border-width: 2px;
+	-fx-border-radius: 4px;
+	-fx-background-color: rgba(0,170,255,0.1); 		/* Relleno azulado */
+}
+
+/* Estilo Scrollbar */
+.scroll-bar {
+	-fx-background-color: transparent;
+	-fx-background-radius: 0;
+	-fx-border-color: transparent;
+}
+
+.scroll-bar .track {
+	-fx-background-radius: 0px;
+	-fx-border-color: transparent;
+	-fx-background-color: #002C55;
+}
+
+.scroll-bar .thumb {
+	-fx-background-color: #0085C5;
+	-fx-background-radius: 8px;
+	-fx-border-color: transparent;
+}
+
+.scroll-bar .thumb:hover {
+	-fx-background-color: #fbfcfd;
+}
+
+.scroll-bar .thumb:pressed {
+	-fx-background-color: #fbfcfd;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 0;
+	-fx-border-color: transparent;
+	-fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+	-fx-background-color: #00aaff;
+	-fx-shape: null;
+}

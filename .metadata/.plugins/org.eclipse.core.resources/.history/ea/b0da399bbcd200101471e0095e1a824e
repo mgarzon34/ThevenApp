@@ -1,0 +1,31 @@
+module com.circuitos.AnalisisCircuitos {
+	requires transitive javafx.controls;
+	requires javafx.fxml;
+	requires java.logging;
+	requires commons.math3;
+	requires transitive javafx.base;
+	requires transitive javafx.graphics;
+	requires com.fasterxml.jackson.databind;
+	requires com.fasterxml.jackson.annotation;
+	requires java.desktop;
+	requires org.controlsfx.controls;
+	requires java.sql;
+	requires javafx.web;
+	requires com.fasterxml.jackson.core;
+	
+	opens com.circuitos.temporal.gui to javafx.graphics, javafx.fxml;
+	opens com.circuitos.temporal.gui.controller to javafx.fxml;
+	opens com.circuitos.temporal.dominio to com.fasterxml.jackson.databind;
+	opens com.circuitos.temporal.dto to com.fasterxml.jackson.databind;
+	
+	exports com.circuitos.temporal.gui.controller;
+	exports com.circuitos.temporal.dominio;
+	exports com.circuitos.temporal.gui.model;
+	exports com.circuitos.temporal.gui.util;
+	exports com.circuitos.temporal.dto;
+	exports com.circuitos.temporal.gui.service.cable;
+	exports com.circuitos.temporal.gui.service.undo;
+	exports com.circuitos.temporal.gui.service.nodes;
+	exports com.circuitos.temporal.gui.commands;
+	exports com.circuitos.temporal.gui.learning.model;
+}

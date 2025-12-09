@@ -1,0 +1,87 @@
+package com.circuitos.temporal.gui.controller;
+
+import java.util.function.Consumer;
+
+import com.circuitos.temporal.gui.learning.model.User;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.Separator;
+
+/**
+ * Controlador del panel de navegación de la sección de E-Learning.
+ * Gestiona los botones que permiten cambiar entre teoría, ejercicios, PDFs, progreso
+ * o pantallas de gestión. 
+ * Se adapta según el rol del usuario (alumno o profesor).
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PanelNavegacionController {
+	@FXML private Button teoriaButton, ejerciciosButton, progresoButton, pdfButton;
+	@FXML private Button gestionEjerciciosButton, gestionTeoriaButton, gestionPdfButton, verProgresoButton;
+	@FXML private Separator separadorProfesor;
+	
+	private Consumer<String> onNavegacionListener;
+	
+	/**
+	 * Inicializa el panel de navegación.
+	 */
+	@FXML
+	public void initialize() {	}
+	
+	/**
+	 * Establece el listener que recibirá los eventos de navegación.
+	 * 
+	 * @param listener escuchador que recibe una cadena con el destino de navegación
+	 */
+	public void setOnNavegacionListener(Consumer<String> listener) {
+		this.onNavegacionListener=listener;
+	}
+	
+	/**
+	 * Configura la visibilidad del panel según el rol del usuario (profesor o estudiante).
+	 * Si es profesor añade opciones de gestión.
+	 * 
+	 * @param user		Usuario actual
+	 */
+	public void configurarRol(User user) {
+		if(user==null) return;
+		boolean esProfe=user.esProfesor();
+		progresoButton.setVisible(!esProfe);
+		progresoButton.setManaged(!esProfe);
+		pdfButton.setVisible(!esProfe);
+		pdfButton.setManaged(!esProfe);
+		if(separadorProfesor!=null) {
+			separadorProfesor.setVisible(esProfe);
+			separadorProfesor.setManaged(esProfe);
+		}
+		gestionEjerciciosButton.setVisible(esProfe);
+		gestionEjerciciosButton.setManaged(esProfe);
+		gestionTeoriaButton.setVisible(esProfe);
+		gestionTeoriaButton.setManaged(esProfe);
+		gestionPdfButton.setVisible(esProfe);
+		gestionPdfButton.setManaged(esProfe);
+		verProgresoButton.setVisible(esProfe);
+		verProgresoButton.setManaged(esProfe);
+	}
+	
+	/* Manejadores de eventos FXML. Notifica que sección debe mostrar */
+	
+	@FXML private void onShowTeoria() { notificar("TEORIA"); }
+	@FXML private void onShowEjercicios() { notificar("EJERCICIOS"); }
+	@FXML private void onShowPdfs() { notificar("PDF"); }
+	@FXML private void onVerProgreso() { notificar("PROGRESO"); }
+	@FXML private void onGestionEjercicios() { notificar("GESTION_EJERCICIOS"); }
+	@FXML private void onGestionTeoria() { notificar("GESTION_TEORIA"); }
+	@FXML private void onGestionPdfs() { notificar("GESTION_PDF"); }
+	
+	/**
+	 * Notifica al listener externo el destino seleccionado del panel de navegación.
+	 * 
+	 * @param destino		Destino seleccionado
+	 */
+	private void notificar(String destino) {
+		if(onNavegacionListener!=null) onNavegacionListener.accept(destino);
+	}
+}

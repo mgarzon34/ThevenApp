@@ -1,0 +1,82 @@
+package com.circuitos.AnalisisCircuitos.gui.util;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.controller.PanelBienvenidaController;
+
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.scene.layout.Pane;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+
+/**
+ * Gestiona el diálogo de bienvenida con opciones: nuevo, abrir y archivos recientes.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DialogoBienvenida {
+	private static final Logger logger=Logger.getLogger(DialogoBienvenida.class.getName());
+	
+	private static final String FXML_WELCOME="/com/circuitos/AnalisisCircuitos/gui/fxml/PanelBienvenida.fxml";
+	
+	/**
+	 * Muestra la ventana de bienvenida al abrir la aplicación.
+	 * 
+	 * @param owner					Stage que contiene la ventana
+	 * @param onNew					Acción de crear circuito nuevo
+	 * @param onOpen				Acción de abrir archivo JSON con circuito
+	 * @param onOpenRecent			Acción de abrir un archivo reciente
+	 * @param onElearning			Acción de botón para ir a E-Learning
+	 */
+	public static void show(Stage owner, Runnable onNew, Supplier<Boolean> onOpen,
+			Consumer<File> onOpenRecent, Runnable onElearning) {
+		try {
+			FXMLLoader loader=new FXMLLoader(DialogoBienvenida.class.getResource(FXML_WELCOME));
+			Pane root=loader.load();
+			PanelBienvenidaController ctrl=loader.getController();
+			Stage dialog=new Stage();
+			dialog.initOwner(owner);
+			dialog.initModality(Modality.APPLICATION_MODAL);
+			
+			ctrl.setOnNuevoCircuito(() -> {
+				onNew.run();
+				dialog.close();
+			});
+			ctrl.setOnAbrirArchivo(() -> {
+				boolean exito=onOpen.get();
+				if(exito) {
+					dialog.close();
+				}
+			});
+			ctrl.setOnAbrirArchivoReciente(file -> {
+				onOpenRecent.accept(file);
+				dialog.close();
+			});
+			
+			ctrl.setOnAbrirElearning(() -> {
+				onElearning.run();
+				dialog.close();
+			});
+			Scene scene=new Scene(root, 800, 600);
+			StylesLoader.aplicarCSS(scene);
+			dialog.setScene(scene);
+			dialog.setResizable(false);
+			dialog.setOnCloseRequest(_ -> {
+				logger.info("Cierre de aplicación desde el panel de bienvenida.");
+				Platform.exit();
+				System.exit(0);
+			});
+			dialog.showAndWait();
+		} catch (IOException ex) {
+			logger.log(Level.SEVERE, "No se pudo abrir el panel de Bienvenida", ex);
+		}
+	}
+}

@@ -1,0 +1,75 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import java.util.logging.Logger;
+
+import com.circuitos.AnalisisCircuitos.gui.model.Cable;
+import com.circuitos.AnalisisCircuitos.gui.model.ConectorPuntos;
+import com.circuitos.AnalisisCircuitos.gui.model.Net;
+import com.circuitos.AnalisisCircuitos.gui.model.PuntoConexion;
+
+/**
+ * Comando para conectar dos componentes mediante un cable.
+ * Maneja la creación y eliminación de conexiones durante operaciones undo/redo.
+ * Los cables tienen su propio ciclo de vida independiente.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ConnectComponentsCommand implements Command {
+    private static final Logger logger = Logger.getLogger(ConnectComponentsCommand.class.getName());
+    
+    private final PuntoConexion puntoA;
+    private final PuntoConexion puntoB;
+    private final ConectorPuntos conector;
+    private Cable cableCreado;
+    private Net netAnteriorA;
+    private Net netAnteriorB;
+    private boolean ejecutado=false;
+    
+    /**
+     * Constructor del comando de conexión de componentes.
+     * 
+     * @param puntoA				Primer punto de conexión
+     * @param puntoB				Segundo punto de conexión
+     * @param conector				Conector que los conecta
+     */
+    public ConnectComponentsCommand(PuntoConexion puntoA, PuntoConexion puntoB, ConectorPuntos conector) {
+        this.puntoA = puntoA;
+        this.puntoB = puntoB;
+        this.conector = conector;
+    }
+    
+    @Override
+    public void ejecutar() {
+    	if(!ejecutado) {
+    		netAnteriorA=(puntoA!=null) ? puntoA.getNet() : null;
+    		netAnteriorB=(puntoB!=null) ? puntoB.getNet() : null;
+    		ejecutado=true;
+    	}
+    	cableCreado=conector.conectarPuntos(puntoA, puntoB);
+    	logger.fine(() -> "Conexión creada - Cable: "+(cableCreado!=null ? cableCreado.getCableId() : "null"));
+    }
+    
+    @Override
+    public void deshacer() {
+    	if(cableCreado==null) return;
+    	conector.eliminarCable(cableCreado);
+    	conector.asignarPinANet(puntoA, netAnteriorA);
+    	conector.asignarPinANet(puntoB, netAnteriorB);
+    	logger.fine(() -> "Conexión deshecha; nets restauradas");
+    }
+    
+    @Override
+    public String getDescripcion() {
+        String compA=puntoA.getComponente()!=null ? puntoA.getComponente().getClass().getSimpleName() : "Punto";
+        String compB=puntoB.getComponente()!=null ? puntoB.getComponente().getClass().getSimpleName() : "Punto";
+        return "Conectar " +compA+ " con " +compB;
+    }
+    
+    @Override
+    public boolean esValido() {
+    	if(puntoA==null || puntoB==null || conector==null) return false;
+    	if(!ejecutado) return true;
+    	return puntoA.getScene()!=null && puntoB.getScene()!=null;
+    }
+}

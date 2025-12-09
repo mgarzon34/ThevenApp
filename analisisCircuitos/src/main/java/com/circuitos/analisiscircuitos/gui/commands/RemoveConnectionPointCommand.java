@@ -1,0 +1,86 @@
+package com.circuitos.analisiscircuitos.gui.commands;
+
+import java.util.List;
+import java.util.Objects;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.cable.CableManager;
+import com.circuitos.analisiscircuitos.gui.service.undo.DescripcionesAccion;
+
+import javafx.scene.layout.Pane;
+
+/**
+ * Comando para eliminar puntos de conexión de los cables (Utiliza snapshots).
+ * Elimina el punto de control de dos segmentos de cable y los fusiona para restaurarlos en caso de undo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class RemoveConnectionPointCommand implements Command {
+	private final PuntoConexion punto;
+	private final Pane zonaDibujo;
+	private final CableManager cableManager;
+	private CableManager.CableSnapshot cableABefore;
+	private CableManager.CableSnapshot cableBBefore;
+	private final String descripcion;
+	private String idCableFusionado;
+	
+	public RemoveConnectionPointCommand(PuntoConexion punto, Pane zonaDibujo, CableManager cableManager) {
+		this.punto=Objects.requireNonNull(punto, "punto");
+		this.zonaDibujo=Objects.requireNonNull(zonaDibujo, "zonaDibujo");
+		this.cableManager=Objects.requireNonNull(cableManager, "cableManager");
+		Componente comp=(punto!=null) ? punto.getComponente() : null;
+		if(comp!=null) {
+			this.descripcion="Eliminar punto de conexión de "+DescripcionesAccion.etiqueta(comp);
+		} else {
+			this.descripcion="Eliminar punto de conexión";
+		}
+	}
+
+	/* Implementación métodos de la interfaz */
+	
+	@Override
+	public void ejecutar() {
+		if(zonaDibujo==null || punto==null) return;
+		boolean esIntermedio=(punto.getComponente()==null);
+		if(esIntermedio) {
+			var conectados=cableManager.obtenerCablesConectadosAlPunto(punto);
+			if(conectados.size()==2) {
+				cableABefore=cableManager.snapshot(conectados.get(0));
+				cableBBefore=cableManager.snapshot(conectados.get(1));
+			} 
+		}
+		zonaDibujo.getChildren().remove(punto);
+		
+		if(esIntermedio && cableABefore!=null && cableBBefore!=null) {
+			var nuevo=cableManager.fusionarCablesYDevolver(punto);
+			idCableFusionado=nuevo.map(Cable::getCableId).orElse(null);
+		}
+	}
+
+	@Override
+	public void deshacer() {
+		if(zonaDibujo==null || punto==null) return;
+		boolean seFusiono=(idCableFusionado!=null && cableABefore!=null && cableBBefore!=null);
+		if(seFusiono) {
+			cableManager.eliminarCablePorId(idCableFusionado);
+			cableManager.renderCables(List.of(cableABefore, cableBBefore));
+		}
+		if(!zonaDibujo.getChildren().contains(punto)) {
+			zonaDibujo.getChildren().add(punto);
+		}
+		cableManager.actualizarEtiquetasYRutas();
+	}
+	
+	@Override
+	public boolean esValido() {
+		return punto!=null && zonaDibujo!=null && cableManager!=null;
+	}
+	
+	@Override
+	public String getDescripcion() {
+		return descripcion;
+	}
+}

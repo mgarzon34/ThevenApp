@@ -1,0 +1,16 @@
+# Ignorar archivos compilados de Java
+*.class
+
+# Ignorar carpetas de compilación
+bin/
+build/
+target/
+out/
+
+# Ignorar archivos temporales y de IDEs
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+*.log

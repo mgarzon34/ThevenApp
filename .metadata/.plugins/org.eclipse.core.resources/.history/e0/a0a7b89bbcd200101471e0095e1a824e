@@ -1,0 +1,43 @@
+package com.circuitos.temporal.gui.util;
+
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import javafx.scene.Node;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.image.WritableImage;
+
+/**
+ * Clase que genera miniaturas recortadas de un nodo concreto.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ThumbnailGenerator {
+	private static final Logger logger=Logger.getLogger(ThumbnailGenerator.class.getName());
+	
+	/**
+	 * Genera una miniatura del nodo dado.
+	 * 
+	 * @param source		Nodo a capturar
+	 * @param widthRatio	Proporción de ancho
+	 * @param clipTop		Recorte por la parte superior
+	 * @return Imagen recortada
+	 * @throws NullPointerException si source es null
+	 * @throws IllegalArgumentException si widthRatio fuera de rango o clipTop negativo
+	 */
+	public static WritableImage generate(Node source, double widthRatio, double clipTop) {
+		Objects.requireNonNull(source, "Source no puede ser null");
+		if(widthRatio<=0 || widthRatio>1) {
+			throw new IllegalArgumentException("widthRatio debe estar entre (0, 1) pero fue: "+widthRatio);
+		}
+		if(clipTop<0) {
+			throw new IllegalArgumentException("clipTop no puede ser negativo: "+clipTop);
+		}
+		WritableImage full=source.snapshot(new SnapshotParameters(), null);
+		int w=(int) (full.getWidth()*widthRatio);
+		int h=(int) (full.getHeight()-clipTop);
+		logger.info("Miniatura generada");
+		return new WritableImage(full.getPixelReader(), 0, (int) clipTop, w, h);
+	}
+}

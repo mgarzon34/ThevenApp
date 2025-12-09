@@ -1,0 +1,121 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import com.circuitos.AnalisisCircuitos.dominio.Componente;
+
+import javafx.application.Platform;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Comando para mover un componente en el diseño del circuito.
+ * Este comando soporta fusión para agrupar movimientos consecutivos
+ * en una sola operación de undo/redo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class MoveComponentCommand implements Command {
+    private final Componente componente;
+    private final StackPane vista;
+    private final double originalX;
+    private final double originalY;
+    private final long createdAt=System.currentTimeMillis();
+    private static final long FUSION_WINDOW_MS=250;
+    private double finalX;
+    private double finalY;
+    
+    /**
+     * Constructor del comando de mover componente.
+     * 
+     * @param componente 		Componente a mover
+     * @param originalX 		Posición X original
+     * @param originalY 		Posición Y original
+     * @param finalX 			Posición X final
+     * @param finalY 			Posición Y final
+     */
+    public MoveComponentCommand(Componente componente, StackPane vista,
+                               double originalX, double originalY, 
+                               double finalX, double finalY) {
+        this.componente = componente;
+        this.vista=vista;
+        this.originalX = originalX;
+        this.originalY = originalY;
+        this.finalX = finalX;
+        this.finalY = finalY;
+    }
+    
+    @Override
+    public void ejecutar() {
+        if(!esValido()) return;
+        if(Platform.isFxApplicationThread()) {
+        	vista.relocate(finalX, finalY);
+        } else {
+        	Platform.runLater(() -> vista.relocate(finalX, finalY));
+        }
+    }
+    
+    @Override
+    public void deshacer() {
+    	if(!esValido()) return;
+    	if(Platform.isFxApplicationThread()) {
+    		vista.relocate(originalX, originalY);
+    	} else {
+    		Platform.runLater(() -> vista.relocate(originalX, originalY));
+    	}
+    }
+    
+    @Override
+    public String getDescripcion() {
+    	String id=(componente!=null) ? componente.getId() : (vista!=null ? vista.getId() : "componente");
+        return "Mover " + id;
+    }
+    
+    @Override
+    public boolean puedeFusionarCon(Command otroComando) {
+        if(!(otroComando instanceof MoveComponentCommand otro)) return false;
+        if(this.vista!=otro.vista) return false;  
+        return (System.currentTimeMillis() - this.createdAt)<FUSION_WINDOW_MS;
+    }
+    
+    @Override
+    public void fusionarCon(Command otroComando) {
+        if(!(otroComando instanceof MoveComponentCommand otro)) {
+            throw new IllegalArgumentException("No se puede fusionar con un comando diferente");
+        }
+        
+        //Actualizar la posición final con la del otro comando
+        this.finalX=otro.finalX;
+        this.finalY=otro.finalY;
+    }
+    
+    @Override
+    public boolean esValido() {
+    	return vista!=null;
+    }
+    
+    /**
+     * Obtiene el componente que está siendo movido.
+     * 
+     * @return El componente
+     */
+    public Componente getComponente() {
+        return componente;
+    }
+    
+    /**
+     * Obtiene la posición X final después del movimiento.
+     * 
+     * @return Posición X final
+     */
+    public double getFinalX() {
+        return finalX;
+    }
+    
+    /**
+     * Obtiene la posición Y final después del movimiento.
+     * 
+     * @return Posición Y final
+     */
+    public double getFinalY() {
+        return finalY;
+    }
+}

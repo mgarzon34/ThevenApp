@@ -1,0 +1,138 @@
+package com.circuitos.temporal.gui.service.design;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.model.ConectorPuntos;
+import com.circuitos.temporal.gui.model.Net;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+
+import javafx.application.Platform;
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.layout.Pane;
+
+/**
+ * Servicio que realiza la fusión automática de nodos muy cercanos para evitar 
+ * duplicidad de nodos eléctricos.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class NodoProximidadValidator {
+	private static final Logger logger=Logger.getLogger(NodoProximidadValidator.class.getName());
+	private static final double DISTANCIA_FUSION=20.0; //píxeles
+	
+	private NodoProximidadValidator() { /* NO INSTANCIABLE */ }
+	
+	/**
+	 * Realiza la fusión automática de nodos cercanos y los alinea visualmente.
+	 * 
+	 * @param zonaDibujo			Área de dibujo donde están los puntos
+	 * @param conector				Gestor de conexiones para unificar Nets
+	 */
+	public static void fusionarNodosCercanos(Pane zonaDibujo, ConectorPuntos conector) {
+		Platform.runLater(() -> {
+			List<PuntoConexion> puntos=encontrarTodosPuntos(zonaDibujo);
+			boolean cambios=false;
+			for(int i=0; i<puntos.size(); i++) {
+				PuntoConexion p1=puntos.get(i);
+				if(!p1.isVisible()) continue;
+				for(int j=i+1; j<puntos.size(); j++) {
+					PuntoConexion p2=puntos.get(j);
+					if(!p2.isVisible()) continue;
+					if(estanCerca(p1, p2, zonaDibujo)) {
+						boolean hayFusion=aplicarFusion(p1, p2, zonaDibujo, conector);
+						if(hayFusion) cambios=true;
+					}
+				}
+			}
+			if(cambios) {
+				logger.fine("Fusión de nodos aplicada correctamente.");
+			}
+		});
+	}
+	
+	/**
+	 * Obtiene todos los puntos de conexión de un nodo.
+	 * 
+	 * @param nodo			Nodo donde buscamos los puntos de conexión
+	 * @return Lista de puntos de conexión
+	 */
+	private static List<PuntoConexion> encontrarTodosPuntos(Node nodo) {
+		List<PuntoConexion> lista=new ArrayList<>();
+		if(nodo instanceof PuntoConexion pc) {
+			lista.add(pc);
+		} else if(nodo instanceof Parent parent) {
+			for(Node hijo : parent.getChildrenUnmodifiable()) {
+				lista.addAll(encontrarTodosPuntos(hijo));
+			}
+		}
+		return lista;
+	}
+	
+	/**
+	 * Comprueba la distancia entre dos puntos de conexión usando coordenadas de la escena (absolutas).
+	 * 
+	 * @param p1					Punto de conexión 1
+	 * @param p2					Punto de conexión 2
+	 * @param zonaDibujo			Área de dibujo donde se encuentran
+	 * @return {@code true) si la distancia es menor que el límite establecido, {@code false} si no
+	 */
+	private static boolean estanCerca(PuntoConexion p1, PuntoConexion p2, Pane zonaDibujo) {
+		Point2D pos1=p1.localToScene(0, 0);
+		Point2D pos2=p2.localToScene(0, 0);
+		return pos1.distance(pos2)<=DISTANCIA_FUSION;
+	}
+	
+	/**
+	 * Aplica la fusión de nodos cercanos a la coordenada del punto del componente (maestro).
+	 * 
+	 * @param p1					Punto de conexión del componente (Maestro)
+	 * @param p2					Punto de conexión del cable o libre (Esclavo)
+	 * @param zonaDibujo			Área de dibujo
+	 * @param conector				Gestor de conexión utilizado
+	 * @return {@code true} si se aplica fusión, {@code false} si no
+	 */
+	private static boolean aplicarFusion(PuntoConexion p1, PuntoConexion p2, Pane zonaDibujo, ConectorPuntos conector) {
+		//Se da prioridad al punto del componente (maestro) que al de cable o punto libre (esclavo)
+		PuntoConexion maestro=p1;
+		PuntoConexion esclavo=p2;
+		//Los puntos de componente no se mueven
+		if(p1.getComponente()!=null && p2.getComponente()!=null) {
+			return false; 		//Dos componentes superpuestos: no tocar
+		} else if(p2.getComponente()!=null) {
+			maestro=p2;		//Componente manda
+			esclavo=p1;
+		} else {
+			maestro=p1;		//Ninguno es componente o p1 es componente, manda p1 por defecto
+			esclavo=p2;
+		}
+		Point2D posMaestro=maestro.localToScene(0, 0);			//Posicion absoluta del maestro
+		Point2D posEsclavo=esclavo.getParent().sceneToLocal(posMaestro); //Se convierte a coordenadas del esclavo
+		esclavo.setLayoutX(posEsclavo.getX()-esclavo.getLayoutBounds().getMinX()-esclavo.getRadius());
+		esclavo.setLayoutY(posEsclavo.getY()-esclavo.getLayoutBounds().getMinY()-esclavo.getRadius());
+		Net netM=maestro.getNet();
+		Net netE=esclavo.getNet();
+		if(netM!=null && netE!=null && netM==netE) {
+			return false;
+		}
+		if(netM!=null) {
+			conector.asignarPinANet(esclavo, netM);
+		} else if(netE!=null) {
+			conector.asignarPinANet(maestro, netE);
+		} else {
+			//si ninguno tiene red, creamos nueva y asignar ambos
+			Net nuevaNet=conector.crearNet();
+			conector.asignarPinANet(maestro, nuevaNet);
+			conector.asignarPinANet(esclavo, nuevaNet);
+		}
+		if(esclavo.getParent()!=null) {
+			esclavo.getParent().requestLayout();			//Forzar repintado de cables conectados a esclavo
+		}
+		return true;
+	}
+}
+	

@@ -1,0 +1,58 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SimpleCommand implements Command {
+	private static final Logger logger=Logger.getLogger(SimpleCommand.class.getName());
+	private final Runnable doRun, undoRun;
+	private final String descripcion;
+	private boolean ejecutado=false;
+	
+	public SimpleCommand(String descripcion, Runnable doRun, Runnable undoRun) {
+		this.descripcion=(descripcion!=null ? descripcion : "");
+		this.doRun=Objects.requireNonNull(doRun);
+		this.undoRun=Objects.requireNonNull(undoRun);
+	}
+	
+	@Override
+	public void ejecutar() {
+		if(!esValido() || ejecutado) return;
+		try {
+			doRun.run();
+			ejecutado=true;
+		} catch(Exception ex) {
+			logger.log(Level.SEVERE, "Error ejecutando comando: "+descripcion, ex);
+		}
+	}
+
+	@Override
+	public void deshacer() {
+		if(!esValido() || !ejecutado) return;
+		try {
+			undoRun.run();
+			ejecutado=false;
+		} catch(Exception ex) {
+			logger.log(Level.SEVERE, "Error deshaciendo comando: "+descripcion, ex);
+		}
+	}
+
+	@Override
+	public String getDescripcion() {
+		return descripcion;
+	}
+	
+	@Override
+	public boolean esValido() {
+		return doRun!=null && undoRun!=null;
+	}
+	
+	@Override
+	public boolean puedeFusionarCon(Command otro) {
+		return false;
+	}
+	
+	@Override
+	public void fusionarCon(Command otro) { /* no aplica */ }
+}

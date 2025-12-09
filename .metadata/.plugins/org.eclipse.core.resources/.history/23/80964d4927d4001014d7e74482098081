@@ -1,0 +1,755 @@
+package com.circuitos.analisiscircuitos.gui.controller;
+
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Tierra;
+import com.circuitos.analisiscircuitos.gui.controller.PanelAprendizajeController.SeccionID;
+import com.circuitos.analisiscircuitos.gui.service.io.CircuitoSerializerService;
+import com.circuitos.analisiscircuitos.gui.service.io.GestionArchivoService;
+import com.circuitos.analisiscircuitos.gui.service.state.VisualOptionsService;
+import com.circuitos.analisiscircuitos.gui.service.undo.UndoRedoManager;
+import com.circuitos.analisiscircuitos.gui.util.AboutClass;
+import com.circuitos.analisiscircuitos.gui.util.CircuitoRender;
+import com.circuitos.analisiscircuitos.gui.util.DialogoBienvenida;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil;
+import com.circuitos.analisiscircuitos.gui.util.LogViewer;
+import com.circuitos.analisiscircuitos.gui.util.MensajesUI;
+import com.circuitos.analisiscircuitos.gui.util.ThumbnailGenerator;
+import com.circuitos.analisiscircuitos.gui.util.UIHelper;
+import com.circuitos.analisiscircuitos.gui.util.MensajesUI.PosicionMensaje;
+import com.circuitos.analisiscircuitos.gui.util.MensajesUI.TipoMensaje;
+
+import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.util.Duration;
+
+/**
+ * Controlador principal de la aplicación ThevenApp. Se encarga de gestionar las
+ * pestañas principales (diseño, análisis y aprendizaje), cargar los
+ * subcontroladores, gestionar el panel de bienvenida y manejar eventos del menú
+ * superior.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ * 
+ */
+public class ThevenAppController {
+	private static final Logger logger=Logger.getLogger(ThevenAppController.class.getName());
+	
+	@FXML private Menu menuRecientes;
+	@FXML private MenuItem menuItemNuevo, menuItemCargar, menuItemGuardar, menuItemGuardarComo, menuItemSalir;
+	@FXML private MenuItem menuItemUndo, menuItemRedo, seleccionarTodo, deseleccionarTodo, limpiarArea;
+	@FXML private TabPane tabPanePrincipal;
+	@FXML private Tab tabDiseno, tabAnalisis, tabAprendizaje;
+	@FXML private ScrollPane panelComp;
+	@FXML private VBox panelAnalisisOpciones, panelNavegacionAprendizaje;
+	@FXML private BorderPane rootBorderpane;
+	@FXML private PanelDisenoController panelDisenoController;
+	@FXML private PanelAnalisisController panelAnalisisController;
+	@FXML private PanelAprendizajeController panelAprendizajeController;
+	@FXML private PanelNavegacionController panelNavegacionAprendizajeController;
+	@FXML private PanelAnalisisOpcionesController panelAnalisisOpcionesController;
+	@FXML private ImageView imagenLogo;
+	@FXML private PanelOpcionesVisualesController panelOpcionesVisualesController;
+	
+	private File archivoActual;
+	private SplitPane panelDiseno, panelAnalisis;
+	private CircuitoRender circuitoRenderer;
+	private final StringProperty windowTitle = new SimpleStringProperty("ThevenApp 1.0 - Circuito Nuevo");
+	private Stage primaryStage;
+	private GestionArchivoService fileService;
+	private UndoRedoManager undoRedoManager;
+	
+	private static final String FXML_DISENO = "/com/circuitos/AnalisisCircuitos/gui/fxml/PanelDiseno.fxml";
+	private static final String FXML_ANALISIS = "/com/circuitos/AnalisisCircuitos/gui/fxml/PanelAnalisis.fxml";
+	private static final String FXML_APRENDIZAJE = "/com/circuitos/AnalisisCircuitos/gui/fxml/PanelAprendizaje.fxml";
+
+	/**
+	 * Inicializa la escena principal y vincula el título de la ventana.
+	 * 
+	 * @param stage escenario principal
+	 */
+	public void initStage(Stage stage) {
+		this.primaryStage=Objects.requireNonNull(stage, "Stage no puede ser null");
+		stage.titleProperty().bind(windowTitle);
+	}
+
+	/**
+	 * Inicializa los componentes FXML, carga las pestañas y muestra el panel de
+	 * bienvenida.
+	 */
+	@FXML
+	public void initialize() {
+		configurarLogger();
+		if(panelAnalisisOpciones!=null) {
+			panelAnalisisOpciones.setVisible(false);
+			panelAnalisisOpciones.setManaged(false);
+		}
+		if(panelNavegacionAprendizaje!=null) {
+			panelNavegacionAprendizaje.setVisible(false);
+			panelNavegacionAprendizaje.setManaged(false);
+		}
+		configurarTabs();
+		cargarSubPaneles();
+		circuitoRenderer=new CircuitoRender(panelDisenoController);
+		InteraccionComponenteUtil.setContextoActual(InteraccionComponenteUtil.Contexto.DISENO);
+		configurarUndoRedo();
+		configurarMenuArchivo();
+		configurarMenuEdicion();
+		configurarOpcionesVisuales();
+		Platform.runLater(this::conectarControladoresAprendizaje);
+	}
+	
+	/**
+	 * Configura el nivel de log para no mostrar todos los mensajes del motor interno
+	 * de JavaFX o CSS y mostrar solo los logs de la aplicación.
+	 */
+	private void configurarLogger() {
+		Logger rootLogger=Logger.getLogger("");
+		rootLogger.setLevel(Level.INFO);
+		for(Handler h : rootLogger.getHandlers()) {
+			h.setLevel(Level.ALL);
+		}
+		Logger.getLogger("com.circuitos").setLevel(Level.ALL);
+	}
+	
+	/**
+	 * Conecta el controlador del menú lateral con el controlador del panel central en
+	 * la sección de E-Learning.
+	 */
+	private void conectarControladoresAprendizaje() {
+		if(panelAprendizajeController!=null) {
+			panelAprendizajeController.setOnLoginListener(this::actualizarVisibilidadPanelesLaterales);
+			panelAprendizajeController.setOnLogoutListener(this::actualizarVisibilidadPanelesLaterales);
+		}
+		if(panelNavegacionAprendizajeController!=null) {
+			panelNavegacionAprendizajeController.setOnNavegacionListener(nombreSeccion -> {
+				if(panelAprendizajeController!=null) {
+					try {
+						SeccionID seccion=SeccionID.valueOf(nombreSeccion);
+						panelAprendizajeController.navegarA(seccion);
+					} catch(IllegalArgumentException | NullPointerException e) {
+						logger.log(Level.WARNING, "Sección de navegación desconocida: "+nombreSeccion);
+					}
+				}
+			});
+		}
+	}
+	
+	/**
+	 * Decide qué panel lateral mostrar según la pestaña y el estado de login.
+	 */
+	private void actualizarVisibilidadPanelesLaterales() {
+		Tab select=tabPanePrincipal.getSelectionModel().getSelectedItem();
+		boolean esDiseno=(select==tabDiseno);
+		boolean esAnalisis=(select==tabAnalisis);
+		boolean esAprendizaje=(select==tabAprendizaje);
+		if(panelComp!=null) {
+			panelComp.setVisible(esDiseno);
+			panelComp.setManaged(esDiseno);
+		}
+		if(panelAnalisisOpciones!=null) {
+			panelAnalisisOpciones.setVisible(esAnalisis);
+			panelAnalisisOpciones.setManaged(esAnalisis);
+		}
+		boolean logueado=panelAprendizajeController!=null && panelAprendizajeController.isUsuarioLogueado();
+		boolean mostrarMenu=esAprendizaje && logueado;
+		if(panelNavegacionAprendizaje!=null) {
+			panelNavegacionAprendizaje.setVisible(mostrarMenu);
+			panelNavegacionAprendizaje.setManaged(mostrarMenu);
+		}
+		if(mostrarMenu && panelNavegacionAprendizajeController!=null) {
+			panelNavegacionAprendizajeController.configurarRol(panelAprendizajeController.getUsuarioActual());
+		}
+	}
+	
+	/**
+	 * 
+	 * Configura los checkbox de opciones visuales en función de la pestaña en la que se encuentre.
+	 * Para modo diseño, checkboxes interactivos, para modo análisis, desactivados.
+	 */
+	private void configurarOpcionesVisuales() {
+		if(panelOpcionesVisualesController!=null) {
+			Tab selected=tabPanePrincipal.getSelectionModel().getSelectedItem();
+			if(selected==tabAnalisis) {
+				panelOpcionesVisualesController.configurarModoAnalisis();
+			} else {
+				panelOpcionesVisualesController.configurarModoDiseno();
+			}
+		}
+		tabPanePrincipal.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+			if(panelOpcionesVisualesController==null) return;
+			if(newVal==tabAnalisis) {
+				panelOpcionesVisualesController.configurarModoAnalisis();
+			} else if(newVal==tabAprendizaje) {
+				panelOpcionesVisualesController.configurarModoAprendizaje();
+			} else {
+				panelOpcionesVisualesController.configurarModoDiseno();
+			}
+		});
+	}
+	
+	/**
+	 * Configura el menú archivo de la pantalla principal con sus atajos correspondientes.
+	 */
+	private void configurarMenuArchivo() {
+		menuItemNuevo.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN));
+		menuItemCargar.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN));
+		menuItemGuardar.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
+		menuItemGuardarComo.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN));
+		menuItemSalir.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.SHORTCUT_DOWN));
+	}
+	
+	/**
+	 * Configura el menú edición de la pantalla principal con sus atajos correspondientes.
+	 * Añade escuchadores para saber si hay algo seleccionado o no o si hay elementos en el área de dibujo.
+	 */
+	private void configurarMenuEdicion() {
+		seleccionarTodo.setAccelerator(new KeyCodeCombination(KeyCode.A, KeyCombination.SHORTCUT_DOWN));
+		deseleccionarTodo.setAccelerator(new KeyCodeCombination(KeyCode.ESCAPE));
+		limpiarArea.setAccelerator(new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN));
+		if(panelDisenoController!=null) {
+			seleccionarTodo.disableProperty().bind(
+					panelDisenoController.hayContenidoProperty().not());
+			limpiarArea.disableProperty().bind(
+					panelDisenoController.hayContenidoProperty().not());
+			deseleccionarTodo.disableProperty().bind(
+					panelDisenoController.haySeleccionProperty().not());
+		}
+	}
+	
+	/**
+	 * Configura las tabs del panel principal (incluido panel de Componentes).
+	 */
+	private void configurarTabs() {
+		tabPanePrincipal.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+			actualizarVisibilidadPanelesLaterales();
+			
+			boolean esAnalisis=newVal==tabAnalisis;
+			if(esAnalisis) {
+				Circuito circuito=panelDisenoController.getCircuitoActual();
+				if(circuito==null) {
+					tabPanePrincipal.getSelectionModel().select(tabDiseno);
+					MensajesUI.mostrarMensaje(panelDisenoController.getZonaDibujo(), 
+							"Debes crear o cargar un circuito antes de realizar el análisis", 
+							TipoMensaje.ERROR, PosicionMensaje.TOP, Duration.seconds(2));
+					return;
+				}
+				if(!verificarTierra()) {
+					tabPanePrincipal.getSelectionModel().select(tabDiseno);
+					MensajesUI.mostrarMensaje(panelDisenoController.getZonaDibujo(),
+							"Debes añadir un componente de tierra antes realizar el análisis", 
+							TipoMensaje.ERROR, PosicionMensaje.CENTER, Duration.seconds(2));
+					return;
+				}
+				generarMiniatura();
+				panelAnalisisOpcionesController.cargarNodosDisponibles(circuito.getComponentes());
+			}
+			boolean esDiseno=newVal==tabDiseno;
+			if(esDiseno) {
+				if(panelDisenoController!=null && (panelDisenoController.getCircuitoActual()==null || panelDisenoController.estaVacio())) {
+					logger.info("No hay circuito al abrir pestaña de diseño, Creando un circuito nuevo.");;
+					panelDisenoController.crearNuevoCircuito();
+				}
+				VisualOptionsService.setAllOptions(true, true, true); //En Diseño, las etiquetas se muestran por defecto
+				InteraccionComponenteUtil.setContextoActual(InteraccionComponenteUtil.Contexto.DISENO);
+				panelDisenoController.mostrarPanelPropiedades(false);
+			} else if(esAnalisis) {
+				InteraccionComponenteUtil.setContextoActual(InteraccionComponenteUtil.Contexto.ANALISIS);
+				panelAnalisisController.mostrarPanelPropiedades(false);
+			}
+		});
+	}
+
+	/**
+	 * Carga los subpaneles diseño, analisis y aprendizaje.
+	 */
+	private void cargarSubPaneles() {
+		try {
+			FXMLLoader loaderDiseno=new FXMLLoader(getClass().getResource(FXML_DISENO));
+			FXMLLoader loaderAnalisis=new FXMLLoader(getClass().getResource(FXML_ANALISIS));
+			FXMLLoader loaderAprendizaje=new FXMLLoader(getClass().getResource(FXML_APRENDIZAJE));
+
+			AnchorPane panelAprendizaje=null;
+			panelDiseno=loaderDiseno.load();
+			panelAnalisis=loaderAnalisis.load();
+			panelAprendizaje=loaderAprendizaje.load();
+			
+			panelDisenoController=loaderDiseno.getController();
+			panelAnalisisController=loaderAnalisis.getController();
+			panelAprendizajeController=loaderAprendizaje.getController();
+			panelAprendizajeController.setPanelDisenoController(panelDisenoController);
+			
+			if(panelAprendizajeController!=null) {
+				panelAprendizajeController.setOnLoginListener(this::actualizarVisibilidadPanelesLaterales);
+				panelAprendizajeController.setOnLogoutListener(this::actualizarVisibilidadPanelesLaterales);
+			}
+			
+			panelAprendizajeController.setOnRequestDisenoTab(() -> {
+				tabPanePrincipal.getSelectionModel().select(tabDiseno);
+			});
+			panelAprendizajeController.setOnRequestLearningTab(() -> {
+				tabPanePrincipal.getSelectionModel().select(tabAprendizaje);
+			});
+			
+			tabDiseno.setContent(panelDiseno);
+			tabAnalisis.setContent(panelAnalisis);
+			tabAprendizaje.setContent(panelAprendizaje);
+			
+			panelAnalisisOpcionesController.setPanelAnalisisController(panelAnalisisController);
+			panelAnalisisController.setOpcionesController(panelAnalisisOpcionesController);
+			panelAnalisisController.setPanelDisenoController(panelDisenoController);
+			
+			instalarAtajosTeclado();
+		} catch (IOException e) {
+			logger.log(Level.SEVERE, "Error cargando subpaneles");
+		}
+	}
+	
+	/**
+	 * Acción del menú para crear un nuevo circuito. Pide confirmación si hay un
+	 * circuito cargado previamente.
+	 */
+	@FXML
+	private void onCrearNuevoCircuito() {
+		Circuito circuito = panelDisenoController.getCircuitoActual();
+		if (circuito!=null) {
+			Alert alerta=new Alert(Alert.AlertType.CONFIRMATION);
+			alerta.setTitle("Nuevo Circuito");
+			alerta.setHeaderText("¿Seguro que quieres crear un nuevo circuito?");
+			alerta.setContentText("El circuito actual se eliminará y no se podrá recuperar.");
+			Optional<ButtonType> result=alerta.showAndWait();
+			if (result.isEmpty() || result.get()!=ButtonType.OK) {
+				return;
+			}
+		}
+		panelDisenoController.crearNuevoCircuito();
+		archivoActual=null;
+		windowTitle.set("ThevenApp 1.0 - Circuito Nuevo");
+		if(panelAnalisisController!=null) {
+			panelAnalisisController.resetAnalisis();
+		}
+	}
+
+	/**
+	 * Acción del menú para abrir un archivo de circuito (*.json). 
+	 * Muestra una ventana de selección de archivo y, una vez cargado,
+	 * modifica el título del stage.
+	 */
+	@FXML
+	private void onAbrir(ActionEvent e) {
+		fileService.open().ifPresent(f -> {
+			try {
+				cargarProyectoCompleto(f);
+			} catch (IOException ex) {
+				logger.log(Level.SEVERE, "Error cargando archivo: "+ f.getName(), ex);
+				mostrarError("Error al cargar el archivo");
+			}
+		});
+	}
+
+	/**
+	 * Acción del menú para guardar proyecto en un archivo. Modifica el título del stage.
+	 * Si el archivo existe simplemente sobreescribe, si no se había guardado nunca salta al
+	 * método onGuardarComo.
+	 */
+	@FXML
+	private boolean onGuardar(ActionEvent e) {
+		if (archivoActual == null) {
+			return onGuardarComo(e);
+		}
+		boolean ok = fileService.save(archivoActual, 
+				panelDisenoController.getCircuitoActual(), 
+				panelDisenoController.getZonaDibujo());
+		if (ok) {
+			mostrarExito("Proyecto guardado");
+		}
+		return ok;
+	}
+
+	/**
+	 * Acción del menú para guardar el circuito actual en un nuevo archivo (*.json).
+	 * Abre un cuadro de selección de ruta de destino para el archivo.
+	 */
+	@FXML
+	private boolean onGuardarComo(ActionEvent e) {
+		Optional<File> opt=fileService.saveAs(archivoActual);
+		if(opt.isEmpty()) return false;
+		File f=opt.get();
+		archivoActual=f;
+		boolean ok=fileService.save(f, 
+				panelDisenoController.getCircuitoActual(), 
+				panelDisenoController.getZonaDibujo());
+		if(ok) {
+			windowTitle.set("ThevenApp 1.0 - "+f.getName());
+			mostrarExito("Proyecto guardado como "+f.getName());
+		}
+		return ok;
+	}
+
+	/**
+	 * Acción del menú para salir de la aplicación.
+	 */
+	@FXML
+	private void onSalir(ActionEvent e) {
+		Platform.exit();
+	}
+	
+	/**
+	 * Acción del menú para mostrar el contenido del archivo de logs.
+	 */
+	@FXML
+	private void onVerLogs(ActionEvent e) {
+		LogViewer.show(primaryStage);
+	}
+	
+	/**
+	 * Acción del menú para seleccionar todos los elementos del área de dibujo.
+	 */
+	@FXML
+	private void onSeleccionarTodo() {
+		if(panelDisenoController!=null) panelDisenoController.seleccionarTodo();
+	}
+	
+	/**
+	 * Acción del menú para deseleccionar todos los elementos del área de dibujo.
+	 */
+	@FXML
+	private void onDeseleccionarTodo() {
+		if(panelDisenoController!=null) panelDisenoController.deseleccionarTodo();
+	}
+	
+	/**
+	 * Acción del menú para limpiar todo el área de dibujo.
+	 */
+	@FXML
+	private void onLimpiarArea() {
+		if(panelDisenoController!=null) panelDisenoController.limpiarAreaDibujo();
+	}
+	
+	@FXML
+	private void onAbrirManual(ActionEvent event) {
+		String ruta="/com/circuitos/analisiscircuitos/manuales/manual_usuario.pdf";
+		String temp="manual_usuario_thevenapp.pdf";
+		try {
+			if(Desktop.isDesktopSupported()) {
+				InputStream pdfSt=getClass().getResourceAsStream(ruta);
+				if(pdfSt==null) {
+					UIHelper.mostrarError("No se encontró el archivo del manual.");
+					return;
+				}
+				File archivotmp=new File(System.getProperty("java.io.tmpdir"), temp);
+				Files.copy(pdfSt, archivotmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				Desktop.getDesktop().open(archivotmp);
+				archivotmp.deleteOnExit();
+				logger.info("Manual de usuario abierto con éxito");
+			} else {
+				UIHelper.mostrarError("El sistema no soporta la apertura de archivos externos.");
+			}
+		} catch(IOException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Error al intentar abrir el manual: ", e);
+			UIHelper.mostrarError("Error al intentar abrir el manual: "+e.getMessage());
+		}
+	}
+	/**
+	 * Acción del menú para mostrar un diálogo "Acerca De" sobre la aplicación.
+	 */
+	@FXML
+	private void onAcercaDe() {
+		AboutClass.mostrarAcercaDe();
+	}
+	
+	/**
+	 * Verifica si hay un componente Tierra conectado al circuito.
+	 * 
+	 * @return {@code true} si hay componente Tierra, {@code false} si no
+	 */
+	private boolean verificarTierra() {
+		Circuito c=panelDisenoController.getCircuitoActual();
+		if(c==null) return false;
+		return c.getComponentes().stream()
+					.anyMatch(comp -> comp instanceof Tierra);
+	}
+	
+	/**
+	 * Obtiene una captura de pantalla del área de diseño para ser 
+	 * utilizada como referencia en el área de análisis.
+	 */
+	private void generarMiniatura() {
+		WritableImage thumb=ThumbnailGenerator.generate(
+				panelDisenoController.getZonaDibujo(), 0.85, 65);
+		panelAnalisisController.setMiniaturaCircuito(thumb);
+	}
+	
+	/**
+	 * Cargar un archivo dado (por el menú "recientes").
+	 */
+	private void cargarArchivoDesdeRuta(File archivo) {
+		if(archivo==null) return;
+		if(!archivo.exists()) {
+			mostrarError("El archivo no existe: "+archivo.getAbsolutePath());
+			actualizarMenuRecientesSafe();
+			return;
+		}
+		try {
+			cargarProyectoCompleto(archivo);
+		} catch(IOException ex) {
+			logger.log(Level.SEVERE, "Error cargando archivo reciente", ex);
+			mostrarError("No se pudo cargar el archivo: "+archivo.getName());
+		}
+		actualizarMenuRecientesSafe();
+	}
+	
+	/**
+	 * Se invoca justo después de stage.show() para que estén los 
+	 * recursos disponibles.
+	 */
+	public void postInit(Stage primaryStage) {
+		fileService=new GestionArchivoService(
+				new CircuitoSerializerService(),
+				windowTitle, menuRecientes, primaryStage);
+		
+		Platform.runLater(()-> {
+			Runnable irAElearning=() -> {
+				tabPanePrincipal.getSelectionModel().select(tabAprendizaje);
+			};
+			Supplier<Boolean> accionAbrir=() -> {
+				Optional<File> archivo=fileService.open();
+				if(archivo.isPresent()) {
+					try {
+						cargarProyectoCompleto(archivo.get());
+						return true;
+					} catch(Exception ex) {
+						logger.log(Level.SEVERE, "Error cargando archivo", ex);
+						mostrarError("Error al cargar el archivo");
+						return true;
+					}
+				}
+				return false;
+			};
+			DialogoBienvenida.show(primaryStage, 
+					()->panelDisenoController.crearNuevoCircuito(), 
+					accionAbrir, 
+					this::cargarArchivoDesdeRuta,
+					irAElearning);
+			actualizarMenuRecientesSafe();
+		});
+	}
+	
+	/**
+	 * Muestra un mensaje de error cuando surge algún problema de lectura o escritura de archivo.
+	 * 
+	 * @param mensaje Mensaje que muestra
+	 */
+	private void mostrarError(String mensaje) {
+		MensajesUI.mostrarMensaje(panelDisenoController.getZonaDibujo(), mensaje, 
+				TipoMensaje.ERROR, PosicionMensaje.TOP, Duration.seconds(2));
+	}
+	
+	/**
+	 * Muestra un mensaje de éxito cuando todo ha salido bien en la lectura o escritura de archivo.
+	 * 
+	 * @param mensaje Mensaje que muestra
+	 */
+	private void mostrarExito(String mensaje) {
+		MensajesUI.mostrarMensaje(panelDisenoController.getZonaDibujo(), mensaje, 
+				TipoMensaje.EXITO, PosicionMensaje.TOP, Duration.seconds(2));
+	}
+	
+	/**
+	 * Carga un proyecto en la aplicación.
+	 * 
+	 * @param f					Archivo del proyecto
+	 * @throws IOException		Excepción si hay error al abrir archivo
+	 */
+	private void cargarProyectoCompleto(File f) throws IOException {
+		circuitoRenderer.cargarArchivo(f);
+		archivoActual=f;
+		windowTitle.set("ThevenApp 1.0 - "+f.getName());
+		actualizarMenuRecientesSafe();
+		logger.log(Level.INFO, "Archivo cargado: "+f.getName());
+		if(panelAnalisisController!=null) {
+			panelAnalisisController.resetAnalisis();
+		}
+	}
+	
+	/**
+	 * Actualiza el menú de archivos recientes de forma segura, 
+	 * usando las excepciones correspondientes.
+	 */
+	private void actualizarMenuRecientesSafe() {
+		try {
+			fileService.actualizarMenuRecientes(
+					this::cargarArchivoDesdeRuta,
+					() -> {
+						try {
+							fileService.actualizarMenuRecientes(this::cargarArchivoDesdeRuta, () -> {});
+						} catch (IOException e) {
+							logger.log(Level.WARNING, "Error actualizando menú recientes", e);
+						}
+					});	
+		} catch(IOException e) {
+			logger.log(Level.WARNING, "Error actualizando menú recientes", e);
+			mostrarError("No se pudo actualizar la lista de archivos recientes");
+		}
+	}
+	
+	/**
+	 * Configurar el gestor de undo/redo y vincula los elementos de la interfaz.
+	 */
+	private void configurarUndoRedo() {
+		undoRedoManager=UndoRedoManager.getInstance();
+		undoRedoManager.setMaxHistorySize(20);
+		
+		//Vincular propiedades de los menús con el estado del gestor
+		menuItemUndo.disableProperty().bind(undoRedoManager.puedeDeshacerProperty().not());
+		menuItemRedo.disableProperty().bind(undoRedoManager.puedeRehacerProperty().not());
+	
+		menuItemUndo.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.SHORTCUT_DOWN));
+		menuItemRedo.setAccelerator(new KeyCodeCombination(KeyCode.Y, KeyCombination.SHORTCUT_DOWN));
+		
+		//Actualizar texto de los menús con descripción de la acción
+		menuItemUndo.textProperty().bind(
+				javafx.beans.binding.Bindings.when(undoRedoManager.puedeDeshacerProperty())
+				.then(javafx.beans.binding.Bindings.concat("Deshacer: ", undoRedoManager.deshacerDescripcionProperty()))
+				.otherwise("Deshacer"));
+		menuItemRedo.textProperty().bind(
+				javafx.beans.binding.Bindings.when(undoRedoManager.puedeRehacerProperty())
+				.then(javafx.beans.binding.Bindings.concat("Rehacer: ", undoRedoManager.rehacerDescripcionProperty()))
+				.otherwise("Rehacer"));
+	}
+	
+	/**
+	 * Maneja el evento de deshacer (Ctrl+Z/Cmd+Z).
+	 * 
+	 * @param event			Evento de acción del menú
+	 */
+	@FXML
+	private void onDeshacer() {
+		try {
+			boolean exito=undoRedoManager.deshacer();
+			if(exito) {
+				//Opcional: mostrar mensaje de éxito
+				String descripcion=undoRedoManager.getDeshacerDescription();
+				if(!descripcion.isEmpty()) {
+					mostrarExito("Deshecho: "+descripcion);
+				}
+			} else {
+				//No había nada que deshacer
+				mostrarError("No hay acciones para deshacer");
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error durante operación deshacer", e);
+			mostrarError("Error al deshacer la acción");
+		}
+	}
+	
+	/**
+	 * Maneja el evento de rehacer (Ctrl+Y/Cmd+Y).
+	 * 
+	 * @param event			Evento de acción del menú
+	 */
+	@FXML
+	private void onRehacer() {
+		try {
+			boolean exito=undoRedoManager.rehacer();
+			if(exito) {
+				//Opcional: mostrar mensaje de éxito
+				String descripcion=undoRedoManager.getRehacerDescripcion();
+				if(!descripcion.isEmpty()) {
+					mostrarExito("Rehecho: "+descripcion);
+				}
+			} else {
+				//No había nada que rehacer
+				mostrarError("No hay acciones para rehacer");
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error durante operación rehacer", e);
+			mostrarError("Error al rehacer la acción");
+		}
+	}
+	
+	/**
+	 * Obtiene el gestor de undo/redo para uso de otros controladores.
+	 * 
+	 * @return Gestor de undo/redo
+	 */
+	public UndoRedoManager getUndoRedoManager() {
+		return undoRedoManager;
+	}
+	
+	/**
+	 * Instala ciertos atajos de teclado para deshacer/rehacer en la aplicación.
+	 */
+	private void instalarAtajosTeclado() {
+		//Instalar cuando la Scene esté lista
+		Platform.runLater(() -> {
+			javafx.scene.Node root=rootBorderpane;
+			if(root==null) {
+				return;
+			}
+			if(root.getScene()!=null) {
+				registrarAtajos(root.getScene());
+			} else {
+				root.sceneProperty().addListener((obs, oldVal, newVal) -> {
+					if(newVal!=null) registrarAtajos(newVal);
+				});
+			}
+		});
+	}
+	
+	/**
+	 * Registra los atajos de teclado para deshacer/rehacer tales como
+	 * Cmd+Z en Mac y Ctrl+Z en Windows para deshacer y 
+	 * Cmd+Shift+Z o Cmd+Y en Mac y Ctrl+Y en Windows para rehacer.
+	 * 
+	 * @param scene 		Scene donde se registran los atajos
+	 */
+	private void registrarAtajos(Scene scene) {
+		var undoMac=new KeyCodeCombination(KeyCode.Z, KeyCombination.META_DOWN);
+		var undoWin=new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN);
+		var redoMacShiftZ=new KeyCodeCombination(KeyCode.Z, KeyCombination.META_DOWN, KeyCombination.SHIFT_DOWN);
+		var redoMacY=new KeyCodeCombination(KeyCode.Y, KeyCombination.META_DOWN);
+		var redoWinY=new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN);
+		scene.getAccelerators().put(undoMac, () -> undoRedoManager.deshacer());
+		scene.getAccelerators().put(undoWin, () -> undoRedoManager.deshacer());
+		scene.getAccelerators().put(redoMacShiftZ, () -> undoRedoManager.rehacer());
+		scene.getAccelerators().put(redoMacY, () -> undoRedoManager.rehacer());
+		scene.getAccelerators().put(redoWinY, () -> undoRedoManager.rehacer());
+	}
+}

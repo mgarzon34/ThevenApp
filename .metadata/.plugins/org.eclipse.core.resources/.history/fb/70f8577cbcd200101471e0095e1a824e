@@ -1,0 +1,81 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.ConectorPuntos;
+import com.circuitos.temporal.gui.model.Net;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.service.undo.DescripcionesAccion;
+
+/**
+ * Comando para conectar dos componentes mediante un cable.
+ * Maneja la creación y eliminación de conexiones durante operaciones undo/redo.
+ * Los cables tienen su propio ciclo de vida independiente.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ConnectComponentsCommand implements Command {
+    private static final Logger logger = Logger.getLogger(ConnectComponentsCommand.class.getName());
+    
+    private final PuntoConexion puntoA;
+    private final PuntoConexion puntoB;
+    private final ConectorPuntos conector;
+    private Cable cableCreado;
+    private Net netAnteriorA;
+    private Net netAnteriorB;
+    private boolean ejecutado=false;
+    private String descripcion="Conectar";
+    
+    /**
+     * Constructor del comando de conexión de componentes.
+     * 
+     * @param puntoA				Primer punto de conexión
+     * @param puntoB				Segundo punto de conexión
+     * @param conector				Conector que los conecta
+     */
+    public ConnectComponentsCommand(PuntoConexion puntoA, PuntoConexion puntoB, ConectorPuntos conector) {
+        this.puntoA = puntoA;
+        this.puntoB = puntoB;
+        this.conector = conector;
+    }
+    
+    /* Implementación métodos de la interfaz */
+    
+    @Override
+    public void ejecutar() {
+    	if(!ejecutado) {
+    		netAnteriorA=(puntoA!=null) ? puntoA.getNet() : null;
+    		netAnteriorB=(puntoB!=null) ? puntoB.getNet() : null;
+    		Componente ca=(puntoA!=null) ? puntoA.getComponente() : null;
+    		Componente cb=(puntoB!=null) ? puntoB.getComponente() : null;
+    		this.descripcion=DescripcionesAccion.conectar(ca, cb);
+    		ejecutado=true;
+    	}
+    	cableCreado=conector.conectarPuntos(puntoA, puntoB);
+    	logger.fine(() -> "Conexión creada - Cable: "+(cableCreado!=null ? cableCreado.getCableId() : "null"));
+    }
+    
+    @Override
+    public void deshacer() {
+    	if(cableCreado==null) return;
+    	conector.eliminarCable(cableCreado);
+    	conector.asignarPinANet(puntoA, netAnteriorA);
+    	conector.asignarPinANet(puntoB, netAnteriorB);
+    	logger.fine(() -> "Conexión deshecha; nets restauradas");
+    }
+    
+    @Override
+    public String getDescripcion() {
+    	return descripcion;
+    }
+    
+    @Override
+    public boolean esValido() {
+    	if(puntoA==null || puntoB==null || conector==null) return false;
+    	if(!ejecutado) return true;
+    	return puntoA.getScene()!=null && puntoB.getScene()!=null;
+    }
+}

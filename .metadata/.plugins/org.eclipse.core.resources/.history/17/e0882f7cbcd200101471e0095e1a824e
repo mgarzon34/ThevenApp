@@ -1,0 +1,143 @@
+package com.circuitos.AnalisisCircuitos.dominio.util;
+
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+
+/**
+ * Gestor para crear y reciclar Ids únicos de los componentes.
+ * Implementa el patrón Singleton para asegurar una única instancia.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class GestorIds {
+	private static final Logger logger=Logger.getLogger(GestorIds.class.getName());
+	//Única instancia de la clase (Singleton)
+	private static final GestorIds INSTANCE=new GestorIds();
+	
+	private static final Map<String, Integer> contadores=new HashMap<>();
+	private static final Map<String, Queue<Integer>> idsLiberados=new HashMap<>();
+	
+	private GestorIds() { /* No instanciable */ }
+	
+	/**
+	 * Devuelve la instancia única del gestor.
+	 * 
+	 * @return Instancia Singleton de GestorIds
+	 */
+	public static GestorIds getInstance() {
+		return INSTANCE;
+	}
+	
+	/**
+	 * Libera el Id del componente para que pueda ser reutilizado.
+	 * Se llama antes de eliminar un componente del circuito.
+	 * 
+	 * @param componente del que liberamos el ID
+	 */
+	public void liberarId(Componente componente) {
+		Objects.requireNonNull(componente, "Componente no puede ser null");
+		String Id=componente.getId();
+		String prefijo=componente.getPrefijo();
+		
+		if(Id==null || Id.equalsIgnoreCase("GND")) {
+			return;
+		}
+		
+		try {
+			int numero=Integer.parseInt(Id.replace(prefijo, ""));
+			idsLiberados.computeIfAbsent(prefijo, _ -> new LinkedList<>()).add(numero);
+			logger.log(Level.FINE, "ID liberado {0}{1}", new Object[] {prefijo, numero});
+		} catch (NumberFormatException e) {
+			logger.log(Level.WARNING, "Formato de ID inválido: {0}", Id);
+		}
+	}
+	
+	/**
+	 * (Sobrecargado) Libera el Id único de un cable para que pueda ser reutilizado.
+	 * Se llama antes de eliminar un cable del circuito.
+	 * 
+	 * @param id			Id único de cable
+	 * @param prefijo		Prefijo usado para identificación
+	 */
+	public void liberarId(String id, String prefijo) {
+		Objects.requireNonNull(prefijo, "Prefijo no puede ser null");
+		if(id==null || prefijo==null || !id.startsWith(prefijo)) return;
+		
+		try {
+			int numero=Integer.parseInt(id.replace(prefijo, ""));
+			idsLiberados.computeIfAbsent(prefijo, _->new LinkedList<>()).add(numero);
+			logger.log(Level.FINE, "ID liberado {0}{1}", new Object[] {prefijo, numero});
+		} catch(NumberFormatException e) {
+			logger.log(Level.WARNING, "Formato de ID inválido: {0}", id);
+		}
+	}
+	
+	/**
+	 * Genera un nuevo identificador único (ID) para un tipo de componente. 
+	 * Primero intenta reutilizar algún Id liberado y si no hay, crea uno nuevo.
+	 * 
+	 * @param prefijo 		Prefijo del componente ("R", "V", etc.)
+	 * @return Nuevo Id
+	 */
+	public String generarId(Componente componente) {
+		Objects.requireNonNull(componente, "Componente no puede ser null");
+		String prefijo=componente.getPrefijo();
+		if(prefijo==null || prefijo.isBlank()) {
+			return "";
+		}
+		if("GND".equals(prefijo)) {
+			return "GND";
+		}
+		
+		Queue<Integer> liberados=idsLiberados.get(prefijo);
+		Integer numero;
+		
+		if(liberados!=null && !liberados.isEmpty()) {
+			numero=liberados.poll(); //reutiliza el ID mas antiguo
+			logger.log(Level.FINE, "Reutilizando ID {0}{1}", new Object[] {prefijo, numero});
+		} else {
+			numero=contadores.getOrDefault(prefijo, 0)+1;
+			contadores.put(prefijo, numero);
+		}
+		return prefijo+numero;
+	}
+	
+	/**
+	 * Genera un nuevo identificador único (ID) para un cable.
+	 * Primero intenta reutilizar algún ID liberado y si no hay, crea uno nuevo.
+	 * 
+	 * @param prefijo		Prefijo del cable ("Cable-")
+	 * @return nuevo ID
+	 */
+	public String generarId(String prefijo) {
+		Objects.requireNonNull(prefijo, "Prefijo no puede ser null");
+		if (prefijo==null || prefijo.isBlank()) return "";
+		Queue<Integer> liberados=idsLiberados.get(prefijo);
+		Integer numero;
+		if(liberados!=null && !liberados.isEmpty()) {
+			numero=liberados.poll();
+		} else {
+			numero=contadores.getOrDefault(prefijo, 0)+1;
+			contadores.put(prefijo, numero);
+		}
+		return prefijo+numero;
+	}
+	
+	/**
+	 * Vacía la lista de Ids utilizados y liberados para comenzar a generarla de nuevo.
+	 * Se usa cuando se crea un circuito nuevo. 
+	 */
+	public static void reset() {
+		contadores.clear();
+		idsLiberados.clear();
+		logger.log(Level.FINE, "GestorIds reiniciado");
+	}
+}

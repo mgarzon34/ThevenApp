@@ -1,0 +1,33 @@
+package com.circuitos.temporal.dto;
+
+import java.util.List;
+
+import com.circuitos.temporal.dominio.Circuito;
+
+/**
+ * DTO (Data Transfer Object) que representa un circuito en un archivo. 
+ * Utiliza JSON para guardar/cargar circuitos: componentes, cables, posiciones y metadatos.
+ * Serializable/Deserializable con Jackson.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public record CircuitoFileDto (
+	Metadata metadata,
+	Circuito circuito,
+	List<PosicionComponenteDto> posiciones,
+	List<CableDto> cables
+) {
+	/**
+	 * Constructor para crear un archivo de circuito con todos sus componentes.
+	 * Genera automáticamente los metadatos.
+	 * 
+	 * @param circuito				Circuito para guardar/cargar
+	 * @param posiciones			Posiciones visuales de cada componente
+	 * @param cables				Cables de conexiones entre componentes
+	 */
+	public static CircuitoFileDto metaDatosGenerados(Circuito circuito, List<PosicionComponenteDto> posiciones,
+			List<CableDto> cables) {
+		return new CircuitoFileDto(new Metadata(), circuito, posiciones, cables);
+	}
+}

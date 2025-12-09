@@ -1,0 +1,489 @@
+package com.circuitos.analisiscircuitos.gui.controller;
+
+import java.text.DecimalFormat;
+import java.util.Arrays;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.dominio.Tierra;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades.Type;
+import com.circuitos.analisiscircuitos.gui.commands.ChangeParamCommand;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.NodeField;
+import com.circuitos.analisiscircuitos.gui.service.undo.DescripcionesAccion;
+import com.circuitos.analisiscircuitos.gui.service.undo.UndoRedoManager;
+
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
+
+/**
+ * Controlador del panel de propiedades de los componentes.
+ * Se encarga de mostrar, actualizar y modificar las propiedades de cada elemento.
+ * 
+ * @author Marco Antonio Garzón
+ * @version 1.0
+ */
+public class PanelPropiedadesController {
+	private static final Logger logger=Logger.getLogger(PanelPropiedadesController.class.getName());
+	
+	@FXML private Label titulo, labelValor, labelExtremos, labelNodoNeg, labelNodoPos;
+	@FXML private Label labelAdvertencia, labelNodosConexion, labelNodosControl, labelCarga;
+	@FXML private Hyperlink linkValorUnidad, linkCarga, linkNodoNeg, linkNodoPos;
+	@FXML private Hyperlink linkCtrlNeg, linkCtrlPos, linkDependencia, linkNodoTierra;
+	@FXML private VBox tierraBox;
+	@FXML private GridPane advertenciaBox, gridNodosConexion, gridControl;
+	@FXML private ImageView iconoAdvertencia;
+	@FXML private Separator separadorAdvertencia;
+
+	private Componente componenteActual;
+	private Cable cableActual;
+	private final PropiedadesEditor editor;
+	
+	/**
+	 * Constructor sin parámetros. Utiliza el adaptador {@link PropiedadesActionsAdapter}
+	 */
+	public PanelPropiedadesController() {
+		this(PropiedadesActionsAdapter.getInstance());
+	}
+	
+	/**
+	 * Constructor con parámetros. Utiliza instancia de {@link PropiedadesEditor}
+	 * 
+	 * @param editor Instancia de PropiedadesEditor
+	 */
+	public PanelPropiedadesController(PropiedadesEditor editor) {
+		this.editor=editor;
+	}
+
+	/**
+	 * Inicialización del Panel de Propiedades de los componentes.
+	 */
+	@FXML
+	public void initialize() {
+		limpiarPanel();
+		asignarHandlers();
+	}
+	
+	/**
+	 * Limpia el panel de propiedades ocultando bloques y etiquetas.
+	 * Se usa para limpiar antes de visualizar un nuevo componente.
+	 */
+	private void limpiarPanel() {
+		titulo.setText("Propiedades");
+		mostrarBloqueValorCarga(false);
+		mostrarBloqueConexiones(false);
+		mostrarBloqueControl(false);
+		mostrarTierraBox(false);
+		mostrarExtremos(false);
+		mostrarAdvertencia(false);
+	}
+	
+	/**
+	 * Helper genérico para registrar un cambio en Undo/Redo.
+	 */
+	private <T> void registrarCambio(Supplier<String> descSup, Supplier<T> oldSupplier, 
+			Supplier<Boolean> action, Supplier<T> newSupplier, Consumer<T> setter, Runnable refrescar) {
+		T oldVal=oldSupplier.get();
+		boolean accion=Boolean.TRUE.equals(action.get());
+		if(!accion) {
+			if(refrescar!=null) refrescar.run();
+			return;
+		}
+		T newVal=newSupplier.get();
+		if(java.util.Objects.equals(oldVal, newVal) ) {
+			if(refrescar!=null) refrescar.run();
+			return;
+		}
+		String desc=(descSup!=null) ? descSup.get() : "";
+		UndoRedoManager.getInstance().ejecutarComando(
+				new ChangeParamCommand<>(desc, () -> oldVal, setter, newVal));
+		if(refrescar!=null) refrescar.run();
+	}
+	
+	/**
+	 * Asigna los manejadores de eventos a los enlaces del panel de propiedades.
+	 * Permiten abrir ventanas para modificar valores.
+	 */
+	private void asignarHandlers() {
+		bindHyperlink(linkValorUnidad,
+				() -> componenteActual!=null,
+				() -> componenteActual.getValor(),
+				() -> editor.editarValorUnidad(componenteActual, linkValorUnidad.getText()),
+				() -> componenteActual.getValor(),
+				(Double v) -> componenteActual.setValor(v),
+				() -> DescripcionesAccion.cambiarValor(componenteActual),
+				() -> mostrarPropiedades(componenteActual));
+		
+		bindHyperlink(linkCarga,
+				() -> componenteActual!=null,
+				() -> componenteActual.isCarga(),
+				() -> editor.gestionarCarga(componenteActual),
+				() -> componenteActual.isCarga(),
+				(Boolean v) -> componenteActual.setCarga(v),
+				() -> DescripcionesAccion.alternarCarga(componenteActual),
+				() -> mostrarPropiedades(componenteActual));
+		
+		bindHyperlink(linkCtrlNeg,
+				() -> componenteActual instanceof FuenteDependiente,
+				() -> ((FuenteDependiente) componenteActual).getCtrlNeg(),
+				() -> editor.editarNodo(componenteActual, NodeField.CONTROL_NEG, linkCtrlNeg.getText()),
+				() -> ((FuenteDependiente) componenteActual).getCtrlNeg(),
+				(Integer v) -> ((FuenteDependiente) componenteActual).setCtrlNeg(v),
+				() -> DescripcionesAccion.editarNodo(componenteActual, NodeField.CONTROL_NEG),
+				() -> mostrarPropiedades(componenteActual));
+
+		bindHyperlink(linkCtrlPos,
+			    () -> componenteActual instanceof FuenteDependiente,
+			    () -> ((FuenteDependiente) componenteActual).getCtrlPos(),
+			    () -> editor.editarNodo(componenteActual, NodeField.CONTROL_POS, linkCtrlPos.getText()),
+			    () -> ((FuenteDependiente) componenteActual).getCtrlPos(),
+			    (Integer v) -> ((FuenteDependiente) componenteActual).setCtrlPos(v),
+			    () -> DescripcionesAccion.editarNodo(componenteActual, NodeField.CONTROL_POS),
+			    () -> mostrarPropiedades(componenteActual));
+		
+		this.<FuenteDependiente.ControlType>bindHyperlink(linkDependencia,
+			    () -> componenteActual instanceof FuenteDependiente,
+			    () -> ((FuenteDependiente) componenteActual).getControlType(),
+			    () -> editor.alternarDependencia((Componente) componenteActual),
+			    () -> ((FuenteDependiente) componenteActual).getControlType(),
+			    (var v) -> ((FuenteDependiente) componenteActual).setControlType(v),
+			    () -> DescripcionesAccion.editarTipoDependencia(componenteActual),
+			    () -> mostrarPropiedades(componenteActual)
+			);
+		configurarSoloLectura(linkNodoNeg);
+		configurarSoloLectura(linkNodoPos);
+		configurarSoloLectura(linkNodoTierra);
+	}
+	
+	/**
+	 * Configura un hyperlink para que parezca texto normal (sin subrayado, sin acción y cursor normal).
+	 * 
+	 * @param link			Link de solo lectura
+	 */
+	private void configurarSoloLectura(Hyperlink link) {
+		link.getStyleClass().remove("propiedades-enlace");
+		link.getStyleClass().add("propiedades-enlace-solo-lectura");
+		link.setOnAction(null);
+	}
+	
+	/**
+	 * Asocia a un {@link Hyperlink} una acción condicional seguida de una actualización de la intefaz.
+	 * 
+	 * @param link				Enlace sobre el que se asigna la acción
+	 * @param condition			Proveedor que devuelve {@code true} si se debe permitir la acción
+	 * @param action			Proveedor que ejecuta la acción y devuelve {@code true} si se realizaron cambios.
+	 * @param refresh			Operación a ejecutar para refrescar la interfaz tras un cambio.
+	 */
+	private <T> void bindHyperlink(Hyperlink link, Supplier<Boolean> condition,
+			Supplier<T> oldGetter, Supplier<Boolean> action, Supplier<T> newGetter,
+			Consumer<T> setter, Supplier<String> descripcionSup, Runnable refresh) {
+		link.setOnAction(k -> {
+			if(!Boolean.TRUE.equals(condition.get())) {
+				logger.warning("Acción no permitida: "+link.getText());
+				return;
+			}
+			registrarCambio(descripcionSup, oldGetter, action, newGetter, setter, refresh);
+		});
+	}
+
+	/**
+	 * Muestra las propiedades del componente seleccionado.
+	 * 
+	 * @param comp				Componente del cual se muestran las propiedades
+	 */
+	public void mostrarPropiedades(Componente comp) {
+		this.componenteActual = comp;
+		if (comp == null) {
+			limpiarPanel();
+			return;
+		}
+		logger.log(Level.FINE, "Mostrando {0} id={1}", new Object[] {comp.getClass().getSimpleName(), comp.getId()});
+		limpiarPanel();
+		if (comp instanceof Resistencia r) mostrarResistencia(r);
+		else if (comp instanceof FuenteTensionInd fti) mostrarFuenteTensionInd(fti);
+		else if (comp instanceof FuenteCorrienteInd fci) mostrarFuenteCorrienteInd(fci);
+		else if (comp instanceof FuenteTensionDependiente ftd) mostrarFuenteTensionDep(ftd);
+		else if (comp instanceof FuenteCorrienteDependiente fcd) mostrarFuenteCorrienteDep(fcd);
+		else if (comp instanceof Tierra t) mostrarTierra(t);
+
+		if (comp instanceof Tierra t) {
+			mostrarAdvertencia(t.getNodoTierra() < 0);
+		} else {
+			mostrarAdvertencia(comp.getNodo1() < 0 || comp.getNodo2() < 0);
+		}
+	}
+
+	/**
+	 * Muestra las propiedades de una resistencia.
+	 * 
+	 * @param r			Resistencia a mostrar
+	 */
+	private void mostrarResistencia(Resistencia r) {
+		titulo.setText("RESISTENCIA "+r.getId());
+		labelValor.setText("Resistencia:");
+		mostrarBloqueValorCarga(true);
+		mostrarValor(Unidades.format(r.getValor(), Type.RESISTENCIA));
+		configurarCarga(r);
+		mostrarBloqueConexiones(true);
+		configurarNodos(r);
+	}
+
+	/**
+	 * Muestra las propiedades de una fuente de tensión independiente.
+	 * 
+	 * @param fti			Fuente de tensión independiente a mostrar
+	 */
+	private void mostrarFuenteTensionInd(FuenteTensionInd fti) {
+		titulo.setText("FUENTE DE TENSIÓN INDEPENDIENTE "+fti.getId());
+		labelValor.setText("Voltaje:");
+		mostrarBloqueValorCarga(true);
+		mostrarValor(Unidades.format(fti.getValor(), Type.TENSION));
+		configurarCarga(fti);
+		mostrarBloqueConexiones(true);
+		configurarNodos(fti);
+	}
+
+	/**
+	 * Muestra las propiedades de una fuente de corriente independiente.
+	 * 
+	 * @param fci			Fuente de corriente independiente a mostrar
+	 */
+	private void mostrarFuenteCorrienteInd(FuenteCorrienteInd fci) {
+		titulo.setText("FUENTE DE CORRIENTE INDEPENDIENTE "+fci.getId());
+		labelValor.setText("Corriente:");
+		mostrarBloqueValorCarga(true);
+		mostrarValor(Unidades.format(fci.getValor(), Type.CORRIENTE));
+		configurarCarga(fci);
+		mostrarBloqueConexiones(true);
+		configurarNodos(fci);
+	}
+
+	/**
+	 * Muestra las propiedades de una fuente de tensión dependiente.
+	 * 
+	 * @param ftd			Fuente de tensión dependiente a mostrar
+	 */
+	private void mostrarFuenteTensionDep(FuenteTensionDependiente ftd) {
+		titulo.setText("FUENTE DE TENSION DEPENDIENTE "+ftd.getId());
+		labelValor.setText("Ganancia:");
+		mostrarBloqueValorCarga(true);
+		mostrarValor(formatearGanancia(ftd.getValor()));
+		configurarCarga(ftd);
+		mostrarBloqueConexiones(true);
+		configurarNodos(ftd);
+		mostrarBloqueControl(true);
+		configurarControl(ftd);
+	}
+
+	/**
+	 * Muestra las propiedades de una fuente de corriente dependiente.
+	 * 
+	 * @param fcd			Fuente de corriente dependiente a mostrar
+	 */
+	private void mostrarFuenteCorrienteDep(FuenteCorrienteDependiente fcd) {
+		titulo.setText("FUENTE DE CORRIENTE DEPENDIENTE "+fcd.getId());
+		labelValor.setText("Ganancia:");
+		mostrarBloqueValorCarga(true);
+		mostrarValor(formatearGanancia(fcd.getValor()));
+		configurarCarga(fcd);
+		mostrarBloqueConexiones(true);
+		configurarNodos(fcd);
+		mostrarBloqueControl(true);
+		configurarControl(fcd);
+	}
+
+	/**
+	 * Muestra las propiedades del nodo de conexión a tierra.
+	 * 
+	 * @param t			Nodo de conexión a tierra
+	 */
+	private void mostrarTierra(Tierra t) {
+		titulo.setText("TIERRA "+t.getId());
+		toggle(tierraBox, true);
+		linkNodoTierra.setText(String.valueOf(t.getNodoTierra()));
+	}
+
+	/**
+	 * Muestra el bloque de valor con etiqueta según el componente.
+	 * 
+	 * @param texto				Magnitud eléctrica del componente para etiqueta
+	 */
+	private void mostrarValor(String texto) {
+		toggleAll(Arrays.asList(labelValor, linkValorUnidad), true);
+		linkValorUnidad.setText(texto);
+		linkValorUnidad.setDisable(false);
+	}
+
+	/**
+	 * Configura la pestaña de selección de componente de carga.
+	 * 
+	 * @param comp				Componente que se marca como de carga o no
+	 */
+	private void configurarCarga(Componente comp) {
+		linkCarga.setText(comp.isCarga() ? "Sí" : "No");
+		linkCarga.setDisable(false);
+	}
+
+	/**
+	 * Configura los nodos de conexión de un componente, mostrando su valor actual.
+	 * 
+	 * @param comp				Componente actual
+	 */
+	private void configurarNodos(Componente comp) {
+		linkNodoNeg.setText(String.valueOf(comp.getNodo1()));
+		linkNodoPos.setText(String.valueOf(comp.getNodo2()));
+	}
+
+	/**
+	 * Configura los nodos de control de una fuente dependiente, mostrando su valor actual.
+	 * 
+	 * @param comp				Fuente dependiente (de tensión o corriente)
+	 */
+	private void configurarControl(Componente comp) {
+		if (comp instanceof FuenteTensionDependiente ftd) {
+			linkCtrlNeg.setText(String.valueOf(ftd.getCtrlNeg()));
+			linkCtrlPos.setText(String.valueOf(ftd.getCtrlPos()));
+			linkDependencia.setText(ftd.getControlType().toString());
+		} else if (comp instanceof FuenteCorrienteDependiente fcd) {
+			linkCtrlNeg.setText(String.valueOf(fcd.getCtrlNeg()));
+			linkCtrlPos.setText(String.valueOf(fcd.getCtrlPos()));
+			linkDependencia.setText(fcd.getControlType().toString());
+		}
+	}
+
+	/**
+	 * Muestra las propiedades de un cable en caso de que se seleccione.
+	 * 
+	 * @param cable				Cable seleccionado
+	 */
+	public void mostrarPropiedades(Cable cable) {
+		this.cableActual = cable;
+		limpiarPanel();
+		if(cable!=null) {
+			titulo.setText(cable.getCableId());
+			labelExtremos.setText(cable.getDescripcionConexiones());
+		}
+		toggle(labelExtremos, true);
+		mostrarAdvertencia(false);
+	}
+
+	/**
+	 * Actualiza las descripciones de un cable según las conexiones.
+	 */
+	public void actualizar() {
+		if (cableActual != null && cableActual.getInicio() != null && cableActual.getFin() != null) {
+			labelExtremos.setText(cableActual.getDescripcionConexiones());
+		}
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de valor/carga.
+	 * 
+	 * @param m			true o false para mostrar u ocultar
+	 */
+	private void mostrarBloqueValorCarga(boolean m) {
+		toggleAll(Arrays.asList(labelValor, linkValorUnidad, 
+				labelCarga, linkCarga), m);
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de conexiones.
+	 * 
+	 * @param m			true o false para mostrar u ocultar
+	 */
+	private void mostrarBloqueConexiones(boolean m) {
+		toggleAll(Arrays.asList(labelNodosConexion, labelNodoNeg,
+				linkNodoNeg, labelNodoPos, linkNodoPos), m);
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de control.
+	 * 
+	 * @param m			true o false para mostrar u ocultar
+	 */
+	private void mostrarBloqueControl(boolean m) {
+		toggleAll(Arrays.asList(labelNodosControl, gridControl,
+				linkCtrlNeg, linkCtrlPos, linkDependencia), m);
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de conexión de tierra.
+	 * 
+	 * @param m			true o false para mostrar u ocultar
+	 */
+	private void mostrarTierraBox(boolean m) {
+		toggle(tierraBox, m);
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de extremos de conexión.
+	 * 
+	 * @param m			true o false para mostrar u ocultar
+	 */
+	private void mostrarExtremos(boolean m) {
+		toggle(labelExtremos, m);
+	}
+	
+	/**
+	 * Muestra u oculta el bloque de advertencia (cuando no hay conexión).
+	 * 
+	 * @param visible			{@code true} o {@code false} para mostrar u ocultar
+	 */
+	private void mostrarAdvertencia(boolean visible) {
+		toggleAll(Arrays.asList(labelAdvertencia, iconoAdvertencia, separadorAdvertencia, advertenciaBox), visible);
+		if(visible) {
+			labelAdvertencia.setText("Hay nodos sin asignar.");
+		}
+	}
+	
+	/**
+	 * Muestra u oculta un nodo en concreto.
+	 * 
+	 * @param node		Nodo a mostrar u ocultar
+	 * @param visible	Valor booleano que controla
+	 */
+	private void toggle(Node node, boolean visible) {
+		node.setVisible(visible);
+		node.setManaged(visible);
+	}
+	
+	/**
+	 * Muestra u oculta un conjunto de nodos en concreto.
+	 * 
+	 * @param nodes		Nodos a mostrar u ocultar
+	 * @param visible	Valor booleano que los controla
+	 */
+	private void toggleAll(Iterable<Node> nodes, boolean visible) {
+		nodes.forEach(n -> toggle(n, visible));
+	}
+	
+	/**
+	 * Formatea la ganancia de fuentes dependientes para mostrar un valor legible,
+	 * ya que admite fracciones y al pasar a decimal puede tener muchos decimales.
+	 * 
+	 * @param valor				Valor a formatear
+	 * @return String con el valor formateado
+	 */
+	private String formatearGanancia(double valor) {
+		if(Double.isNaN(valor)) return "-";
+		DecimalFormat df=new DecimalFormat("0.###");
+		return df.format(valor);
+	}
+}
+

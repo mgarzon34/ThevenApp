@@ -1,0 +1,15 @@
+
+package com.circuitos.temporal.demo;
+
+import com.circuitos.analisiscircuitos.dominio.*;
+
+public class CircuitoEjemplo {
+    public static Circuito crear() {
+        Circuito c = new Circuito();
+        c.addComponente(new FuenteTensionInd(10.0, 0, 1));
+        c.addComponente(new Resistencia(100.0, 1, 2));
+        c.addComponente(new Resistencia(200.0, 2, 0));
+        c.addComponente(new Tierra(0));
+        return c;
+    }
+}

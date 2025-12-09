@@ -1,0 +1,123 @@
+package com.circuitos.temporal.gui.model;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Logger;
+
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+
+/**
+ * Clase que representa una red eléctrica (nodo lógico) en un circuito. 
+ * Una {@code Net} agrupa varios {@link PuntoConexion} que están eléctricamente 
+ * conectados entre sí y comparte un identificador de nodo único. 
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class Net {
+	private static final Logger logger=Logger.getLogger(Net.class.getName());
+	private final IntegerProperty idProperty=new SimpleIntegerProperty(-1);
+	private final List<PuntoConexion> pins=new ArrayList<>();
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param id identificador del nodo
+	 */
+	public Net(int id) {
+		idProperty.set(id);
+	}
+	
+	/**
+	 * Devuelve el identificador del nodo asignado a esta red.
+	 * 
+	 * @return identificador del nodo o -1 si no se ha asignado
+	 */
+	public int getId() {
+		return idProperty.get();
+	}
+	
+	/**
+	 * Permite asignar un identificador de nodo a esta red.
+	 * 
+	 * @param id identificador de nodo a asignar
+	 */
+	public void setId(int id) {
+		if(id<0) throw new IllegalArgumentException("ID de Net no puede ser negativo");
+		idProperty.set(id);
+	}
+	
+	/**
+	 * Devuelve la propiedad observable del identificador ID.
+	 * 
+	 * @return IntegerProperty de id
+	 */
+	public IntegerProperty idProperty() {
+		return idProperty;
+	}
+	
+	/**
+	 * Añade un punto de conexión a la red si aún no forma parte de ella.
+	 * 
+	 * @param pin punto de conexión a añadir
+	 */
+	public void addPin(PuntoConexion pin) {
+		if(!pins.contains(pin)) {
+			pins.add(pin);
+			pin.setNet(this);
+		}
+		logger.fine("Pin agregado a Net "+getId());
+	}
+	
+	/**
+	 * Devuelve la lista de puntos de conexión que forma parte de ella.
+	 * 
+	 * @return	lista de {@link PuntoConexion} asociados a la red
+	 */
+	public List<PuntoConexion> getPins() {
+		return Collections.unmodifiableList(pins);
+	}
+	
+	/**
+	 * Elimina el punto de conexión de un pin.
+	 * 
+	 * @param pin		Pin del que elimina el punto de conexión
+	 * @return {@code true} si lo elimina, {@code false} si no
+	 */
+	public boolean eliminarPin(PuntoConexion pin) {
+		if(pins.remove(pin)) {
+			pin.setNet(null);
+			logger.fine("Eliminado punto de conexión del pin "+pin.getId());
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Devuelve un String del Net.
+	 */
+	@Override
+	public String toString() {
+		return "Net[id="+getId()+", pins="+pins.size()+"]";
+	}
+	
+	/**
+	 * Comprueba que un objeto sea el mismo que el net.
+	 */
+	@Override
+	public boolean equals(Object o) {
+		if(this==o) return true;
+		if(!(o instanceof Net)) return false;
+		return getId()==((Net)o).getId();
+	}
+	
+	/**
+	 * Obtiene el código hash del Net.
+	 */
+	@Override
+	public int hashCode() {
+		return Integer.hashCode(getId());
+	}
+}

@@ -1,0 +1,102 @@
+package com.circuitos.temporal.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.util.GestorIds;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.CableBuilder;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.Net;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.util.CableUtil;
+
+import javafx.scene.layout.Pane;
+
+/**
+ * Clase de servicio que gestiona la división de un cable en dos tramos separados por un punto de control.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableSegmentacionService {
+	private static final Logger logger=Logger.getLogger(CableSegmentacionService.class.getName());
+	private static final String ID_PREFIX="Cable-";
+	
+	/**
+	 * Gestiona la división del cable y la inserción de un punto intermedio al hacer click sobre él.
+	 * 
+	 * @param origen				Punto origen desde donde se va a conectar al cable
+	 * @param x						Coordenada X del punto intermedio
+	 * @param y						Coordenada Y del punto intermedio
+	 * @return 
+	 */
+	public static List<Cable> dividirCable(Cable original, PuntoConexion origen,
+									double x, double y, Pane zonaDibujo,
+									ConectorPuntos conector, boolean reconectar) {
+		List<Double> puntosRaw=new ArrayList<>(original.getCablePolyline().getPoints());
+		int idx=CableUtil.indiceSegmentoCercano(puntosRaw, x, y);
+		if(idx<0) {
+			logger.fine(()->"No se encontró segmento cercano para dividir cable "+original.getCableId());
+			return List.of();
+		}
+		List<Double> antes=new ArrayList<>(puntosRaw.subList(0, idx+2));
+		List<Double> despues=new ArrayList<>(puntosRaw.subList(idx+2, puntosRaw.size()));
+		List<Double> nuevosTodos=new ArrayList<>(antes);
+		nuevosTodos.add(x);
+		nuevosTodos.add(y);
+		nuevosTodos.addAll(despues);
+		
+		PuntoConexion nuevoPunto=new PuntoConexion(null, false);
+		Net net=original.getInicio().getNet();
+		net.addPin(nuevoPunto);
+		nuevoPunto.setLayoutX(x-nuevoPunto.getRadius());
+		nuevoPunto.setLayoutY(y-nuevoPunto.getRadius());
+		nuevoPunto.setPosicion(null);
+		zonaDibujo.getChildren().add(nuevoPunto);
+		conector.registrarPunto(nuevoPunto);
+		
+		List<Double> tramo1=nuevosTodos.subList(0, idx+4);
+		List<Double> tramo2=nuevosTodos.subList(idx+2, nuevosTodos.size());
+		
+		String id1=GestorIds.getInstance().generarId(ID_PREFIX);
+		String id2=GestorIds.getInstance().generarId(ID_PREFIX);
+		
+		Cable cable1=new CableBuilder()
+				.desde(original.getInicio())
+				.hasta(nuevoPunto)
+				.conId(id1)
+				.en(zonaDibujo)
+				.usando(conector)
+				.conTrayectoria(new ArrayList<>(tramo1))
+				.construir();
+		Cable cable2=new CableBuilder()
+				.desde(nuevoPunto)
+				.hasta(original.getFin())
+				.conId(id2)
+				.en(zonaDibujo)
+				.usando(conector)
+				.conTrayectoria(new ArrayList<>(tramo2))
+				.construir();
+		try { 
+			GestorIds.getInstance().liberarId(original.getCableId(), "Cable-");
+			zonaDibujo.getChildren().remove(original);
+			zonaDibujo.getChildren().addAll(cable1, cable2);
+			logger.info(() -> String.format(
+					"Cable %s segmentado en %s y %s en (%f, %f)",
+					original.getCableId(), id1, id2, x, y));
+		} catch(Exception ex) {
+			zonaDibujo.getChildren().add(original);
+			GestorIds.getInstance().liberarId(id1, ID_PREFIX);
+			GestorIds.getInstance().liberarId(id2, ID_PREFIX);
+			logger.log(Level.SEVERE, "Error al segmentar cable "+original.getCableId(), ex);
+			return List.of();
+		}
+		if(reconectar) {
+			conector.conectarPuntos(origen, nuevoPunto);
+		}
+		return List.of(cable1, cable2);
+	}
+}

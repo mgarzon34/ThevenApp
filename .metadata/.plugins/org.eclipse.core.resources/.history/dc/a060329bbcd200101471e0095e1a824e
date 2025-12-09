@@ -1,0 +1,220 @@
+package com.circuitos.temporal.gui.learning.manager;
+
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.learning.database.LearningService;
+import com.circuitos.temporal.gui.learning.model.PdfDocument;
+import com.circuitos.temporal.gui.learning.model.User;
+import com.circuitos.temporal.gui.util.UIHelper;
+
+import javafx.collections.FXCollections;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
+
+/**
+ * Clase que gestiona operaciones de archivos PDF en la aplicación.
+ * Se usa en el panel de E-Learning.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PdfFileManager {
+	private static final Logger logger=Logger.getLogger(PdfFileManager.class.getName());
+	private static final String PDF_DIRECTORIO=System.getProperty("user.home")+"/ThevenApp/pdfs";
+	
+	private final LearningService learningService;
+	private final ListView<PdfDocument> listEstudiante;
+    private final ListView<PdfDocument> listProfesor;
+    private final Label infoLabel;
+    private final TextArea infoArea;
+    private final Button openButton;
+    private final Button deleteButton;
+    private final TextField uploadTitle;
+    private final TextArea uploadDesc;
+    private final Label uploadStatus;
+    
+    /**
+     * Constructor del gestor.
+     * 
+     * @param service					Servicio de aprendizaje ({@link LearningService})
+     * @param listEstudiante			Lista de Pdf para el estudiante
+     * @param listProfesor				Lista de Pdf para el profesor
+     * @param infoLabel					Etiqueta de información del pdf
+     * @param infoArea					Área de información del pdf
+     * @param openButton				Botón para abrir un pdf
+     * @param uploadTitle				Título del pdf
+     * @param uploadDesc				Descripción del pdf
+     * @param uploadStatus				Etiqueta de estado del pdf
+     */
+    public PdfFileManager(LearningService service, ListView<PdfDocument> listEstudiante,
+    					ListView<PdfDocument> listProfesor, Label infoLabel, TextArea infoArea,
+    					Button openButton, Button deleteButton, TextField uploadTitle, 
+    					TextArea uploadDesc, Label uploadStatus) {
+    	this.learningService=service;
+    	this.listEstudiante=listEstudiante;
+    	this.listProfesor=listProfesor;
+    	this.infoLabel=infoLabel;
+    	this.infoArea=infoArea;
+    	this.openButton=openButton;
+    	this.deleteButton=deleteButton;
+    	this.uploadTitle=uploadTitle;
+    	this.uploadDesc=uploadDesc;
+    	this.uploadStatus=uploadStatus;
+    	UIHelper.configurarLista(listEstudiante, PdfDocument::getTitulo);
+    	if(listProfesor!=null) {
+    		UIHelper.configurarLista(listProfesor, pdf->"📄 "+pdf.getTitulo()+" ("+pdf.getTamanoArchivo()+")");
+    	}
+    	crearDirectorioPdf();
+    	configurarListeners();
+    }
+	
+	/**
+	 * Crea el directorio de almacenamiento de PDFs.
+	 */
+	private void crearDirectorioPdf() {
+		try {
+			Path pdfDir=Paths.get(PDF_DIRECTORIO);
+			Files.createDirectories(pdfDir);
+			logger.info("Directorio PDF creado: "+PDF_DIRECTORIO);
+		} catch(IOException e) {
+			logger.log(Level.WARNING, "Error creando directorio PDF", e);
+		}
+	}
+	
+	/**
+	 * Configura el listener para mostrar los parámetros del pdf cuando se selecciona en la lista.
+	 */
+	private void configurarListeners() {
+		listEstudiante.getSelectionModel().selectedItemProperty().addListener((_, _, newVal) -> {
+			if(newVal!=null) mostrarContenidoPdf(newVal);
+		});
+		if(listProfesor!=null && deleteButton!=null) {
+			deleteButton.setDisable(true);
+			listProfesor.getSelectionModel().selectedItemProperty().addListener((_, _, newVal) -> {
+				deleteButton.setDisable(newVal==null);
+			});
+		}
+	}
+	
+	/**
+	 * Carga los documentos PDF disponibles si los hay.
+	 */
+	public void cargarDocumentosPdf() {
+		try {
+			List<PdfDocument> pdfs=learningService.getPdfs();
+			listEstudiante.setItems(FXCollections.observableArrayList(pdfs));
+			if(listProfesor!=null) listProfesor.setItems(FXCollections.observableArrayList(pdfs));
+			if(pdfs.isEmpty()) {
+				infoLabel.setText("No hay documentos disponibles");
+				infoArea.setText("No hay documentos PDF disponibles en este momento.");
+				openButton.setDisable(true);
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error cargando PDFs", e);
+		}
+	}
+	
+	/**
+	 * Muestra el contenido de un pdf antes de abrirlo (título, descripción, fecha).
+	 * 
+	 * @param pdf			Documento pdf
+	 */
+	public void mostrarContenidoPdf(PdfDocument pdf) {
+		infoLabel.setText(pdf.getTitulo());
+		infoArea.setText("📄 Documento: "+pdf.getTitulo()+"\n"+
+					"📝 Descripción: "+pdf.getDescripcion()+"\n"+
+					"📅 Fecha: "+pdf.getFechaSubida());
+		openButton.setDisable(false);
+		openButton.setUserData(pdf.getPathArchivo());
+	}
+	
+	/**
+	 * Sube un pdf a la plataforma de E-Learning.
+	 * 
+	 * @param window			Ventana de subida
+	 */
+	public void subirPdf(Window window) {
+		String titulo=uploadTitle.getText().trim();
+		if(titulo.isEmpty()) {
+			uploadStatus.setText("El título es obligatorio");
+			uploadStatus.setStyle("-fx-text-fill: red");
+			return;
+		}
+		FileChooser fileChooser=new FileChooser();
+		fileChooser.setTitle("Seleccionar archivo PDF");
+		fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Archivos PDF", "*.pdf"));
+		File seleccionado=fileChooser.showOpenDialog(window);
+		if(seleccionado==null) return;
+		try {
+			String nombreArchivo=System.currentTimeMillis()+"_"+seleccionado.getName();
+			Path pathDestino=Paths.get(PDF_DIRECTORIO, nombreArchivo);
+			Files.copy(seleccionado.toPath(), pathDestino, StandardCopyOption.REPLACE_EXISTING);
+			User usuarioActual=learningService.getUsuarioActual();
+			PdfDocument pdf=new PdfDocument();
+			pdf.setTitulo(titulo);
+			pdf.setDescripcion(uploadDesc.getText());
+			pdf.setNombreArchivo(nombreArchivo);
+			pdf.setPathArchivo(pathDestino.toString());
+			pdf.setTamanoArchivo(seleccionado.length());
+			pdf.setSubidoPor(usuarioActual.getId());
+			boolean exito=learningService.guardarDocumentoPdf(pdf);
+			if(exito) {
+				uploadStatus.setText("PDF subido con éxito");
+				uploadStatus.setStyle("-fx-text-fill: green");
+				uploadTitle.clear();
+				uploadDesc.clear();
+				cargarDocumentosPdf();
+			}
+		} catch(IOException e) {
+			logger.log(Level.WARNING, "Error subiendo PDF", e);
+		}
+	}
+	
+	/**
+	 * Elimina un pdf de la plataforma.
+	 */
+	public void eliminarPdf() {
+		PdfDocument seleccionado=listProfesor.getSelectionModel().getSelectedItem();
+		if(seleccionado==null) return;
+		if(UIHelper.mostrarConfirmacion("Borrar Documento", 
+				"¿Seguro que quieres eliminar el documento '"+seleccionado.getTitulo()+"'?")) {
+			boolean exito=learningService.eliminarDocumentoPdf(seleccionado.getId());
+			if(exito) {
+				try {
+					Files.deleteIfExists(Paths.get(seleccionado.getPathArchivo()));
+					cargarDocumentosPdf();
+				} catch(IOException e) {
+					logger.warning("No se pudo borrar el archivo físico");
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Abre un pdf en un visualizador de pdfs externo.
+	 */
+	public void abrirPdf() {
+		String pdfPath=(String) openButton.getUserData();
+		if(pdfPath!=null) {
+			try {
+				Desktop.getDesktop().open(new File(pdfPath));
+			} catch(Exception e) {
+				logger.warning("No se pudo abrir PDF");
+			}
+		}
+	}
+}

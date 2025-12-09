@@ -1,0 +1,171 @@
+package com.circuitos.temporal.gui.service.io;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.FuenteCorrienteDependiente;
+import com.circuitos.temporal.dominio.FuenteCorrienteInd;
+import com.circuitos.temporal.dominio.FuenteTensionDependiente;
+import com.circuitos.temporal.dominio.FuenteTensionInd;
+import com.circuitos.temporal.dominio.Resistencia;
+import com.circuitos.temporal.dominio.Tierra;
+import com.circuitos.temporal.dto.CableDto;
+import com.circuitos.temporal.dto.CircuitoFileDto;
+import com.circuitos.temporal.dto.PosicionComponenteDto;
+import com.circuitos.temporal.dto.PuntoDto;
+import com.circuitos.temporal.gui.controller.ThevenAppController;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.service.cable.CableNodeRepairUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.NamedType;
+
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Servicio encargado de serializar un circuito a archivo JSON, incluyendo
+ * posiciones de componentes y cables.
+ * Se usa desde controlador {@link ThevenAppController}
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitoSerializerService {
+	
+	private static final Logger logger=Logger.getLogger(CircuitoSerializerService.class.getName());
+	private static final String ID_PREFIX="Cable-";
+	private final ObjectMapper mapper;
+	
+	/**
+	 * Constructor. Inicializa el ObjectMapper con subtipos.
+	 */
+	public CircuitoSerializerService() {
+		mapper = new ObjectMapper()
+				.enable(SerializationFeature.INDENT_OUTPUT)
+				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		mapper.registerSubtypes(new NamedType(Resistencia.class, "Resistencia"),
+				new NamedType(FuenteTensionInd.class, "FuenteTensionIndependiente"),
+				new NamedType(FuenteCorrienteInd.class, "FuenteCorrienteIndependiente"),
+				new NamedType(FuenteTensionDependiente.class, "FuenteTensionDependiente"),
+				new NamedType(FuenteCorrienteDependiente.class, "FuenteCorrienteDependiente"),
+				new NamedType(Tierra.class, "Tierra"));
+	}
+	
+	/**
+	 * Guarda un circuito en un archivo JSON.
+	 * 
+	 * @param archivo			Archivo de destino
+	 * @param circuito			Circuito a guardar
+	 * @param zonaDibujo		Área de dibujo donde está todo colocado
+	 * @throws IOException		si ocurre algún error al escribir el archivo
+	 */
+	public void guardarCircuitoArchivo(File archivo, 
+			Circuito circuito, Pane zonaDibujo) throws IOException {
+		Objects.requireNonNull(archivo, "El archivo de destino no puede ser null");
+		logger.fine(()->"Serializando circuito: "+circuito.hashCode());
+		List<PosicionComponenteDto> posiciones=extraerPosiciones(zonaDibujo);
+		List<CableDto> originales=extraerCables(zonaDibujo);
+		List<CableDto> reparados=CableNodeRepairUtil.repairCables(originales);
+		CircuitoFileDto fichero = CircuitoFileDto.metaDatosGenerados(circuito, posiciones, reparados);
+		mapper.writeValue(archivo, fichero);
+		logger.info(()->String.format(
+				"Circuito %s guardado en %s (%d componentes, %d cables)",
+				circuito.hashCode(), archivo.getName(),
+				posiciones.size(), reparados.size()));
+	}
+	
+	/**
+	 * Extrae las posiciones de cada componente del circuito dentro del Pane
+	 * correspondiente.
+	 * 
+	 * @param pane		Pane del área donde están los componentes
+	 * @return lista de posiciones de los componentes
+	 */
+	private List<PosicionComponenteDto> extraerPosiciones(Pane pane) {
+		return pane.getChildren().stream()
+				.filter(n -> n instanceof StackPane)
+				.map(StackPane.class::cast)
+				.filter(sp -> sp.getUserData() instanceof Componente)
+				.map(sp -> {
+					Componente comp = (Componente) sp.getUserData();
+					double x = sp.getLayoutX();
+					double y = sp.getLayoutY();
+					double rot=sp.getRotate();
+					return new PosicionComponenteDto(comp.getId(), x, y, (int) rot);
+				}).collect(Collectors.toList());
+	}
+	
+	/**
+	 * Extrae la lista de cables que hay en un circuito dentro del pane 
+	 * correspondiente.
+	 * 
+	 * @param pane			Pane del área donde están los cables
+	 * @return lista de cables del pane
+	 */
+	private List<CableDto> extraerCables(Pane pane) {
+		return pane.getChildren().stream()
+				.filter(n -> n instanceof Cable)
+				.map(Cable.class::cast)
+				.map(c -> toDto(c))
+				.collect(Collectors.toList());
+	}
+	
+	/**
+	 * Establece los parámetros para un cable en concreto, su id, origen, destino, etc.
+	 * 
+	 * @param cable		Cable que se extrae de archivo
+	 * @return CableDto del cable
+	 */
+	private CableDto toDto(Cable cable) {
+		if(cable.getCableId()==null) {
+			cable.setCableId(ID_PREFIX+UUID.randomUUID().toString());
+		}
+		PuntoConexion ini=cable.getInicio();
+		PuntoConexion fin=cable.getFin();
+		
+		String compOrigenId=ini.getComponente()!=null ? ini.getComponente().getId() : null;
+		PuntoConexion.Posicion origenPos=ini.getComponente()!=null ? ini.getPosicion() : null;
+		boolean origenPositivo=ini.getComponente()!=null && ini.esPositivo();
+		Integer origenNodo=ini.getComponente()==null ? ini.getNodo() : null;
+		
+		String compDestinoId=fin.getComponente()!=null ? fin.getComponente().getId() : null;
+		PuntoConexion.Posicion destinoPos=fin.getComponente()!=null ? fin.getPosicion() : null;
+		boolean destinoPositivo=fin.getComponente()!=null && fin.esPositivo();
+		Integer destinoNodo=fin.getComponente()==null ? fin.getNodo() : null;
+		
+		List<PuntoDto> pts=cable.getPuntos().stream()
+				.map(p->new PuntoDto(p.getX(), p.getY()))
+				.collect(Collectors.toList());
+		return new CableDto(cable.getCableId(),
+				compOrigenId, origenPos, origenPositivo, origenNodo,
+				compDestinoId, destinoPos, destinoPositivo, destinoNodo, pts);
+	}
+	
+	/**
+	 * Serializa el circuito actual a una cadena JSON (String) incluyendo posiciones y cables.
+	 * Se usa para guardar el circuito en la base de datos.
+	 * 
+	 * @param circuito							Circuito a guardar
+	 * @param zonaDibujo						Pane donde está dibujado el circuito
+	 * @return String JSON del circuito serializado
+	 * @throws JsonProcessingException Si falla la conversión a JSON
+	 */
+	public String serializar(Circuito circuito, Pane zonaDibujo) throws JsonProcessingException {
+		List<PosicionComponenteDto> posiciones=extraerPosiciones(zonaDibujo);
+		List<CableDto> originales=extraerCables(zonaDibujo);
+		List<CableDto> reparados=CableNodeRepairUtil.repairCables(originales);
+		CircuitoFileDto fichero=CircuitoFileDto.metaDatosGenerados(circuito, posiciones, reparados);
+		return mapper.writeValueAsString(fichero);
+	}
+}

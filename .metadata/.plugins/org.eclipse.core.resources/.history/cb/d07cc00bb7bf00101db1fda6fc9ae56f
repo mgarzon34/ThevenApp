@@ -1,0 +1,30 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import com.circuitos.AnalisisCircuitos.gui.model.Cable;
+
+public class RemoveControlPointCommand implements Command {
+	private final Cable cable;
+	private final int index;
+	private final double oldX, oldY;
+	
+	public RemoveControlPointCommand(Cable cable, int index, double oldX, double oldY) {
+		this.cable=cable;
+		this.index=index;
+		this.oldX=oldX; this.oldY=oldY;
+	}
+	
+	@Override
+	public void ejecutar() {
+		cable.removeControlPoint(index);
+	}
+
+	@Override
+	public void deshacer() {
+		cable.addControlPoint(index, oldX, oldY);
+	}
+
+	@Override
+	public String getDescripcion() {
+		return "Eliminar punto control de cable";
+	}
+}

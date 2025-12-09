@@ -1,0 +1,142 @@
+package com.circuitos.temporal.dominio;
+
+import java.util.Objects;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * Clase que extiende la clase abstracta Componente para definir el componente
+ * de Tierra, es decir, el nodo conectado a Tierra dentro del circuito.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+public class Tierra extends Componente {
+	
+	/**
+	 * Constructor sin argumentos para deserialización (pedido por libreria Jackson)
+	 */
+	public Tierra(@JsonProperty("nodoTierra") Integer nodoTierra) {
+		super(clamp(nodoTierra));
+		super.setNodo2(getNodo1());
+	}
+	
+	/**
+	 * Obtiene el nodo de Tierra.
+	 * 
+	 * @return			Nodo de Tierra.
+	 */
+	@JsonProperty("nodoTierra")
+	public int getNodoTierra() {
+		return getNodo1();
+	}
+	
+	/**
+	 * Permite modificar el nodo de Tierra.
+	 * 
+	 * @param nodoTierra		Nodo de Tierra nuevo
+	 */
+	public void setNodoTierra(int nodoTierra) {
+		int nt=clamp(nodoTierra);
+		super.setNodo1(nt);
+		super.setNodo2(nt);
+	}
+	
+	/**
+	 * Nodo 2 se mantiene igual que nodo 1 para Tierra.
+	 */
+	@Override
+	@JsonIgnore
+	public int getNodo2() {
+		return getNodo1();
+	}
+	
+	/**
+	 * Representación tipo String con descripción del componente.
+	 * 
+	 * @return String			Descripción del componente
+	 */
+	@Override
+	public String getTipo() {
+		return "Tierra";
+	}
+
+	/**
+	 * Devuelve el prefijo para componente Tierra.
+	 * 
+	 * @return G para componente Tierra
+	 */
+	@Override
+	public String getPrefijo() {
+		return "G";
+	}
+	
+	/**
+	 * Reasigna número de nodo en caso de negativo.
+	 * 
+	 * @param n		Valor original
+	 * @return valor actualizado
+	 */
+	private static int clamp(Integer n) {
+		return (n!=null && n>=0) ? n : 0;
+	}
+	
+	/**
+	 * Métodos no implementados. No necesarios para conexión Tierra.
+	 */
+	@Override
+	public Componente clonar() {
+		return new Tierra(getNodo1());
+	}
+
+	@Override
+	public Componente clonarConNuevosNodos(int nuevoNodo1, int nuevoNodo2) {
+		return new Tierra(nuevoNodo1);
+	}
+
+	@Override @JsonIgnore
+	public double getValor() {
+		return 0.0;
+	}
+	
+	@Override
+	public void setValor(double v) {
+	}
+	
+	/**
+	 * Describe una fuente de corriente independiente.
+	 * Complementa el método describir de la clase {@link Componente}
+	 */
+	@Override
+	@JsonIgnore
+	public String describir() {
+		return String.format(
+				"%s (%s)\nNodo: %d", getTipo(), getId(), getNodo1());
+	}
+	
+	/**
+	 * Compara esta Tierra con otro objeto.
+	 * 
+	 * @param obj objeto a comparar
+	 * @return {@code true} si son la misma instancia, {@code false} si no
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if(this==obj) return true;
+		if(!(obj instanceof Tierra)) return false;
+		if(!super.equals(obj)) return false;
+		Tierra otro=(Tierra) obj;
+		return getNodo1()==otro.getNodo1();
+	}
+	
+	/**
+	 * Calcula el código hash.
+	 * 
+	 * @return código hash
+	 */
+	@Override
+	public int hashCode() {
+		return Objects.hash(super.hashCode(), getNodo1());
+	}
+}

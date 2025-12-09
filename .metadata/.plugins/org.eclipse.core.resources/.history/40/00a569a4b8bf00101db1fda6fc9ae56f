@@ -1,0 +1,136 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Comando compuesto que ejecuta múltiples comandos como una sola operación.
+ * Útil para operaciones complejas que requieren múltiples pasos atómicos.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CompositeCommand implements Command {
+	private static final Logger logger=Logger.getLogger(CompositeCommand.class.getName());
+	
+	private final List<Command> comandos;
+	private final String descripcion;
+	private final List<Command> ejecutados=new ArrayList<>();
+	private boolean enEjecucion=false;
+	
+	/**
+	 * Constructor del comando compuesto.
+	 * 
+	 * @param descripcion		Descripción de la operación compuesta
+	 */
+	public CompositeCommand(String descripcion) {
+		this.comandos=new ArrayList<>();
+		this.descripcion=descripcion!=null ? descripcion : "Operación compuesta";
+	}
+
+	/**
+	 * Añade un comando a la lista de comandos a ejecutar.
+	 * 
+	 * @param comando			Comando a añadir
+	 */
+	public void addCommand(Command comando) {
+		if(comando!=null) {
+			comandos.add(comando);
+		}
+	}
+	
+	/**
+	 * Añade múltiples comandos a la lista.
+	 * 
+	 * @param comandos			Comandos a añadir
+	 */
+	public void addCommands(Command...comandos) {
+		if(comandos==null) return;
+		for(Command comando : comandos) {
+			addCommand(comando);
+		}
+	}
+	
+	@Override
+	public void ejecutar() {
+		if(enEjecucion) return;
+		enEjecucion=true;
+		ejecutados.clear();
+		
+		//Ejecutar todos los comandos en orden
+		try {
+			for(Command comando : comandos) {
+				comando.ejecutar();
+				ejecutados.add(comando);
+			}
+		} catch(Exception e) {
+			//Si falla uno, intentar deshacer los ya ejecutados
+			logger.log(Level.SEVERE, "Error ejecutando subcomando en operación compuesta: "+e.getMessage(), e);
+			deshacerEjecucionComandos();
+			enEjecucion=false;
+			throw new RuntimeException("Falló la operación compuesta", e);
+		}
+	}
+
+	@Override
+	public void deshacer() {
+		//Deshacer solo los comandos que se ejecutaron en orden inverso
+		for(int i=ejecutados.size()-1; i>=0; i--) {
+			try {
+				ejecutados.get(i).deshacer();
+			} catch(Exception e) {
+				logger.log(Level.WARNING, "Error deshaciendo subcomando en operación compuesta: "+e.getMessage(), e);
+			}
+		}
+		ejecutados.clear();
+	}
+
+	/**
+	 * Deshace los comandos ya ejecutados en caso de error durante el ejecutar().
+	 */
+	private void deshacerEjecucionComandos() {
+		for(int i=ejecutados.size()-1; i>=0; i--) {
+			try {
+				ejecutados.get(i).deshacer();
+			} catch(Exception e) {
+				logger.log(Level.WARNING, "Error deshaciendo tras fallo: "+e.getMessage(), e);
+			}
+		}
+		ejecutados.clear();
+	}
+	
+	@Override
+	public String getDescripcion() {
+		return descripcion;
+	}
+	
+	/**
+	 * Indica si este comando compuesto está vacío.
+	 * 
+	 * @return {@code true} si no tiene comandos, {@code false} en caso contrario
+	 */
+	public boolean isEmpty() {
+		return comandos.isEmpty();
+	}
+	
+	/**
+	 * Obtiene el número de comandos en este comando compuesto.
+	 * 
+	 * @return Número de comandos
+	 */
+	public int size() {
+		return comandos.size();
+	}
+	
+	/**
+	 * Obtiene una copia de la lista de comandos.
+	 * 
+	 * @return Lista inmutable de comandos
+	 */
+	public List<Command> getCommands() {
+		return Collections.unmodifiableList(comandos);
+	}
+}

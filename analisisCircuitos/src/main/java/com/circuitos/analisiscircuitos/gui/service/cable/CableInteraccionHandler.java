@@ -1,0 +1,67 @@
+package com.circuitos.analisiscircuitos.gui.service.cable;
+
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil;
+
+import javafx.scene.input.MouseEvent;
+
+/**
+ * Servicio que gestiona los eventos de ratón sobre el cable, tal como configurar la selección,
+ * y añadir puntos de control con doble click.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableInteraccionHandler {
+	private static final Logger logger=Logger.getLogger(CableInteraccionHandler.class.getName());
+	private static final int DOUBLE_CLICK_COUNT=2;
+	
+	private final Cable cable;
+	
+	/**
+	 * Constructor del Handler.
+	 * 
+	 * @param cable sobre el que interactuamos
+	 */
+	public CableInteraccionHandler(Cable cable) {
+		this.cable=cable;
+	}
+	
+	/**
+	 * Configura los eventos que se pueden realizar sobre el cable.
+	 */
+	public void configurarEventos() {
+		configurarSeleccion();
+		configurarDobleClickPunto();
+	}
+	
+	/**
+	 * Configura el evento para seleccionar este cable al hacer click sobre él.
+	 */
+	private void configurarSeleccion() {
+		cable.getCablePolyline().addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+			e.consume();
+			InteraccionComponenteUtil.seleccionar(cable);
+			cable.getParent().requestFocus();
+			logger.fine("Cable seleccionado: "+cable.getCableId());
+		});
+	}
+	
+	/**
+	 * Añade un nuevo punto de control al hacer doble click sobre el cable.
+	 */
+	private void configurarDobleClickPunto() {
+		cable.getCablePolyline().addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
+			if(e.getClickCount()==DOUBLE_CLICK_COUNT && cable.estaSeleccionado()) {
+				double x=e.getX();
+				double y=e.getY();
+				cable.addPunto(x, y);
+				logger.fine(()->String.format(
+						"Añadiendo punto en (%.1f,%.1f) al cable %s", x, y, cable.getCableId()));
+				e.consume();
+			}
+		});
+	}
+}

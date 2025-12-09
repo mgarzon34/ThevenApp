@@ -1,0 +1,93 @@
+package com.circuitos.temporal.gui.util;
+
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.model.PuntoConexion.Posicion;
+
+/**
+ * Clase que define dónde está el punto de conexión de un componente según su posición rotacional.
+ * 
+ * @author Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class PosicionUtil {
+	private static final Logger logger=Logger.getLogger(PosicionUtil.class.getName());
+	
+	private static final String TIPO_RESISTENCIA="resistencia";
+	private static final String TIPO_FUENTE_TENSION_IND="fuentetensionind";
+	private static final String TIPO_FUENTE_TENSION_DEP="fuentetensiondependiente";
+	private static final String TIPO_FUENTE_CORRIENTE_IND="fuentecorrienteind";
+	private static final String TIPO_FUENTE_CORRIENTE_DEP="fuentecorrientedependiente";
+	private static final String TIPO_TIERRA="tierra"; 
+	
+	/**
+	 * Calcula la posición según su orientación.
+	 * 
+	 * @param componente			Componente al que pertenece el punto
+	 * @param positivo				true si se trata del terminal positivo	
+	 * @param rotacion				Nivel de rotación del componente en grados
+	 * @return Posicion del punto (Arriba, abajo, izquierda, derecha)
+	 */
+	public static Posicion calcularPosicion(Componente componente, boolean positivo, int rotacion) {
+		Objects.requireNonNull(componente, "Componente no puede ser null");
+		String tipo=componente.getClass().getSimpleName().toLowerCase();
+		int angulo=((rotacion%360) + 360)%360;
+		logger.log(Level.FINE, "Calculando posición para tipo={0}, rotacion={1}, positivo={2}",
+				new Object[] {tipo, angulo, positivo});
+		switch(tipo) {
+			case TIPO_RESISTENCIA -> {
+				boolean horizontal=(angulo==0 || angulo==180);
+				if(horizontal) {
+					return positivo ? Posicion.DERECHA : Posicion.IZQUIERDA;
+				} else {
+					return (angulo==90)
+							? (positivo ? Posicion.ARRIBA : Posicion.ABAJO)
+							: (positivo ? Posicion.ABAJO : Posicion.ARRIBA);
+				}
+			}
+			case TIPO_FUENTE_TENSION_IND,
+				 TIPO_FUENTE_TENSION_DEP,
+				 TIPO_FUENTE_CORRIENTE_IND,
+				 TIPO_FUENTE_CORRIENTE_DEP -> {
+				boolean vertical=(angulo==0 || angulo==180);
+				if(vertical) {
+					return positivo ? Posicion.ARRIBA : Posicion.ABAJO;
+				} else {
+					return (angulo==90)
+							? (positivo ? Posicion.IZQUIERDA : Posicion.DERECHA)
+							: (positivo ? Posicion.DERECHA : Posicion.IZQUIERDA);
+				}
+			}
+			case TIPO_TIERRA -> {
+				return Posicion.ARRIBA;
+			}
+			default -> {
+				logger.log(Level.WARNING, "Tipo desconocido ({0}), usando IZQUIERDA por defecto", tipo);
+				return Posicion.IZQUIERDA;
+			}
+		}
+	}
+	
+	/**
+	 * Estima la posición de un punto de conexión según su layout visual.
+	 * Útil para reasignar orientación después de una rotación. 
+	 * 
+	 * @param punto			Punto de conexión a analizar
+	 * @return Posicion estimada según layoutX/Y
+	 */
+	public static PuntoConexion.Posicion definirPorVisual(PuntoConexion punto) {
+		Objects.requireNonNull(punto, "PuntoConexion no puede ser null");
+		double x=punto.getLayoutX();
+		double y=punto.getLayoutY();
+		Posicion resultado=Math.abs(x)>Math.abs(y)
+				? (x>0 ? Posicion.DERECHA : Posicion.IZQUIERDA)
+				: (y>0 ? Posicion.ABAJO : Posicion.ARRIBA);
+		logger.log(Level.FINE, "Posición visual calculada: {0} (x={1}, y={2})",
+				new Object[] {resultado, x, y});
+		return resultado;
+	}
+}

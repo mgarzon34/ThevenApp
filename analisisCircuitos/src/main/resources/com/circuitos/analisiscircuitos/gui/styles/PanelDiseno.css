@@ -1,0 +1,14 @@
+/* ========================================================
+ * Estilos para el panel de diseño de circuitos.
+ * Archivo: PanelDiseno.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+
+/* Fondo del área de dibujo con imagen precargada, centrada y cubriendo el área */
+.design-panel-con-fondo {
+	-fx-background-image: url("../images/sand.jpg");
+	-fx-background-repeat: no-repeat;
+	-fx-background-position: center center;
+	-fx-background-size: cover;
+}

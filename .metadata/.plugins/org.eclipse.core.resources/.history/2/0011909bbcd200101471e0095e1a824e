@@ -1,0 +1,226 @@
+package com.circuitos.temporal.gui.learning.manager;
+
+import com.circuitos.analisiscircuitos.gui.learning.database.LearningService;
+import com.circuitos.analisiscircuitos.gui.util.UIHelper;
+
+import javafx.collections.FXCollections;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.VBox;
+
+/**
+ * Clase que gestiona la sección de registro y login en el módulo de E-Learning.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class AuthSectionManager {
+	
+	private final LearningService learningService;
+	private final Runnable loginExito;			//Para avisar al controlador
+	
+	private final VBox loginPanel;
+    private final ToggleButton loginModeButton;
+    private final ToggleButton registerModeButton;
+    private final TextField usernameField;
+    private final PasswordField passwordField;
+    private final TextField nombreField, apellido1Field, apellido2Field, securityAnswerField;
+    private final VBox registerFields;
+    private final ComboBox<String> roleComboBox, securityQuestionCombo;
+    private final Button authButton;
+    private final Label authStatusLabel;
+    
+    /**
+     * Constructor del gestor de autenticación.
+     * 
+     * @param service						Servicio de aprendizaje ({@link LearningService)
+     * @param loginExito					Acción tras login con éxito
+     * @param loginPanel					Panel de login/registro
+     * @param modeToggleGroup				Grupo de botones para cambiar de modo
+     * @param loginModeButton				Botón para activar modo login
+     * @param registerModeButton			Botón para activar modo registro
+     * @param usernameField					Campo de nombre de usuario
+     * @param passwordField					Campo de contraseña
+     * @param nombreField					Campo de nombre real del usuario
+     * @param apellido1Field				Campo de apellido 1
+     * @param apellido2Field				Campo de apellido 2
+     * @param registerFields				Contenedor de campos exclusivos de registro
+     * @param roleComboBox					Selector de rol de usuario
+     * @param authButton					Botón de acción (login/registro)
+     * @param authStatusLabel				Etiqueta de mensaje de estado
+     * @param securityQuestionCombo			Selector de pregunta de seguridad
+     * @param securityAnswerField			Campo de respuesta de seguridad
+     */
+    public AuthSectionManager(LearningService service, Runnable loginExito, VBox loginPanel,
+    						ToggleGroup modeToggleGroup, ToggleButton loginModeButton, 
+    						ToggleButton registerModeButton, TextField usernameField,  PasswordField passwordField,
+    						TextField nombreField, TextField apellido1Field, TextField apellido2Field,
+    						VBox registerFields, ComboBox<String> roleComboBox, Button authButton, Label authStatusLabel,
+    						ComboBox<String> securityQuestionCombo, TextField securityAnswerField) {
+    	this.learningService=service;
+    	this.loginExito=loginExito;
+    	this.loginPanel=loginPanel;
+    	this.loginModeButton=loginModeButton;
+    	this.registerModeButton=registerModeButton;
+    	this.usernameField=usernameField;
+    	this.passwordField=passwordField;
+    	this.nombreField=nombreField;
+    	this.apellido1Field=apellido1Field;
+    	this.apellido2Field=apellido2Field;
+    	this.registerFields=registerFields;
+    	this.roleComboBox=roleComboBox;
+    	this.authButton=authButton;
+    	this.authStatusLabel=authStatusLabel;
+    	this.securityQuestionCombo=securityQuestionCombo;
+    	this.securityAnswerField=securityAnswerField;
+    	
+    	inicializar();
+    }
+    
+    /**
+     * Inicializa la interfaz de autenticación.
+     */
+    private void inicializar() {
+		roleComboBox.setItems(FXCollections.observableArrayList("ESTUDIANTE", "PROFESOR"));
+		roleComboBox.setValue("ESTUDIANTE");
+		
+		loginModeButton.getToggleGroup().selectedToggleProperty().addListener((_, _, newVal) -> {
+			if(newVal==loginModeButton) mostrarModoLogin();
+			else if(newVal==registerModeButton) mostrarModoRegistro();
+		});
+		passwordField.setOnAction(_ -> procesarAccionAuth());
+    }
+    
+    /**
+     * Ejecuta la acción correspondiente según el modo activo (login o registro).
+     */
+    public void procesarAccionAuth() {
+    	if(loginModeButton.isSelected()) realizarLogin();
+    	else realizarRegistro();
+    }
+    
+    /**
+     * Realiza el inicio de sesión de un usuario validando campos.
+     */
+	private void realizarLogin() {
+		String username=usernameField.getText().trim();
+		String password=passwordField.getText();
+		if(username.isEmpty() || password.isEmpty()) {
+			mostrarEstado("Todos los campos son obligatorios", false);
+			return;
+		}
+		boolean exito=learningService.login(username, password);
+		if(exito) {
+			mostrarEstado("Login correcto", true);
+			loginExito.run();
+		} else {
+			mostrarEstado("Usuario o contraseña incorrectos", false);
+		}
+	}
+	
+	/**
+	 * Realiza el registro de un nuevo usuario.
+	 */
+	private void realizarRegistro() {
+		String username=usernameField.getText().trim();
+		String password=passwordField.getText();
+		String nombre=nombreField.getText().trim();
+		String apellido1=apellido1Field.getText().trim();
+		String apellido2=apellido2Field.getText().trim();
+		String role=roleComboBox.getValue();
+		String pregunta=securityQuestionCombo.getValue();
+		String respuesta=securityAnswerField.getText().trim();
+		if(username.isEmpty() || password.isEmpty() || nombre.isEmpty() || apellido1.isEmpty()) {
+			mostrarEstado("Campos obligatorios incompletos", false);
+			return;
+		}
+		if(pregunta==null || respuesta.isEmpty()) {
+			mostrarEstado("Faltan datos de seguridad", false);
+			return;
+		}
+		if(learningService.buscarUsuario(username)!=null) {
+			mostrarEstado("El nombre de usuario ya está en uso.", false);
+			String mensaje="El usuario '"+username+"' ya existe en la base de datos.\n\n"
+					+"Por favor, elige otro nombre de usuario";
+			UIHelper.mostrarWarning("¡El usuario ya existe!", mensaje);
+			usernameField.requestFocus();
+			usernameField.selectAll();
+			return;
+		}
+		boolean exito=learningService.registrar(username, password, nombre, apellido1, apellido2, role, pregunta, respuesta);
+		if(exito) {
+			mostrarEstado("Registro exitoso. Ahora puedes iniciar sesión.", true);
+			UIHelper.mostrarInfo("¡El usuario "+username+" ha sido registrado correctamente!");
+			limpiarInterfaz();
+			loginModeButton.setSelected(true);
+		} else {
+			mostrarEstado("Error en el registro. El usuario puede ya existir.", false);
+		}
+	}
+	
+	/**
+	 * Cierra la sesión de un usuario.
+	 */
+	public void logout() {
+		learningService.logout();
+		limpiarInterfaz();
+		loginPanel.setVisible(true);
+		loginPanel.setManaged(true);
+	}
+	
+	/**
+	 * Oculta el panel de autenticación.
+	 */
+	public void ocultarPanel() {
+		loginPanel.setVisible(false);
+		loginPanel.setManaged(false);
+	}
+	
+	/**
+	 * Limpia todos los campos del formulario.
+	 */
+	private void limpiarInterfaz() {
+		usernameField.clear();
+		passwordField.clear();
+		nombreField.clear();
+		apellido1Field.clear();
+		apellido2Field.clear();
+		if(securityQuestionCombo.getItems().size()>0)
+			securityQuestionCombo.getSelectionModel().selectFirst();
+		authStatusLabel.setText("");
+	}
+	
+	/**
+	 * Activa la interfaz del modo login.
+	 */
+	private void mostrarModoLogin() {
+		registerFields.setVisible(false);
+		registerFields.setManaged(false);
+		authButton.setText("Iniciar Sesión");
+	}
+	
+	/**
+	 * Activa la interfaz del modo registro.
+	 */
+	private void mostrarModoRegistro() {
+		registerFields.setVisible(true);
+		registerFields.setManaged(true);
+		authButton.setText("Registrarse");
+	}
+	
+	/**
+	 * Muestra mensaje de estado en la interfaz.
+	 * 
+	 * @param msg			Mensaje a mostrar
+	 * @param exito			Si es {@code true} se muestra en verde, si no, en rojo
+	 */
+	private void mostrarEstado(String msg, boolean exito) {
+		authStatusLabel.setText(msg);
+		authStatusLabel.setStyle(exito ? "-fx-text-fill: #28a745;" : "-fx-text-fill: #dc3545;");
+	}
+}

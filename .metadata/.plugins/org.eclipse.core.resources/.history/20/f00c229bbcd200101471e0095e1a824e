@@ -1,0 +1,109 @@
+package com.circuitos.temporal.gui.util;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dto.PosicionComponenteDto;
+import com.circuitos.temporal.gui.builder.ComponenteVisualFactory;
+import com.circuitos.temporal.gui.controller.PanelDisenoController;
+import com.circuitos.temporal.gui.model.ConectorPuntos;
+import com.circuitos.temporal.gui.model.Net;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.service.label.EtiquetaNodoService;
+
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Clase encargada de renderizar visualmente los componentes en la zona de dibujo
+ * a partir de las posiciones guardadas en archivo.
+ * Se utiliza en el proceso de carga de un circuito desde archivo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ComponenteRender {
+	private static final Logger logger=Logger.getLogger(ComponenteRender.class.getName());
+	
+	private static final String ERROR_COMP_NOT_FOUND="Componente no encontrado en el circuito: %s";
+	private static final String RENDER_START="Iniciando render de %d componentes";
+	private static final String RENDER_END="Render finalizado";
+	private final PanelDisenoController panel;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param panel Área de dibujo
+	 */
+	public ComponenteRender(PanelDisenoController panel) {
+		this.panel=Objects.requireNonNull(panel, "PanelDisenoController no puede ser null");
+	}
+	
+	/**
+	 * Renderiza visualmente los componentes en la zona de dibujo.
+	 * @param posiciones lista de posiciones para ubicación y orientación de componentes
+	 */
+	public void render(List<PosicionComponenteDto> posiciones) {
+		Objects.requireNonNull(posiciones, "La lista de posiciones no puede ser null");
+		logger.log(Level.INFO, String.format(RENDER_START, posiciones.size()));
+		Pane zona=panel.getZonaDibujo();
+		var conector=panel.getConector();
+		for(PosicionComponenteDto posDto : posiciones) {
+			String compId=posDto.componenteId();
+			Componente comp=panel.getCircuitoActual()
+								 .getComponentes().stream()
+								 .filter(c -> c.getId().equals(compId))
+								 .findFirst()
+								 .orElseThrow(() ->
+								 	new IllegalStateException(String.format(ERROR_COMP_NOT_FOUND, compId)));
+			String icono=ComponenteVisualFactory.getTipoImagen(comp);
+			StackPane visual=ComponenteVisualFactory.crearVisual(
+					icono, posDto.x(), posDto.y(), 
+					panel.getConector(), zona, panel.getOnSeleccionarComponente(), 
+					(c) -> {
+						if(panel.getCableManager()!=null) {
+							panel.getCableManager().actualizarConexiones(c);
+						}
+					}, comp);
+			visual.setUserData(comp);
+			visual.setRotate(posDto.rotacion());
+			zona.getChildren().add(visual);
+			PuntoConexion pcNeg=ComponenteVisualFactory.obtenerPuntoConexion(visual, false);
+			PuntoConexion pcPos=ComponenteVisualFactory.obtenerPuntoConexion(visual, true);
+			int nodoNeg=comp.getNodo1();
+			int nodoPos=comp.getNodo2();
+			
+			asignarPin(pcNeg, nodoNeg, conector, zona);
+			asignarPin(pcPos, nodoPos, conector, zona);
+		}
+		logger.log(Level.INFO, RENDER_END);
+	}
+	
+	/**
+	 * Crea o recupera la Net para un nodo, le añade el punto de conexión
+	 * y gestiona la etiqueta si es visible.
+	 * 
+	 * @param pc			Punto de conexión
+	 * @param nodoId		Número del nodo
+	 * @param conector		Conector
+	 * @param zona			Àrea de dibujo
+	 */
+	private void asignarPin(PuntoConexion pc, int nodoId, 
+			ConectorPuntos conector, Pane zona) {
+		Net net=conector.getNetId(nodoId);
+		if(net==null) {
+			net=conector.crearNet();
+			net.setId(nodoId);
+		}
+		net.addPin(pc);
+		pc.setNet(net);
+		conector.incrementarUsoNodo(nodoId);
+		if(pc.isVisible()) {
+			EtiquetaNodoService.crearEtiquetaNodo(pc, zona);
+			EtiquetaNodoService.actualizarEtiquetaNodo(pc, zona);
+		}
+	}
+}

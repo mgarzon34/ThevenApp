@@ -1,0 +1,81 @@
+package com.circuitos.AnalisisCircuitos.gui.dialog;
+
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.Resistencia;
+import com.circuitos.temporal.gui.util.UIHelper;
+
+/**
+ * Clase utilitaria encargada de gestionar el marcado o desmarcado como carga de un componente.
+ * Es utilizada por {@link PropiedadesActions} para realizar sus operaciones.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DialogoCarga {
+	private static final Logger logger=Logger.getLogger(DialogoCarga.class.getName());
+	private static final String TITULO_QUITAR="Quitar componente de carga";
+	private static final String HEADER_QUITAR="¿Está seguro de quitar este componente?";
+	private static final String CONTENT_QUITAR="Esto podría invalidar el análisis de carga.";
+	private static final String CONTENT_MARCAR_NO_RES="Las fuentes de tensión/corriente no pueden actuar como carga.\n"
+													+ "Selecciona una resistencia u otro elemento pasivo como carga.";
+	
+	private DialogoCarga() { /* No instanciable */ }
+	
+	/**
+	 * Marca o desmarca un componente como carga, mostrando alerta de confirmación
+	 * si es necesario.
+	 * 
+	 * @param comp			Componente que se va a marcar o desmarcar
+	 * @return {@code true} si el estado de carga del componente ha cambiado, {@code false} si no
+	 */
+	public static boolean gestionar(Componente comp) {
+		if(comp.isCarga()) {
+			return confirmar(TITULO_QUITAR, HEADER_QUITAR, CONTENT_QUITAR, comp, false);
+		}
+		if(comp instanceof Resistencia) {
+			comp.setCarga(true);
+			logger.info("Componente marcado como carga: "+comp.getId());
+			return true;
+		}
+		return error(CONTENT_MARCAR_NO_RES);
+	}
+	
+	/**
+	 * Gestiona la alerta de confirmación para el diálogo de carga.
+	 * 
+	 * @param title			Titulo de la alerta
+	 * @param header		Encabezamiento de la alerta
+	 * @param content		Contenido de la alerta
+	 * @param comp			Componente que se marca o desmarca
+	 * @param marcar		Boolean de marcado o desmarcado
+	 * @return {@code true} si se confirma, {@code false} si no
+	 */
+	private static boolean confirmar(String title, String header, String content,
+			Componente comp, boolean marcar) {
+		boolean ok=UIHelper.mostrarConfirmacion(title, content);
+		if(ok) {
+			comp.setCarga(marcar);
+			logger.info((marcar ? "Marcado" : "Desmarcado")+ " como carga: "+comp.getId());
+		} else {
+			logger.fine("Acción cancelada por el usuario en: "+comp.getId());
+		}
+		return ok;
+	}
+	
+	/**
+	 * Genera una alerta de error cuando se marca un componente activo como carga (una fuente)..
+	 * 
+	 * @param title				Título de la alerta
+	 * @param header			Cabecera de la alerta
+	 * @param content			Contenido de la alerta
+	 * @param comp				Componente que se ha intentado marcar como carga
+	 * @return {@code false}
+	 */
+	private static boolean error(String content) {
+		UIHelper.mostrarError(content);
+		logger.info("Intento de marcar como carga un componente no válido.");
+		return false;
+	}
+}

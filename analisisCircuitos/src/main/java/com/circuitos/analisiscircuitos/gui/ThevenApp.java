@@ -1,0 +1,121 @@
+package com.circuitos.analisiscircuitos.gui;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
+import com.circuitos.analisiscircuitos.gui.controller.ThevenAppController;
+import com.circuitos.analisiscircuitos.gui.util.LogViewer;
+import com.circuitos.analisiscircuitos.gui.util.StylesLoader;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.stage.Stage;
+
+/**
+ * Clase principal de la aplicación ThevenApp (creada con Java y JavaFX).
+ * Permite elaborar un circuito para su posterior análisis usando los teoremas de Thevenin y Norton.
+ * La aplicación está orientada al aprendizaje del análisis de circuitos.
+ * Carga vista principal desde FXML, aplica estilos CSS y muestra el escenario principal.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ * 
+ */
+public class ThevenApp extends Application {
+	private static final Logger logger=Logger.getLogger(ThevenApp.class.getName());
+	private static final String FXML_PRINCIPAL="/com/circuitos/analisiscircuitos/gui/fxml/Principal.fxml";
+	private static final String APP_TITULO="ThevenApp - Análisis de Circuitos";
+	
+	/* Configuración de logs */
+	private static final String LOG_DIR_PATH=System.getProperty("user.home")+"/ThevenApp/logs";
+	private static final String LOG_FILE_NAME="ThevenAppLogs-";
+	
+	public void init() throws Exception {
+		super.init();
+		Path logDir=Path.of(LOG_DIR_PATH);
+		try {
+			Files.createDirectories(logDir);
+		} catch(IOException ioe) {
+			System.err.println("WARNING: No se pudo crear carpeta de logs: "+ioe.getMessage());
+		}
+		String ts=LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+		String logFileName=LOG_FILE_NAME+ts+".log";
+		Path logFile=logDir.resolve(logFileName);
+		try {
+			FileHandler fh=new FileHandler(logFile.toString(), false);
+			fh.setFormatter(new SimpleFormatter());
+			fh.setLevel(Level.ALL);
+			Logger root=Logger.getLogger("");
+			root.addHandler(fh);
+			root.setLevel(Level.ALL);
+			logger.info("Logging iniciado en "+logFile);
+			LogViewer.setLogFilePath(logFile);
+		} catch(IOException e) {
+			logger.severe("Error inicializando FileHandler de logs: "+e.getMessage());
+		}
+		Thread.setDefaultUncaughtExceptionHandler((thread, throwable)-> {
+			logger.log(Level.SEVERE, "Excepción no capturada en thread "+thread.getName(), throwable);
+			Platform.runLater(()-> {
+				Alert alert=new Alert(Alert.AlertType.ERROR);
+				alert.setTitle("Error inesperado");
+				alert.setHeaderText("Se ha producido un error crítico");
+				alert.setContentText("Detalles: "+throwable.getLocalizedMessage()+
+						"\n\nConsulte el archivo de log para más información.");
+				alert.showAndWait();
+			});
+		});
+	}
+	
+	/**
+	 * Inicializa y muestra la ventana principal.
+	 */
+	@Override
+	public void start(Stage stage) {
+		Objects.requireNonNull(stage, "Stage no puede ser null");
+		try {
+			logger.log(Level.INFO, "Cargando recurso FXML: {0}", FXML_PRINCIPAL);
+			FXMLLoader loader=new FXMLLoader(getClass().getResource(FXML_PRINCIPAL));
+			Parent root=loader.load();
+		
+			Scene scene=new Scene(root);
+			StylesLoader.aplicarCSS(scene);
+		
+			stage.setTitle(APP_TITULO);
+			stage.setScene(scene);
+		
+			ThevenAppController ctrl=loader.getController();
+			ctrl.initStage(stage);
+			
+			stage.setOnCloseRequest(k -> {
+				logger.log(Level.INFO, "Cerrando aplicación.");
+				Platform.exit();
+			});
+		
+			stage.show();
+			ctrl.postInit(stage);
+			logger.log(Level.INFO, "Aplicación iniciada correctamente.");
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, "Error al iniciar la aplicación", e);
+			Platform.exit();
+		}
+	}
+	
+	/**
+	 * Método principal (entrada de la JVM), delega en {@link #start(Stage)}.
+	 */
+	public static void main(String[] args)  {
+		launch(args);
+	}
+}

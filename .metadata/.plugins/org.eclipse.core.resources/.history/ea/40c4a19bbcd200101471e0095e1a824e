@@ -1,0 +1,79 @@
+package com.circuitos.temporal.gui.service.cable;
+
+import java.util.List;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
+
+import com.circuitos.analisiscircuitos.dominio.util.GestorIds;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.CableBuilder;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+
+import javafx.scene.layout.Pane;
+
+/**
+ * Servicio que se encarga de la fusión lógica entre cables.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableFusionService {
+	private static final Logger logger=Logger.getLogger(CableFusionService.class.getName());
+	private static final String ID_PREFIX="Cable-";
+	
+	/**
+     * Intenta fusionar este cable con otros si comparten un punto intermedio.
+     *
+     * @param base         	Cable base
+     * @param otrosCables 	Lista de cables con los que se desea intentar la fusión
+     * @param zonaDibujo   	Panel sobre el que se realiza la operación
+     */
+    public static void intentarFusion(Cable base, List<Cable> otrosCables, Pane zonaDibujo) {
+        for (Cable candidato : otrosCables) {
+            if (candidato == base) continue;
+
+            PuntoConexion comun=encontrarPuntoComun(base, candidato);
+            if(comun==null) continue;
+            
+            PuntoConexion extremoA=comun.equals(base.getInicio())
+            						? base.getFin()
+            						: base.getInicio();
+            PuntoConexion extremoB=comun.equals(candidato.getInicio())
+            						? candidato.getFin()
+            						: candidato.getInicio();
+            String nuevoId=GestorIds.getInstance().generarId(ID_PREFIX);
+            Cable fusion=new CableBuilder()
+                		.desde(extremoA)
+                		.hasta(extremoB)
+                		.conId(nuevoId)
+                		.en(zonaDibujo)
+                		.usando(base.getConector())
+                		.construir();
+            logger.fine(() -> String.format(
+            		"Fusionando cables %s y %s usando punto %s, nuevo cable %s",
+            		base.getCableId(), candidato.getCableId(), candidato, fusion.getCableId()));
+            GestorIds gest=GestorIds.getInstance();
+            gest.liberarId(base.getCableId(), ID_PREFIX);
+            gest.liberarId(candidato.getCableId(), ID_PREFIX);
+            
+            zonaDibujo.getChildren().add(fusion);
+            zonaDibujo.getChildren().removeAll(base, candidato, comun);
+            return;
+        }
+        logger.fine("No se encontró ningún punto común para fusionar con el cable "+base.getCableId());
+    }
+    
+    /**
+     * Busca en los dos cables un PuntoConexión compartido que no pertenezca 
+     * a un componente.
+     * 
+     * @return PuntoConexión común o {@code null} si no existe
+     */
+    private static PuntoConexion encontrarPuntoComun(Cable a, Cable b) {
+    	return Stream.of(a.getInicio(), a.getFin())
+    			.filter(pc -> pc!=null && pc.getComponente()==null)
+    			.filter(pc -> pc.equals(b.getInicio()) || pc.equals(b.getFin()))
+    			.findFirst()
+    			.orElse(null);
+    }
+}

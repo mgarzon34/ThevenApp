@@ -1,0 +1,207 @@
+package com.circuitos.temporal.gui.learning.manager;
+
+import com.circuitos.analisiscircuitos.gui.learning.database.LearningService;
+import com.circuitos.analisiscircuitos.gui.learning.model.EstadisticasProgreso;
+import com.circuitos.analisiscircuitos.gui.learning.model.User;
+import com.circuitos.analisiscircuitos.gui.util.UIHelper;
+
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
+
+/**
+ * Clase que gestiona el progreso de los estudiantes en el módulo de E-Learning.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ProgresoSectionManager {
+
+	private final LearningService service;
+	
+	//Referencias UI
+	private final SplitPane splitProfe;
+	private final VBox containerAlumno;
+	private final ListView<User> listaAlumnos;
+	
+	//Campos profesor
+	private final Label lblNombre, lblInfoEj, lblInfoTeo;
+	private final TextField txtNota;
+	private final TextArea txtMsgProf;
+	
+	//Campos alumno
+	private final Label lblNotaAlumno, lblPorcAlumno;
+	private final ProgressBar barAlumno;
+	private final TextArea txtMsgAlumno;
+	
+	private User alumnoSel=null;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param service					Servicio de aprendizaje ({@link LearningService})
+	 * @param splitProfe				SplitPane del profesor (lista de alumnos y acciones)
+	 * @param containerAlumno			Contenedor de la lista de alumnos
+	 * @param listaAlumnos				Lista de alumnos registrados
+	 * @param lblNombre					Etiqueta de nombre
+	 * @param lblInfoEj					Etiqueta de información de ejercicios
+	 * @param lblInfoTeo				Etiqueta de información de teoría
+	 * @param txtNota					Campo para poner calificación
+	 * @param txtMsgProf				Campo para mandar un mensaje a un alumno
+	 * @param lblNotaAlumno				Etiqueta de la calificación
+	 * @param lblPorcAlumno				Etiqueta de porcentaje del alumno
+	 * @param barAlumno					Barra de progreso del alumno
+	 * @param txtMsgAlumno				Campo donde se muestra el mensaje del profesor
+	 */
+	public ProgresoSectionManager(LearningService service, SplitPane splitProfe, VBox containerAlumno,
+								ListView<User> listaAlumnos, Label lblNombre, Label lblInfoEj, Label lblInfoTeo,
+								TextField txtNota, TextArea txtMsgProf, Label lblNotaAlumno, Label lblPorcAlumno,
+								ProgressBar barAlumno, TextArea txtMsgAlumno) {
+		this.service=service;
+		this.splitProfe=splitProfe;
+		this.containerAlumno=containerAlumno;
+		this.listaAlumnos=listaAlumnos;
+		this.lblNombre=lblNombre;
+		this.lblInfoEj=lblInfoEj;
+		this.lblInfoTeo=lblInfoTeo;
+		this.txtNota=txtNota;
+		this.txtMsgProf=txtMsgProf;
+		this.lblNotaAlumno=lblNotaAlumno;
+		this.lblPorcAlumno=lblPorcAlumno;
+		this.barAlumno=barAlumno;
+		this.txtMsgAlumno=txtMsgAlumno;
+		
+		inicializar();
+	}
+	
+	/**
+	 * Inicializa el gestor.
+	 */
+	private void inicializar() {
+		UIHelper.configurarLista(listaAlumnos, u->u.getName()+" ("+u.getUsername()+")");
+		if(listaAlumnos!=null) {
+			listaAlumnos.getSelectionModel().selectedItemProperty().addListener((_, _, nv) -> cargarAlumnoProfe(nv));
+		}
+	}
+	
+	/**
+	 * Actualiza la vista según el rol del usuario (profesor/estudiante).
+	 */
+	public void actualizarVista() {
+		User actual=service.getUsuarioActual();
+		if(actual==null) return;
+		if(actual.esProfesor()) {
+			mostrarVistaProfesor();
+		} else {
+			mostrarVistaAlumno();
+		}
+	}
+	
+	/**
+	 * Muestra la vista de profesor.
+	 */
+	private void mostrarVistaProfesor() {
+		splitProfe.setVisible(true);
+		splitProfe.setManaged(true);
+		containerAlumno.setVisible(false);
+		containerAlumno.setManaged(false);
+		if(listaAlumnos!=null) listaAlumnos.getItems().setAll(service.getEstudiantes());
+	}
+	
+	/**
+	 * Muestra la vista de alumno.
+	 */
+	private void mostrarVistaAlumno() {
+		splitProfe.setVisible(false);
+		splitProfe.setManaged(false);
+		containerAlumno.setVisible(true);
+		containerAlumno.setManaged(true);
+		User u=service.getUsuarioActual();
+		EstadisticasProgreso stats=service.getEstadisticasProgreso();
+		if(u!=null) {
+			lblNotaAlumno.setText(String.format("%.1f", u.getCalificacionGeneral()));
+			String msg=u.getComentariosProfesor();
+			txtMsgAlumno.setText((msg==null || msg.isBlank()) ? "No hay mensajes." : msg);
+		}
+		if(stats!=null) {
+			barAlumno.setProgress(stats.getProgresoTotal());
+			lblPorcAlumno.setText(String.format("%.0f%%", stats.getProgresoTotal()*100));
+		}
+		
+	}
+	
+	/**
+	 * Carga los parámetros del alumno seleccionado por el profesor.
+	 * 
+	 * @param u			Usuario (estudiante)
+	 */
+	private void cargarAlumnoProfe(User u) {
+		if(u==null) return;
+		this.alumnoSel=u;
+		lblNombre.setText(u.getName());
+		txtNota.setText(String.valueOf(u.getCalificacionGeneral()));
+		txtMsgProf.setText(u.getComentariosProfesor());
+		lblInfoEj.setText(service.ejerciciosCompAlumno(u.getId())+"/"+service.getTotalEjercicios());
+		lblInfoTeo.setText(service.temasLeidosAlumno(u.getId())+"/"+service.getTotalTeoria());
+	}
+	
+	/**
+	 * Actualiza la calificación de un alumno.
+	 */
+	public void guardarNota() {
+		if(alumnoSel==null) return;
+		try {
+			double nota=Double.parseDouble(txtNota.getText().replace(",", "."));
+			if(nota<0 || nota>10) throw new NumberFormatException();
+			if(service.actualizarCalificacion(alumnoSel.getId(), nota)) {
+				UIHelper.mostrarInfo("Calificación actualizada.");
+				mostrarVistaProfesor();		//recargar lista
+			}
+		} catch(Exception _) {
+			UIHelper.mostrarError("Nota no válida (0-10)");
+		}
+	}
+	
+	/**
+	 * Guarda el comentario realizado a un alumno por el profesor.
+	 */
+	public void guardarComentario() {
+		if(alumnoSel==null) return;
+		if(service.actualizarComentarios(alumnoSel.getId(), txtMsgProf.getText())) {
+			UIHelper.mostrarInfo("Comentario enviado.");
+			mostrarVistaProfesor();
+		}
+	}
+	
+	/**
+	 * Resetea el progreso de un alumno (calificación a 0, borra comentarios e historial de completados).
+	 */
+	public void resetearProgreso() {
+		if(alumnoSel==null) {
+			UIHelper.mostrarError("Ningún alumno seleccionado.");
+			return;
+		}
+		String mensaje="Esta acción borrará:\n"
+				+"- Ejercicios resueltos.\n"
+				+"- Historial de teoría leída.\n"
+				+"- Calificación y comentarios.\n\n"
+				+"Esta acción no se puede deshacer\n."
+				+"¿Seguro que quieres reiniciar a "+alumnoSel.getName()+"?";
+		if(UIHelper.mostrarConfirmacion("Reiniciar Progreso", mensaje)) {
+			if(service.resetearProgreso(alumnoSel.getId())) {
+				UIHelper.mostrarInfo("El progreso del alumno ha sido reiniciado correctamente.");
+				txtNota.setText("0.0");
+				txtMsgProf.setText("");
+				lblInfoEj.setText("-");
+				lblInfoTeo.setText("-");
+				mostrarVistaProfesor();
+			} else {
+				UIHelper.mostrarError("No se pudo reiniciar el progreso.");
+			}
+		}
+	}
+}

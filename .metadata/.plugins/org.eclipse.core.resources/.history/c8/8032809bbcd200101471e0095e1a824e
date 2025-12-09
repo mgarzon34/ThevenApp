@@ -1,0 +1,40 @@
+package com.circuitos.temporal.gui.controller;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.gui.dialog.PropiedadesActions;
+import com.circuitos.analisiscircuitos.gui.model.NodeField;
+
+/**
+ * Adapter que implementa PropiedadesEditor para delegar funciones
+ * del panel de propiedades.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PropiedadesActionsAdapter implements PropiedadesEditor {
+	private static final PropiedadesActionsAdapter instance=new PropiedadesActionsAdapter();
+	private PropiedadesActionsAdapter() {}
+	public static PropiedadesActionsAdapter getInstance() { return instance; }
+	
+	/* Implementación métodos de la interfaz */
+	
+	@Override
+	public boolean editarValorUnidad(Componente comp, String texto) {
+		return PropiedadesActions.editarValorUnidad(comp, texto);
+	}
+	
+	@Override
+	public boolean gestionarCarga(Componente comp) {
+		return PropiedadesActions.gestionarCarga(comp);
+	}
+	
+	@Override
+	public boolean editarNodo(Componente comp, NodeField field, String texto) {
+		return PropiedadesActions.editarNodo(comp, field, texto);
+	}
+	
+	@Override
+	public boolean alternarDependencia(Componente comp) {
+		return PropiedadesActions.alternarDependencia(comp);
+	}
+}

@@ -1,0 +1,288 @@
+package com.circuitos.temporal.gui.service.undo;
+
+import java.util.Stack;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.commands.Command;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+/**
+ * Gestor para el sistema de deshacer/rehacer (undo/redo) de la aplicación.
+ * 
+ * Mantiene dos pilas:  una para comandos que se pueden deshacer y otra para comandos que 
+ * se pueden rehacer. Proporciona propiedades observables para que la interfaz de usuario pueda
+ * reaccionar a los cambios de estado.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class UndoRedoManager {
+	
+	private int MAX_HISTORY_SIZE=20;
+	private static final Logger logger=Logger.getLogger(UndoRedoManager.class.getName());
+	private final Stack<Command> desPila=new Stack<>();
+	private final Stack<Command> rePila=new Stack<>();
+	private boolean reproduciendo=false;
+	
+	//Propiedades observables
+	private final BooleanProperty puedeDeshacer=new SimpleBooleanProperty(false);
+	private final BooleanProperty puedeRehacer=new SimpleBooleanProperty(false);
+	private final StringProperty desDescripcion=new SimpleStringProperty("");
+	private final StringProperty reDescripcion=new SimpleStringProperty("");
+	
+	/**
+	 * Instancia (patrón singleton) del gestor de deshacer/rehacer.
+	 */
+	private static UndoRedoManager instancia;
+	
+	/**
+	 * Constructor privado para aplicar el patrón singleton.
+	 */
+	private UndoRedoManager() {
+		actualizarPropiedades();
+	}
+	
+	/**
+	 * Obtiene la instancia singleton del gestor.
+	 * 
+	 * @return Instancia única del gestor.
+	 */
+	public static UndoRedoManager getInstance() {
+		if(instancia==null) {
+			instancia=new UndoRedoManager();
+		}
+		return instancia;
+	}
+	
+	/**
+	 * Ejecuta un comando y lo añade al historial de "deshacer".
+	 * Limpia la pila de "rehacer" ya que se está ejecutando una nueva acción
+	 * 
+	 * @param comando			Comando a ejecutar
+	 */
+	public void ejecutarComando(Command comando) {
+		if(comando==null) {
+			return;
+		}
+		try {
+			//Intentar fusionar con el último comando si es posible
+			if(!desPila.isEmpty() && desPila.peek().puedeFusionarCon(comando)) {
+				Command ultimoComando=desPila.peek();
+				ultimoComando.fusionarCon(comando);
+				ultimoComando.ejecutar();
+				rePila.clear();
+				recortarHistorial();
+				actualizarPropiedades();
+				return;
+			}
+			comando.ejecutar();								//Ejecutar el comando
+			desPila.push(comando);							//Añadir al historial de deshacer
+			rePila.clear();									//Limpiar la pila de rehacer
+			recortarHistorial();
+			actualizarPropiedades();
+		} catch(Exception e) {								//Si falla la ejecución, no añadir al historial
+			logger.log(Level.SEVERE, "Error ejecutando comando: "+(comando!=null ? comando.getDescripcion() : ""), e);
+		}
+	}
+	
+	/**
+	 * Deshace el último comando ejecutado.
+	 * Valida los comandos antes de ejecutarlos y limpia comandos inválidos automáticamente.
+	 * 
+	 * @return {@code true} si se pudo deshacer, {@code false} si no hay comandos válidos para deshacer
+	 */
+	public boolean deshacer() {
+		//Limpiar comandos inválidos de la pila
+		limpiarComandosInvalidos(desPila);
+		if(desPila.isEmpty()) {
+			actualizarPropiedades();
+			return false;
+		}
+		try {
+			Command comando;
+			do {
+				if(desPila.isEmpty()) {			//Validar comando antes de ejecutar
+					actualizarPropiedades();
+					return false;
+				}
+				comando=desPila.pop();
+			} while(!comando.esValido());
+			reproduciendo=true;
+			comando.deshacer();
+			reproduciendo=false;
+			rePila.push(comando);
+			actualizarPropiedades();
+			return true;
+		} catch(Exception e) {
+			reproduciendo=false;
+			logger.log(Level.SEVERE, "Error deshaciendo comando.");
+			actualizarPropiedades();
+			return false;
+		}
+	}
+	
+	/**
+	 * Rehace el último comando deshecho. 
+	 * Valida los comandos antes de ejecutarlos y limpia comandos inválidos automáticamente.
+	 * 
+	 * @return {@code true} si se pudo rehacer, {@code false} si no hay comandos válidos para rehacer
+	 */
+	public boolean rehacer() {
+		limpiarComandosInvalidos(rePila);
+		if(rePila.isEmpty()) {
+			actualizarPropiedades();
+			return false;
+		}
+		try {
+			Command comando;
+			do {
+				if(rePila.isEmpty()) {
+					actualizarPropiedades();
+					return false;
+				}
+				comando=rePila.pop();
+			} while(!comando.esValido());
+			reproduciendo=true;
+			comando.ejecutar();
+			reproduciendo=false;
+			desPila.push(comando);
+			actualizarPropiedades();
+			return true;
+		} catch(Exception e) {
+			reproduciendo=false;
+			logger.log(Level.SEVERE, "Error rehaciendo comando.");
+			actualizarPropiedades();
+			return false;
+		}
+	}
+	
+	/**
+	 * Limpia todo el historial de deshacer/rehacer.
+	 * Útil cuando se carga un nuevo archivo o se reinicia el diseño.
+	 */
+	public void limpiarHistoria() {
+		desPila.clear();
+		rePila.clear();
+		actualizarPropiedades();
+	}
+	
+	/**
+	 * Actualiza las propiedades observables según el estado actual.
+	 */
+	private void actualizarPropiedades() {
+		puedeDeshacer.set(!desPila.isEmpty());
+		puedeRehacer.set(!rePila.isEmpty());
+		desDescripcion.set(desPila.isEmpty() ? "" : desPila.peek().getDescripcion());
+		reDescripcion.set(rePila.isEmpty() ? "" : rePila.peek().getDescripcion());
+	}
+	
+	/**
+	 * Limpia los comandos inválidos de una pila. Se eliminan desde la parte superior de la pila.
+	 * 
+	 * @param pila 				Pila a limpiar de comandos inválidos
+	 */
+	private void limpiarComandosInvalidos(Stack<Command> pila) {
+		while(!pila.isEmpty() && !pila.peek().esValido()) {
+			Command comandoInvalido=pila.pop();
+			logger.log(Level.FINE, "Comando inválido eliminado del historial: "+comandoInvalido.getDescripcion());
+		}
+	}
+	
+	/**
+	 * Fuerza la limpieza de todos los comandos inválidos de ambas pilas.
+	 * Útil para llmar después de operaciones que pueden invalidar múltiples comandos.
+	 */
+	public void limpiarComandosInvalidos() {
+		int desSizeAntes=desPila.size();
+		int reSizeAntes=rePila.size();
+		limpiarComandosInvalidos(desPila);
+		limpiarComandosInvalidos(rePila);
+		int desSizeDespues=desPila.size();
+		int reSizeDespues=rePila.size();
+		
+		if(desSizeAntes!=desSizeDespues || reSizeAntes!=reSizeDespues) {
+			logger.info(String.format("Limpieza completada: se eliminaron %d comandos de deshacer inválidos y %d comandos de rehacer inválidos.",
+				    (desSizeAntes - desSizeDespues), (reSizeAntes - reSizeDespues)));
+			actualizarPropiedades();
+		}
+	}
+	
+	/**
+	 * Getters para propiedades observables.
+	 */
+	public BooleanProperty puedeDeshacerProperty() {
+		return puedeDeshacer;
+	}
+	
+	public boolean puedeDeshacer() {
+		return puedeDeshacer.get();
+	}
+	
+    public BooleanProperty puedeRehacerProperty() {
+        return puedeRehacer;
+    }
+    
+    public boolean puedeRehacer() {
+        return puedeRehacer.get();
+    }
+    
+    public boolean isReproduciendo() {
+    	return reproduciendo;
+    }
+    
+    public StringProperty deshacerDescripcionProperty() {
+        return desDescripcion;
+    }
+    
+    public String getDeshacerDescription() {
+        return desDescripcion.get();
+    }
+    
+    public StringProperty rehacerDescripcionProperty() {
+        return reDescripcion;
+    }
+    
+    public String getRehacerDescripcion() {
+        return reDescripcion.get();
+    }
+    
+    /**
+     * Obtiene el número de comandos en el historial de deshacer.
+     * 
+     * @return Número de comandos que se pueden deshacer
+     */
+    public int getDeshacerHistorySize() {
+    	return desPila.size();
+    }
+    
+    /**
+     * Establece el máximo tamaño del historial de acciones para hacer o deshacer.
+     * 
+     * @param n			Máximo de acciones
+     */
+    public void setMaxHistorySize(int n) {
+    	this.MAX_HISTORY_SIZE=Math.max(1, n);
+    }
+    
+    /**
+     * Elimina acciones del historial cuando se supera el número almacenado.
+     */
+    private void recortarHistorial() {
+    	while(desPila.size()>MAX_HISTORY_SIZE)
+    		desPila.remove(0);
+    }
+    
+    /**
+     * Obtiene el número de comandos en el historial de rehacer.
+     * 
+     * @return Número de comandos que se pueden rehacer
+     */
+    public int getRehacerHistorySize() {
+    	return rePila.size();
+    }
+}

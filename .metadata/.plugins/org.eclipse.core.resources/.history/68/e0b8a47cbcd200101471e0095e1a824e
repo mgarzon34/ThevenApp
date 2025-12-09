@@ -1,0 +1,193 @@
+package com.circuitos.AnalisisCircuitos.gui.util;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+
+import javafx.scene.Node;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+
+/**
+ * Gestiona la selección múltiple de nodos en la escena (componentes, cables, puntos).
+ * Permite selección con Ctrl/Cmd+click y por área arrastrando con el ratón.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class SeleccionManager {
+	
+	/* Función que recibe un nodo y devuelve el nodo lógico o null
+	 * Se usa cuando se hace click en hijo y se quiere seleccionar el contenedor (componente-stackpane)
+	 */
+	private Function<Node, Node> normalizador;
+	
+	private final Pane zonaDibujo;
+	private final List<Node> seleccionados=new ArrayList<>();
+	private Rectangle rectanguloSel;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param zonaDibujo			Zona en la que se encuentran los nodos
+	 */
+	public SeleccionManager(Pane zonaDibujo) {
+		this.zonaDibujo=zonaDibujo;
+	}
+	
+	/**
+	 * Obtiene la lista de nodos seleccionados.
+	 * 
+	 * @return lista de nodos seleccionados
+	 */
+	public List<Node> getSeleccionados() {
+		return new ArrayList<>(seleccionados);
+	}
+	
+	/**
+	 * Establece la función de normalización de nodos. Se aplica antes de decidir si un nodo es 
+	 * seleccionable. Si se hace click sobre un hijo y se quiere seleccionar su contenedor (stackpane).
+	 * 
+	 * @param normalizador			Función normalizadora
+	 */
+	public void setNormalizador(Function<Node, Node> normalizador) {
+		this.normalizador=normalizador;
+	}
+	
+	/**
+	 * Alterna el estado de selección de un nodo. (Selecciona o deselecciona).
+	 * 
+	 * @param nodo					Nodo del que se alterna su selección
+	 */
+	public void toggleSeleccion(Node nodo) {
+		if(seleccionados.contains(nodo)) {
+			deseleccionar(nodo);
+		} else {
+			seleccionar(nodo);
+		}
+	}
+	
+	/**
+	 * Marca un nodo como seleccionado.
+	 * 
+	 * @param nodo			Nodo a seleccionar
+	 */
+	public void seleccionar(Node nodo) {
+		if(nodo==null || seleccionados.contains(nodo)) return;
+		seleccionados.add(nodo);
+		InteraccionComponenteUtil.marcarSeleccion(nodo);
+	}
+	
+	/**
+	 * Quita la selección de un nodo.
+	 * 
+	 * @param nodo			Nodo a deseleccionar
+	 */
+	public void deseleccionar(Node nodo) {
+		if(nodo==null) return;
+		seleccionados.remove(nodo);
+		InteraccionComponenteUtil.desmarcarSeleccion(nodo);
+	}
+	
+	/**
+	 * Limpia la selección actual (deselecciona todos los nodos).
+	 */
+	public void limpiarSeleccion() {
+		for(Node n : new ArrayList<>(seleccionados))
+			deseleccionar(n);
+		seleccionados.clear();
+	}
+	
+	/**
+	 * Inicia una selección por caja (marquee) en la posición indicada.
+	 * Crea y muestra el rectángulo de selección.
+	 * 
+	 * @param x				Coordenada X inicial
+	 * @param y				Coordenada Y inicial
+	 */
+	public void iniciarCaja(double x, double y) {
+		if(rectanguloSel!=null)
+			zonaDibujo.getChildren().remove(rectanguloSel);
+		rectanguloSel=new Rectangle(x, y, 0, 0);
+		rectanguloSel.setFill(Color.rgb(0,  120, 255, 0.12));
+		rectanguloSel.setStroke(Color.DODGERBLUE);
+		rectanguloSel.getStrokeDashArray().setAll(4.0, 4.0);
+		rectanguloSel.setMouseTransparent(true);
+		zonaDibujo.getChildren().add(rectanguloSel);
+	}
+	
+	/**
+	 * Actualiza las dimensiones y la posición de la caja de selección a la posición del mouse.
+	 * 
+	 * @param x				Coordenada X actual
+	 * @param y				Coordenada Y actual
+	 */
+	public void actualizarCaja(double x, double y) {
+		if(rectanguloSel==null) return;
+		rectanguloSel.setWidth(Math.abs(x-rectanguloSel.getX()));
+		rectanguloSel.setHeight(Math.abs(y-rectanguloSel.getY()));
+		rectanguloSel.setX(Math.min(x,  rectanguloSel.getX()));
+		rectanguloSel.setY(Math.min(y,  rectanguloSel.getY()));
+	}
+	
+	/**
+	 * Finaliza la selección por caja y selecciona todos los elementos que intersectan
+	 * el rectángulo.
+	 * 
+	 * @return {@code true} si la caja ha seleccionado, {@code false} si no
+	 */
+	public boolean finalizarCaja() {
+		if(rectanguloSel==null) return false;
+		if(rectanguloSel.getWidth()<5 && rectanguloSel.getHeight()<5) {
+			zonaDibujo.getChildren().remove(rectanguloSel);
+			rectanguloSel=null;
+			return false;
+		}
+		limpiarSeleccion();
+		var area=rectanguloSel.getBoundsInParent();
+		for(Node n : snapshotDescendientes(zonaDibujo)) {
+			if(!n.isVisible()) continue;
+			Node sel=(normalizador!=null) ? normalizador.apply(n) : n;
+			if(sel==null) continue;
+			boolean esCable=sel instanceof Cable;
+			boolean esComp=sel.getUserData() instanceof Componente;
+			boolean esPuntoLibre=(sel instanceof PuntoConexion p && p.getComponente()==null);
+			if((esCable || esComp || esPuntoLibre) && sel.getBoundsInParent().intersects(area)) {
+				seleccionar(sel);
+			}
+		}
+		zonaDibujo.getChildren().remove(rectanguloSel);
+		rectanguloSel=null;
+		return true;
+	}
+	
+	/**
+	 * Obtiene una instantánea de todos los nodos descendientes de un contenedor raíz.
+	 * 
+	 * @param root				Contenedor raíz desde el que se recorren los nodos
+	 * @return Lista con la raíz y sus descendientes
+	 */
+	private List<Node> snapshotDescendientes(Pane root) {
+		List<Node> out=new ArrayList<>();
+		collect(root, out);
+		return out;
+	}
+	
+	/**
+	 * Recorre recursivamente el árbol de nodos añadiendo cada nodo a la lista.
+	 * 
+	 * @param n					Nodo actual
+	 * @param out				Lista donde se añaden los nodos visitados
+	 */
+	private void collect(Node n, List<Node> out) {
+		out.add(n);
+		if(n instanceof Pane p) {
+			for(Node c : p.getChildren()) collect(c, out);
+		}
+	}
+}

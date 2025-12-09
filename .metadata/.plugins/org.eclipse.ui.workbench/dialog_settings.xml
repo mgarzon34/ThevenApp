@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="ImportExportAction">
+		<item key="ImportExportPage.STORE_SELECTED_IMPORT_WIZARD_ID" value="org.eclipse.m2e.core.wizards.Maven2ImportWizard"/>
+		<item key="ImportExportPage.STORE_SELECTED_EXPORT_WIZARD_ID" value="org.eclipse.ui.wizards.export.ZipFile"/>
+		<list key="ImportExportPage.STORE_EXPANDED_IMPORT_CATEGORIES">
+			<item value="org.eclipse.m2e"/>
+		</list>
+		<list key="ImportExportPage.STORE_EXPANDED_EXPORT_CATEGORIES">
+			<item value="org.eclipse.ui.Basic"/>
+			<item value="org.eclipse.jdt.ui.Java"/>
+		</list>
+		<section name="ImportExportWizard.dialogBounds">
+		</section>
+	</section>
+	<section name="WorkbenchPreferenceDialog.dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="197"/>
+		<item key="DIALOG_Y_ORIGIN" value="87"/>
+		<item key="DIALOG_WIDTH" value="791"/>
+		<item key="DIALOG_HEIGHT" value="914"/>
+		<item key="DIALOG_FONT_NAME" value="1|.AppleSystemUIFont|11.0|0|COCOA|1|.AppleSystemUIFont"/>
+	</section>
+	<section name="ZipFileExportWizard">
+		<item key="WizardZipFileResourceExportPage1.STORE_CREATE_STRUCTURE_ID" value="true"/>
+		<item key="WizardZipFileResourceExportPage1.STORE_COMPRESS_CONTENTS_ID" value="true"/>
+		<list key="WizardZipFileResourceExportPage1.STORE_DESTINATION_NAMES_ID">
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoFINAL.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD1DIC.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD29Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD28Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD27Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD26Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoBAD25Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoBAD24Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD24Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD22Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD21Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD19Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD17Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD14Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD13Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD12Nov.zip"/>
+			<item value="/Users/marcoagp/Library/CloudStorage/OneDrive-UNED/ProyectoGOOD11Nov.zip"/>
+			<item value="/Users/marcoagp/Desktop/ProyectoCorrecciones/CORRECCION-GOOD5NOV.zip"/>
+			<item value="/Users/marcoagp/Desktop/ProyectoCorrecciones/CORRECCION-GOOD.zip"/>
+			<item value="/Users/marcoagp/Desktop/ProyectoCorrecciones/Correccion31Octubre.zip"/>
+		</list>
+		<section name="ZipFileExportWizard.dialogBounds">
+			<item key="DIALOG_X_ORIGIN" value="394"/>
+			<item key="DIALOG_Y_ORIGIN" value="175"/>
+			<item key="DIALOG_WIDTH" value="691"/>
+			<item key="DIALOG_HEIGHT" value="617"/>
+			<item key="DIALOG_FONT_NAME" value="1|.AppleSystemUIFont|11.0|0|COCOA|1|.AppleSystemUIFont"/>
+		</section>
+	</section>
+	<section name="InstallationDialogSettings">
+		<item key="DIALOG_X_ORIGIN" value="-6"/>
+		<item key="DIALOG_Y_ORIGIN" value="-199"/>
+		<item key="DIALOG_WIDTH" value="762"/>
+		<item key="DIALOG_HEIGHT" value="639"/>
+		<item key="DIALOG_FONT_NAME" value="1|.AppleSystemUIFont|11.0|0|COCOA|1|.AppleSystemUIFont"/>
+	</section>
+	<section name="org.eclipse.ui.internal.QuickAccess">
+		<item key="org.eclipse.ui.internal.quickaccess.QuickAccessDialogDIALOG_WIDTH" value="502"/>
+		<item key="org.eclipse.ui.internal.quickaccess.QuickAccessDialogDIALOG_HEIGHT" value="439"/>
+		<item key="org.eclipse.ui.internal.quickaccess.QuickAccessDialogDIALOG_USE_PERSISTED_SIZE" value="true"/>
+		<item key="org.eclipse.ui.internal.quickaccess.QuickAccessDialogDIALOG_USE_PERSISTED_LOCATION" value="false"/>
+		<list key="orderedElements">
+		</list>
+		<list key="orderedProviders">
+		</list>
+		<list key="textEntries">
+		</list>
+		<list key="textArray">
+		</list>
+	</section>
+	<section name="NewWizardAction">
+		<section name="NewWizard.dialogBounds">
+			<item key="DIALOG_X_ORIGIN" value="297"/>
+			<item key="DIALOG_Y_ORIGIN" value="206"/>
+			<item key="DIALOG_WIDTH" value="586"/>
+			<item key="DIALOG_HEIGHT" value="500"/>
+			<item key="DIALOG_FONT_NAME" value="1|.AppleSystemUIFont|11.0|0|COCOA|1|.AppleSystemUIFont"/>
+		</section>
+	</section>
+</section>

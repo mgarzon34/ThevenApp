@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelPropiedadesController"
+      prefWidth="250.0" styleClass="propiedades-fondo-panel">
+    <children>
+        <VBox spacing="10.0" AnchorPane.topAnchor="0" 
+                             AnchorPane.leftAnchor="0"
+                             AnchorPane.rightAnchor="0"
+                             AnchorPane.bottomAnchor="0">
+            <padding>
+                <Insets top="12" right="12" bottom="12" left="12" />
+            </padding>
+
+            <!-- TÍTULO DEL PANEL -->
+            <Label fx:id="titulo" text="Propiedades del componente" styleClass="propiedades-titulo" wrapText="true" 
+            		maxWidth="230" alignment="CENTER_LEFT" />
+
+            <!-- BLOQUE VALOR/UNIDAD Y CARGA -->
+            <GridPane hgap="10" vgap="6">
+            	<columnConstraints>
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" halignment="RIGHT"/>
+    			</columnConstraints>
+                <Label fx:id="labelValor" text="Valor:" styleClass="propiedades-texto" GridPane.rowIndex="0" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkValorUnidad" styleClass="propiedades-enlace" text="-" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+
+                <Label fx:id="labelCarga" text="Componente de carga:" styleClass="propiedades-texto" GridPane.rowIndex="1" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkCarga" styleClass="propiedades-enlace" text="No" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+			</GridPane>
+			<Separator />
+			
+		 	<!-- BLOQUE NODOS DE CONEXIÓN -->
+			<Label fx:id="labelNodosConexion" text="Nodos de conexión:" styleClass="propiedades-label-bold" />
+			<GridPane fx:id="gridNodosConexion" hgap="10" vgap="5">
+			    <columnConstraints>
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" halignment="RIGHT"/>
+    			</columnConstraints>
+                <Label fx:id="labelNodoNeg" text="Nodo Negativo:" styleClass="propiedades-texto" GridPane.rowIndex="2" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkNodoNeg" styleClass="propiedades-enlace" text="NaN" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+
+                <Label fx:id="labelNodoPos" text="Nodo Positivo:" styleClass="propiedades-texto" GridPane.rowIndex="3" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkNodoPos" styleClass="propiedades-enlace" text="NaN" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+			</GridPane>
+			<Separator />
+			
+                <!-- NODOS DE CONTROL (solo para fuentes dependientes) -->
+            <Label fx:id="labelNodosControl" text="Nodos de control:" styleClass="propiedades-label-bold" />
+            <GridPane fx:id="gridControl" hgap="10" vgap="5" visible="false" managed="false">
+                <columnConstraints>
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" halignment="RIGHT"/>
+    			</columnConstraints>
+                <Label text="Control Negativo:" styleClass="propiedades-texto" GridPane.rowIndex="4" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkCtrlNeg" styleClass="propiedades-enlace" text="NaN" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+
+                <Label text="Control Positivo:" styleClass="propiedades-texto" GridPane.rowIndex="5" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkCtrlPos" styleClass="propiedades-enlace" text="NaN" GridPane.rowIndex="5" GridPane.columnIndex="1" />
+
+                <Label text="Dependencia:" styleClass="propiedades-texto" GridPane.rowIndex="6" GridPane.columnIndex="0" />
+                <Hyperlink fx:id="linkDependencia" styleClass="propiedades-enlace" text="Tensión" GridPane.rowIndex="6" GridPane.columnIndex="1" />
+            </GridPane>
+
+            <!-- BLOQUE EXCLUSIVO PARA TIERRA -->
+            <VBox fx:id="tierraBox" spacing="6.0" visible="false" managed="false">
+                <GridPane hgap="10">
+                    <columnConstraints>
+        				<ColumnConstraints hgrow="SOMETIMES" minWidth="100"/>
+        				<ColumnConstraints hgrow="ALWAYS" halignment="RIGHT"/>
+    				</columnConstraints>
+                    <Label text="Nodo de tierra:" styleClass="propiedades-label-bold" GridPane.columnIndex="0" />
+                    <Hyperlink fx:id="linkNodoTierra" styleClass="propiedades-enlace" GridPane.columnIndex="1" />
+                </GridPane>
+            </VBox>
+
+            <!-- BLOQUE CABLES -->
+            <GridPane hgap="10" vgap="5">
+                <columnConstraints>
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" halignment="RIGHT"/>
+    			</columnConstraints>
+                <Label fx:id="labelExtremos" wrapText="true" maxWidth="250" visible="false" managed="false"
+                       styleClass="propiedades-texto" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+            </GridPane>
+
+            <!-- BLOQUE ADVERTENCIA "NO CONECTADO" -->
+            <Separator fx:id="separadorAdvertencia" />
+            <GridPane fx:id="advertenciaBox" visible="false" managed="false" hgap="5">
+                <columnConstraints>
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+        			<ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" halignment="RIGHT"/>
+    			</columnConstraints>
+                <ImageView fx:id="iconoAdvertencia" fitHeight="20" fitWidth="20" GridPane.columnIndex="0">
+                    <image>
+                        <Image url="@../images/warning.png" />
+                    </image>
+                </ImageView>
+                <Label fx:id="labelAdvertencia" text="No conectado" styleClass="propiedades-label-advertencia" GridPane.columnIndex="1" />
+            </GridPane>
+        </VBox>
+    </children>
+</AnchorPane>

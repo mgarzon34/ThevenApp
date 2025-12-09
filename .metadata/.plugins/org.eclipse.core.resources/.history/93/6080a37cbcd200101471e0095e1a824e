@@ -1,0 +1,232 @@
+package com.circuitos.AnalisisCircuitos.gui.util;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.FuenteDependiente;
+import com.circuitos.temporal.dominio.Tierra;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.ConectorPuntos;
+import com.circuitos.temporal.gui.model.Net;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.service.cable.CableManager;
+
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.layout.Pane;
+
+/**
+ * Gestiona operaciones lógicas sobre el diseño del circuito como la
+ * eliminación de componentes, restauración de nodos usando {@link CableManager}
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitDesignUtil {
+	private static final Logger logger=Logger.getLogger(CircuitDesignUtil.class.getName());
+	
+	private final Pane zonaDibujo;
+	private final CableManager cableManager;
+	private final Consumer<Componente> onSeleccionarComponente;
+	private final ConectorPuntos conector;
+	
+	/**
+	 * Constructor para crear una nueva instancia del gestor de diseño de circuito.
+	 * 
+	 * @param zonaDibujo					Pane donde se dibuja el circuito
+	 * @param cableManager					Gestor de operaciones sobre cables
+	 * @param onSeleccionarComponente		Listener para deseleccion de componente
+	 */
+	public CircuitDesignUtil(Pane zonaDibujo, CableManager cableManager, 
+							Consumer<Componente> onSeleccionarComponente) {
+		this(zonaDibujo, cableManager, null, onSeleccionarComponente);
+	}
+	
+	/**
+	 * Constructor para crear una nueva instancia del gestor de diseño de circuito.
+	 * Usa también la variable conector de la clase ConectorPuntos.
+	 * 
+	 * @param zonaDibujo					Pane donde se dibuja el circuito
+	 * @param cableManager					Gestor de operaciones sobre cables
+	 * @param conector						Conector para conexión eléctrica
+	 * @param onSeleccionarComponente		Listener para deseleccion de componente
+	 */
+	public CircuitDesignUtil(Pane zonaDibujo, CableManager cableManager,
+						ConectorPuntos conector, Consumer<Componente> onSeleccionarComponente) {
+		this.zonaDibujo=zonaDibujo;
+		this.cableManager=cableManager;
+		this.onSeleccionarComponente=onSeleccionarComponente;
+		this.conector=conector;
+		logger.fine(()->"CircuitDesignUtil inicializado");
+	}
+	/**
+	 * Eliminar un nodo del circuito (componente o cable). 
+	 * Reorganiza nodos o fusión de tramos.
+	 * 
+	 * @param seleccionado			Nodo visual a eliminar
+	 */
+	public void eliminarElemento(Node seleccionado) {
+		Objects.requireNonNull(seleccionado, "seleccionado no puede ser null");
+		logger.info(()->"Eliminando elemento: "+seleccionado);
+		if(seleccionado instanceof Pane panelComp) {
+			eliminarComponente(panelComp);
+		} else if(seleccionado instanceof Cable cable) {
+			eliminarCable(cable);
+		}
+		zonaDibujo.getChildren().remove(seleccionado);
+		notifyDeselection();
+	}
+	
+	/**
+	 * Notifica la deselección de componente.
+	 */
+	private void notifyDeselection() {
+		if(onSeleccionarComponente!=null) {
+			onSeleccionarComponente.accept(null);
+		}
+	}
+	/**
+	 * Encuentra todos los cables conectados a un punto.
+	 * 
+	 * @param punto		Punto de conexión
+	 * @return lista de cables conectados
+	 */
+	private List<Cable> findCablesFor(PuntoConexion punto) {
+		Objects.requireNonNull(punto, "punto no puede ser null");
+		return zonaDibujo.getChildren().stream()
+				.filter(n->n instanceof Cable)
+				.map(Cable.class::cast)
+				.filter(c -> c.getInicio()==punto || c.getFin()==punto)
+				.toList();
+	}
+	
+	/**
+	 * Elimina un componente del circuito y todos los cables conectados.
+	 * Fusiona tramos o libera nodos no utilizados.
+	 * 
+	 * @param panelComp			Panel que contiene el componente a eliminar
+	 */
+	private void eliminarComponente(Pane panelComp) {
+		List<PuntoConexion> puntos=panelComp.getChildren().stream()
+			.filter(n->n instanceof PuntoConexion)
+			.map(n->(PuntoConexion) n)
+			.toList();
+		for(PuntoConexion punto : puntos) {
+			for(Cable cable : findCablesFor(punto)) {
+				PuntoConexion otroExtremo=(cable.getInicio()==punto) ? cable.getFin() : cable.getInicio();
+				cableManager.eliminarCableActualizarNodos(cable);
+				liberarNodoInutilizado(otroExtremo);
+				cableManager.fusionarCables(otroExtremo);
+			}
+			liberarNodoInutilizado(punto);
+		}
+	}
+	
+	/**
+	 * Elimina un cable y realiza limpieza de nodos o fusión de tramos.
+	 * 
+	 * @param cable				Cable que se elimina
+	 */
+	private void eliminarCable(Cable cable) {
+		PuntoConexion inicio=cable.getInicio();
+		PuntoConexion fin=cable.getFin();
+		
+		cableManager.eliminarCableActualizarNodos(cable);
+		
+		for(PuntoConexion punto : List.of(inicio, fin)) {
+			liberarNodoInutilizado(punto);
+			cableManager.fusionarCables(punto);
+		}
+	}
+	
+	/**
+	 * Libera el nodo de un componente si ya no está conectado a ningún cable. 
+	 * Restaura su nodo predeterminado.
+	 * 
+	 * @param punto			Punto o nodo que se libera
+	 */
+	private void liberarNodoInutilizado(PuntoConexion punto) {
+		Objects.requireNonNull(punto, "punto no puede ser null");
+		if(punto.getComponente()==null) return;
+		
+		boolean conectado=zonaDibujo.getChildren().stream()
+				.filter(n->n instanceof Cable)
+				.map(n->(Cable)n)
+				.anyMatch(c->c.getInicio()==punto || c.getFin()==punto);
+		
+		if(!conectado) {
+			int defaultNodo=punto.getNodoPredeterminado();
+			if(punto.getComponente() instanceof Tierra t) {
+				t.setNodoTierra(defaultNodo);
+			}
+			if(punto.esPositivo()) {
+				punto.getComponente().setNodo2(defaultNodo);
+			} else {
+				punto.getComponente().setNodo1(defaultNodo);
+			}
+			punto.setNet(null);	
+			logger.fine(()->"Nodo restaurado para punto: "+punto);
+		}
+	}
+	
+	/**
+	 * Recorre recursivamente el árbol de nodos a partir de un nodo especificado, buscando
+	 * instancias de {@link PuntoConexion} y reasigna nodo si está incluido en el mapa de reasignación.
+	 * Si el componente es una fuente dependiente, también actualiza sus nodos de control.
+	 * 
+	 * @param nodo						Nodo raíz desde donde comienza la búsqueda recursiva
+	 * @param reasignacion				Mapa con las reasignaciones de nodos
+	 */
+	public void actualizarPuntosRecursivo(Node nodo, Map<Integer, Integer> reasignacion) {
+		Objects.requireNonNull(nodo, "nodo no puede ser null");
+		if(nodo instanceof PuntoConexion pc) {
+			int actual=pc.getNodo();
+			if(actual>=0 && reasignacion.containsKey(actual)) {
+				int nuevoNodo=reasignacion.get(actual);
+				Net net=pc.getNet();
+				if(net!=null) {
+					net.setId(nuevoNodo);
+					pc.setNet(net);
+					if(conector!=null) {
+						conector.actualizarComponente(pc.getComponente(), pc.esPositivo(), nuevoNodo);
+					}
+					logger.finer(()->"Nodo actualizado en PuntoConexion: "+nuevoNodo);
+				} else {
+					logger.warning("PuntoConexion sin Net al actualizar: "+pc);
+				}
+			}
+		} else if(nodo instanceof Parent parent) {
+			for(Node hijo : parent.getChildrenUnmodifiable()) {
+				actualizarPuntosRecursivo(hijo, reasignacion);
+			}
+		}
+	}
+	
+	/**
+	 * Actualiza los nodos de control de un componente si es una fuente dependiente.
+	 * 
+	 * @param componente				Componente a comprobar
+	 * @param reasignacion				Mapa con la reasigancion de nodos
+	 */
+	public void actualizarNodosControl(Componente componente, Map<Integer, Integer> reasignacion) {
+		Objects.requireNonNull(componente, "componente no puede ser null");
+		if(componente instanceof FuenteDependiente fuente) {
+			System.out.println("Fuente Dependiente encontrada con nodos control "+fuente.getCtrlNeg() +" y " +fuente.getCtrlPos());
+			int ctrlNeg=fuente.getCtrlNeg();
+			int ctrlPos=fuente.getCtrlPos();
+			
+			if(reasignacion.containsKey(ctrlPos)) {
+				fuente.setCtrlPos(reasignacion.get(ctrlPos));
+			}
+			if(reasignacion.containsKey(ctrlNeg)) {
+				fuente.setCtrlNeg(reasignacion.get(ctrlNeg));
+			}
+			if(onSeleccionarComponente!=null) onSeleccionarComponente.accept((Componente) fuente);
+		}
+		logger.fine(()->"Nodos de control actualizados para fuente: "+componente.getId());
+	}
+}

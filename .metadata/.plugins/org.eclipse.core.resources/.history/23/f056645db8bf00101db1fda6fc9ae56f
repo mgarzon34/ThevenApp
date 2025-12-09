@@ -1,0 +1,37 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import com.circuitos.AnalisisCircuitos.gui.model.PuntoConexion;
+
+import javafx.scene.layout.Pane;
+
+public class RemoveConnectionPointCommand implements Command {
+	private final PuntoConexion punto;
+	private final Pane zonaDibujo;
+	
+	public RemoveConnectionPointCommand(PuntoConexion punto, Pane zonaDibujo) {
+		this.punto=punto;
+		this.zonaDibujo=zonaDibujo;
+	}
+
+	@Override
+	public void ejecutar() {
+		zonaDibujo.getChildren().remove(punto);
+	}
+
+	@Override
+	public void deshacer() {
+		if(!zonaDibujo.getChildren().contains(punto)) {
+			zonaDibujo.getChildren().add(punto);
+		}
+	}
+	
+	@Override
+	public boolean esValido() {
+		return punto!=null;
+	}
+	
+	@Override
+	public String getDescripcion() {
+		return "Eliminar punto de conexión";
+	}
+}

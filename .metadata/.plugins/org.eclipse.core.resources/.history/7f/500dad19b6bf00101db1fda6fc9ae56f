@@ -1,0 +1,32 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import com.circuitos.AnalisisCircuitos.gui.model.Cable;
+
+public class MoveControlPointCommand implements Command {
+	private final Cable cable;
+	private final int index; 		//índice del punto dentro de la polyline
+	private final double oldX, oldY, newX, newY;
+	
+	public MoveControlPointCommand(Cable cable, int index, double oldX, double oldY,
+									double newX, double newY) {
+		this.cable=cable;
+		this.index=index;
+		this.oldX=oldX; this.oldY=oldY;
+		this.newX=newX; this.newY=newY;
+	}
+	
+	@Override
+	public void ejecutar() {
+		cable.setControlPoint(index, newX, newY);
+	}
+	
+	@Override
+	public void deshacer() {
+		cable.setControlPoint(index, oldX, oldY);
+	}
+	
+	@Override
+	public String getDescripcion() {
+		return "Mover punto control de cable";
+	}
+}

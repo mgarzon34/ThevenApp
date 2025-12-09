@@ -1,0 +1,326 @@
+package com.circuitos.analisiscircuitos.gui.util;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.swing.SwingUtilities;
+
+import org.controlsfx.control.ToggleSwitch;
+
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
+import javafx.geometry.Pos;
+import javafx.print.PrinterJob;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Separator;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.FileChooser;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.Window;
+
+/**
+ * Visor de logs que permite búsqueda, impresión y exportación.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class LogViewer {
+	
+	private static Path logFilePath;
+	private static List<String> originalLines;
+	
+	/**
+	 * Muestra la ventana de visor de logs.
+	 * 
+	 * @param owner			Ventana que contiene el visor
+	 */
+	public static void show(Window owner) {
+		if(logFilePath==null) {
+			System.err.println("LogViewer: logFilePath no configurado");
+			return;
+		}
+		
+		originalLines=leerArchivoLogs();
+		ListView<String> lv=crearListViewLogs();
+		ToggleSwitch toggleColor=new ToggleSwitch("Modo Color");
+		toggleColor.getStyleClass().add("log-toggle-switch");
+		toggleColor.setSelected(true);
+		configurarCellFactory(lv, toggleColor);
+		
+		HBox buscador=crearPanelBusqueda(lv, toggleColor);
+		
+		Stage dialog=new Stage();
+		dialog.initOwner(owner);
+		dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.setTitle("Visor de logs");
+		
+		HBox acciones=crearPanelAcciones(dialog, lv);
+		
+		BorderPane root=new BorderPane();
+		root.setTop(buscador);
+		root.setBottom(acciones);
+		root.setCenter(lv);
+		BorderPane.setMargin(lv, new Insets(5));
+		Scene scene=new Scene(root, 800, 600);
+		StylesLoader.aplicarCSS(scene);
+		dialog.setScene(scene);
+		
+		filtrarLogs(lv, "", Set.of("INFO", "FINE", "FINER", "WARNING", "SEVERE"));
+		dialog.showAndWait();
+	}
+	
+	/**
+	 * Establece la ruta del archivo de log. 
+	 * 
+	 * @param path 			Ruta absoluta
+	 */
+	public static void setLogFilePath(Path path) {
+		logFilePath=path;
+	}
+	
+	/**
+	 * Lee el archivo de logs.
+	 *
+	 * @return Lista de líneas del archivo o error si falla la lectura
+	 */
+	private static List<String> leerArchivoLogs() {
+		try {
+			return Files.readAllLines(logFilePath);
+		} catch(IOException e) {
+			return List.of("Error leyendo logs: "+e.getMessage());
+		}
+	}
+	
+	/**
+	 * Crea el área de lectura de logs.
+	 * 
+	 * @return Lista de logs vacía 
+	 */
+	private static ListView<String> crearListViewLogs() {
+		ListView<String> lv=new ListView<>(FXCollections.observableArrayList());
+		lv.setFocusTraversable(false);
+		return lv;
+	}
+	
+	/**
+	 * Configura la {@link ListCell} del {@link ListView} para aplicar estilos según 
+	 * el nivel de log (Info, fine, warning...) y del estado del toggleSwitch.
+	 * 
+	 * @param lv				Lista de las líneas de log
+	 * @param tbColor			Interruptor que activa/desactiva el coloreado por nivel
+	 */
+	private static void configurarCellFactory(ListView<String> lv, ToggleSwitch tbColor) {
+		lv.setCellFactory(_ -> new ListCell<>() {
+			@Override
+			protected void updateItem(String item, boolean vacio) {
+				super.updateItem(item, vacio);
+				
+				ObservableList<String> styles=getStyleClass();
+				if(!styles.contains("log-cell")) {
+					styles.add("log-cell");
+				}
+				styles.removeAll("info-entry", "fine-entry", "finer-entry", "warning-entry", "severe-entry");
+				if(vacio || item==null) {
+					setText(null);
+				} else {
+					setText(item);
+					if(tbColor.isSelected()) {
+						if(item.contains("INFO:")) getStyleClass().add("info-entry");
+						else if(item.contains("FINE:")) getStyleClass().add("fine-entry");
+						else if(item.contains("FINER:")) getStyleClass().add("finer-entry");
+						else if(item.contains("WARNING:")) getStyleClass().add("warning-entry");
+						else if(item.contains("SEVERE:")) getStyleClass().add("severe-entry");
+					}
+				}
+			}
+		});
+		tbColor.selectedProperty().addListener((_, _, _) -> lv.refresh());
+	}
+	
+	/**
+	 * Crea el panel de búsqueda para filtrar y los checkboxes para filtrar por tipo.
+	 * 
+	 * @param lv			Lista de logs
+	 * @param tbColor		Interruptor del modo color
+	 * @return Panel de busqueda (tipo {@link HBox})
+	 */
+	private static HBox crearPanelBusqueda(ListView<String> lv, ToggleSwitch tbColor) {
+		TextField tfBuscar=new TextField();
+		tfBuscar.setPromptText("Buscar...");
+		Button btnBuscar=new Button("Buscar");
+		
+		CheckBox cbInfo=new CheckBox("INFO");
+		CheckBox cbFine=new CheckBox("FINE");
+		CheckBox cbFiner=new CheckBox("FINER");
+		CheckBox cbWarning=new CheckBox("WARNING");
+		CheckBox cbSevere=new CheckBox("SEVERE");
+		cbInfo.setSelected(true);
+		cbFine.setSelected(true);
+		cbFiner.setSelected(true);
+		cbWarning.setSelected(true);
+		cbSevere.setSelected(true);
+		
+		Runnable refrescar=()->{
+			String term=tfBuscar.getText();
+			Set<String> niveles=Stream.of(
+					cbInfo.isSelected() ? "INFO" : null,
+					cbFine.isSelected() ? "FINE" : null,
+					cbFiner.isSelected() ? "FINER" : null,
+					cbWarning.isSelected() ? "WARNING" : null,
+ 					cbSevere.isSelected() ? "SEVERE" : null
+			).filter(Objects::nonNull).collect(Collectors.toSet());
+			
+			filtrarLogs(lv, term, niveles);
+			if(!lv.getItems().isEmpty() && !term.isBlank()) {
+				lv.getSelectionModel().select(0);
+				lv.scrollTo(0);
+			}
+		};
+		
+		btnBuscar.setOnAction(_ -> refrescar.run());
+		tfBuscar.setOnKeyPressed(e->{
+			if(e.getCode()==KeyCode.ENTER) refrescar.run(); 
+		});
+		cbInfo.setOnAction(_->refrescar.run());
+		cbFine.setOnAction(_->refrescar.run());
+		cbFiner.setOnAction(_->refrescar.run());
+		cbWarning.setOnAction(_->refrescar.run());
+		cbSevere.setOnAction(_->refrescar.run());
+		
+		HBox buscador=new HBox(8, tfBuscar, btnBuscar, new Separator(Orientation.VERTICAL),
+				cbInfo, cbFine, cbFiner, cbWarning, cbSevere, new Separator(Orientation.VERTICAL),
+				tbColor);
+		buscador.setPadding(new Insets(8));
+		buscador.setAlignment(Pos.CENTER_LEFT);
+		return buscador;
+	}
+	
+	/**
+	 * Filtra los logs por tipo de log: INFO, FINE, WARNING o SEVERE.
+	 * 
+	 * @param lv				Lista de los logs filtrados
+	 * @param term				Términos de búsqueda 
+	 * @param niveles			Conjunto de niveles permitidos (INFO, FINE, FINER, WARNING, SEVERE)
+	 */
+	private static void filtrarLogs(ListView<String> lv, String term, Set<String> niveles) {
+		String lowerTerm=(term==null) ? "" : term.toLowerCase();
+		List<String> filtrado=originalLines.stream()
+				.filter(line -> niveles.stream().anyMatch(l ->
+						line.contains(l + ":")
+						|| line.contains("["+l+"]")))
+				.filter(line -> lowerTerm.isBlank() || line.toLowerCase().contains(lowerTerm))
+				.collect(Collectors.toList());
+		lv.getItems().setAll(filtrado);
+	}
+	
+	/**
+	 * Crea un panel de acciones que contiene los botones de imprimir y guardar.
+	 * 
+	 * @param dialog			Diálogo donde se crea el panel de acciones
+	 * @param lv				Lista de logs
+	 * @return Panel de acciones (tipo {@link HBox})
+	 */
+	private static HBox crearPanelAcciones(Stage dialog, ListView<String> lv) {
+		Button btnImprimir=new Button("Imprimir");
+		Button btnGuardar=new Button("Guardar copia");
+		Button btnCerrar=new Button("Cerrar");
+		btnImprimir.setOnAction(_ -> doPrint(dialog, lv));
+		btnGuardar.setOnAction(_ -> doSave(dialog,lv));
+		btnCerrar.setOnAction(_ -> dialog.close());
+		HBox acciones=new HBox(10, btnImprimir, btnGuardar, btnCerrar);
+		acciones.setPadding(new Insets(8));
+		acciones.setAlignment(Pos.CENTER);
+		return acciones;
+	}
+	
+	/**
+	 * Imprime el contenido del visor de logs a través de una impresora.
+	 * 
+	 * @param owner				Ventana contenedora
+	 * @param printable			Nodo que se envía a la impresora
+	 */
+	private static void doPrint(Window owner, Node printable) {
+		PrinterJob job=PrinterJob.createPrinterJob();
+		if(job!=null) {
+			boolean imprimir=job.showPrintDialog(null);
+			if(imprimir && job.printPage(printable)) {
+				job.endJob();
+				return;
+			}
+			return;
+		}
+		java.awt.print.PrinterJob awtJob=java.awt.print.PrinterJob.getPrinterJob();
+		SwingUtilities.invokeLater(()->{
+			boolean doPrint=awtJob.printDialog();
+			if(!doPrint) return;
+			new Thread(()->{
+				try {
+					awtJob.print();
+				} catch(java.awt.print.PrinterException ex) {
+					Platform.runLater(()-> {
+						Alert alert=new Alert(Alert.AlertType.ERROR,
+								"Error al imprimir vía AWT:\n"+ex.getMessage(),
+								ButtonType.OK);
+						alert.initOwner(owner);
+						alert.showAndWait();
+					});
+				}
+			}, "AWT-Print-Thread").start();
+		});
+	}
+	
+	/**
+	 * Guarda una copia del contenido del visor de logs en un archivo.
+	 * 
+	 * @param owner			Ventana contenedora
+	 * @param lv			Lista de logs filtrados
+	 */
+	private static void doSave(Window owner, ListView<String> lv) {
+		FileChooser fc=new FileChooser();
+		fc.setTitle("Guardar logs como...");
+		fc.setInitialFileName(logFilePath.getFileName().toString());
+		fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Archivo de texto", "*.log", "*.txt"));
+		
+		Stage stage=owner instanceof Stage ? (Stage) owner : null;
+		var file=fc.showSaveDialog(stage);
+		if(file==null) return;
+		
+		try {
+			Files.write(file.toPath(), lv.getItems());	
+		} catch (IOException ex) {
+			mostrarError(owner, "No se pudo guardar el ficher:\n"+ex.getMessage());
+		}
+	}
+	
+	/**
+	 * Muestra una alerta de error en caso de no poder realizar una acción.
+	 * 
+	 * @param owner				Ventana contenedora
+	 * @param message			Mensaje del error
+	 */
+	private static void mostrarError(Window owner, String message) {
+		Alert alerta=new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+		alerta.initOwner(owner);
+		alerta.showAndWait();
+	}
+}

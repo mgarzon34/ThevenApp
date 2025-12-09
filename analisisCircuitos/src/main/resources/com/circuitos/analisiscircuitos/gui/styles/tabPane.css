@@ -1,0 +1,31 @@
+/* ============================================================================
+ * Estilos para las pestañas del panel central: Diseño, Análisis y Aprendizaje
+ * Archivo: tabPane.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * =========================================================================== */
+
+/* Estilo general de las pestañas */
+.tab-pane .tab {
+	-fx-padding: 10 20 10 20;			/* Espaciado interno para una pestaña más grande */
+	-fx-background-color: #0085C5;	/* Fondo azul para pestañas no seleccionadas */
+	-fx-background-radius: 8;			/* Bordes redondeados */
+	-fx-border-color: transparent;		/* Sin borde */
+	-fx-font-weight: bold;				/* Texto en negrita */
+}
+
+/* Texto de la pestaña no seleccionada */
+.tab-pane .tab .tab-label {
+	-fx-text-fill: white;				/* Letras blancas sobre fondo azul */
+}
+
+/* Pestaña seleccionada */
+.tab-pane .tab:selected {
+	-fx-background-color: #ffffff;		/* Fondo blanco para la pestaña seleccionada */
+	-fx-font-weight: bold;				
+}
+
+/* Texto de la pestaña seleccionada */
+.tab-pane .tab:selected .tab-label {
+	-fx-text-fill: black;				/* Letras negras sobre fondo blanco */
+}

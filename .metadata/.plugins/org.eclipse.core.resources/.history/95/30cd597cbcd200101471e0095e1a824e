@@ -1,0 +1,162 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.gui.controller.PanelDisenoController;
+import com.circuitos.temporal.gui.service.undo.DescripcionesAccion;
+
+import javafx.scene.Parent;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Comando para añadir un componente al diseño del circuito.
+ * Solo maneja componentes (cables independientes).
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class AddComponentCommand implements Command {
+	private static final Logger logger=Logger.getLogger(AddComponentCommand.class.getName());
+	
+	private final PanelDisenoController controlador;
+	private final String tipoComponente;
+	private final double x;
+	private final double y;
+	
+	private Componente componente;
+	private StackPane compVisual;
+	private boolean ejecutado=false;
+	private String descripcion="Añadir componente";
+	
+	private int paneIndexUsado=-1;
+	private int listIndexUsado=-1;
+	
+	/**
+	 * Constructor del comando de añadir componente. 
+	 * 
+	 * @param controlador				Controlador del panel de diseño
+	 * @param tipoComponente			Tipo de componente a añadir
+	 * @param x							Posición X donde se añade
+	 * @param y							Posición Y donde se añade
+	 */
+	public AddComponentCommand(PanelDisenoController controlador,
+							String tipoComponente, double x, double y) {
+		this.controlador=Objects.requireNonNull(controlador, "controlador");
+		this.tipoComponente=Objects.requireNonNull(tipoComponente, "tipoComponente");
+		this.x=x;
+		this.y=y;
+	}
+	
+	/**
+	 * Limita valor entero a [min, max]
+	 */
+	private static int clamp(int val, int min, int max) {
+		if(val<min) return min;
+		if(val>max) return max;
+		return val;
+	}
+	
+	/* Implementación métodos de la interfaz */
+
+	@Override
+	public void ejecutar() {
+		final Pane zona=controlador.getZonaDibujo();
+		final Circuito circuito=controlador.getCircuitoActual();
+		
+		if(!ejecutado) {
+			StackPane panel=controlador.crearComponenteVisual(tipoComponente, x, y);
+			if(panel==null) return;
+			
+			//vincular modelo
+			Object dato=panel.getUserData();
+			if(dato instanceof Componente comp) {
+				this.componente=comp;
+				this.compVisual=panel;
+				
+				//Determinar índices y reinsertar en posiciones exactas
+				paneIndexUsado=zona.getChildren().size();
+				listIndexUsado=circuito.getComponentes().size();
+				
+				//Insertar en pane (evita duplicados)
+				if(zona.getChildren().contains(panel)) zona.getChildren().remove(panel);
+				zona.getChildren().add(paneIndexUsado, panel);
+				
+				//Insertar en modelo (evita duplicados)
+				if(circuito.getComponentes().contains(comp)) circuito.getComponentes().remove(comp);
+				circuito.getComponentes().add(listIndexUsado, comp);
+				this.descripcion=DescripcionesAccion.anadir(comp);
+				ejecutado=true;
+				logger.fine(() -> "Componente añadido: "+comp.getId());
+			} else {
+				//si no hay componente en userData, añade la vista
+				paneIndexUsado=zona.getChildren().size();
+				if(zona.getChildren().contains(panel)) zona.getChildren().remove(panel);
+				zona.getChildren().add(paneIndexUsado, panel);
+				this.compVisual=panel;
+				this.descripcion="Añadir componente visual";
+				ejecutado=true;
+				logger.fine("Componente visual añadido sin modelo asociado");	
+			}
+		} else {
+			//Rehacer - volver a añadir el componente
+			if(compVisual==null) return;
+			Parent parent=compVisual.getParent();
+			if(parent!=null && parent!=zona && parent instanceof Pane p) {
+				p.getChildren().remove(compVisual);
+			}
+			paneIndexUsado=clamp(paneIndexUsado, 0, zona.getChildren().size());
+			if(componente!=null) {
+				listIndexUsado=clamp(listIndexUsado, 0, circuito.getComponentes().size());
+			}
+			//Reubicar en pane (evita duplicados)
+			if(zona.getChildren().contains(compVisual))
+				zona.getChildren().remove(compVisual);
+			zona.getChildren().add(paneIndexUsado, compVisual);
+			
+			//Reubicar en modelo si existe
+			if(componente!=null) {
+				if(circuito.getComponentes().contains(componente)) {
+					circuito.getComponentes().remove(componente);
+				}
+				circuito.getComponentes().add(listIndexUsado, componente);
+				logger.fine(() -> "Componente restaurado: "+componente.getId());
+			} else {
+				logger.fine("Componente visual restaurado (sin modelo)");
+			}
+		}
+	}
+
+	@Override
+	public void deshacer() {
+		final Pane zona=controlador.getZonaDibujo();
+		final Circuito circuito=controlador.getCircuitoActual();
+		if(compVisual!=null) zona.getChildren().remove(compVisual);
+		if(componente!=null) {
+			circuito.getComponentes().remove(componente);
+			logger.fine(() -> "Componente eliminado por -deshacer-: "+componente.getId());
+		}
+	}
+
+	@Override
+	public String getDescripcion() {
+		return descripcion;
+	}
+	
+	@Override
+	public boolean esValido() {
+		//El comando es válido si el controlador existe y si hay componentes creados que también existan
+		if(controlador==null) {
+			return false;
+		}
+		
+		if(ejecutado) {
+			//Si ya fue ejecutado, verificar que el componente y la vista existan
+			return componente!=null && compVisual!=null;
+		}
+		return true; //Si no ha sido ejecutado aún, es válido
+	}
+}

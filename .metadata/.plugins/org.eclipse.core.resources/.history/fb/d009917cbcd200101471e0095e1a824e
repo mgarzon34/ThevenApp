@@ -1,0 +1,74 @@
+package com.circuitos.AnalisisCircuitos.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.circuitos.temporal.gui.model.PuntoConexion;
+
+import javafx.geometry.Point2D;
+import javafx.scene.shape.Circle;
+
+/**
+ * Clase auxiliar para la generación de trayectorias geométricas de cables.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableGeometriaUtil {
+	
+	/**
+	 * Constructor no instanciable.
+	 */
+	private CableGeometriaUtil() { /* No instanciable */ }
+	
+	/**
+	 * Genera una lista de coordenadas para una trayectoria. Se utiliza cuando el cable
+	 * tiene puntos de control añadidos por el usuario.
+	 * 
+	 * @param inicio				Punto inicial
+	 * @param fin					Punto final
+	 * @param codos					Lista de puntos de control
+	 * @return Lista de coordenadas
+	 */
+	public static List<Double> generarPuntosConCodos(Point2D inicio, Point2D fin, List<Circle> codos) {
+		List<Double> puntos=new ArrayList<>();
+		
+		//Inicio
+		puntos.add(inicio.getX());
+		puntos.add(inicio.getY());
+		
+		//Codos
+		if(codos!=null) {
+			for(Circle c : codos) {
+				puntos.add(c.getCenterX());
+				puntos.add(c.getCenterY());
+			}
+		}
+		//Fin
+		puntos.add(fin.getX());
+		puntos.add(fin.getY());
+		return puntos;
+	}
+	
+	/**
+	 * Genera una trayectoria automática sin codos definidos por el usuario. Usa {@link CableTrayectoriaCalculator}
+	 * para decidir la ruta L, U o recta.
+	 * 
+	 * @param inicio					Posición del extremo inicial
+	 * @param fin						Posición del extremo final
+	 * @param pInicio					Punto de conexión inicial
+	 * @param pFin						Punto de conexión final
+	 * @return Lista de coordenadas de la trayectoria
+	 */
+	public static List<Double> generarPuntosSimple(Point2D inicio, Point2D fin, PuntoConexion pInicio, PuntoConexion pFin) {
+		List<Point2D> ruta=CableTrayectoriaCalculator.calcularTrayectoria(inicio, fin, pInicio, pFin);
+		List<Double> puntosPolyline=new ArrayList<>();
+		if(ruta!=null) {
+			for(Point2D p : ruta) {
+				puntosPolyline.add(p.getX());
+				puntosPolyline.add(p.getY());
+			}
+		}
+		return puntosPolyline;
+	}
+}

@@ -1,0 +1,216 @@
+package com.circuitos.temporal.gui.service.undo;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.FuenteCorrienteDependiente;
+import com.circuitos.temporal.dominio.FuenteCorrienteInd;
+import com.circuitos.temporal.dominio.FuenteTensionDependiente;
+import com.circuitos.temporal.dominio.FuenteTensionInd;
+import com.circuitos.temporal.dominio.Resistencia;
+import com.circuitos.temporal.dominio.Tierra;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.NodeField;
+
+/**
+ * Clase para generar descripciones de texto de acciones utilizadas por el sistema undo/redo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DescripcionesAccion {
+	
+	/**
+	 * Constructor privado. Evita instanciación.
+	 */
+	private DescripcionesAccion() { /* NO INSTANCIABLE */}
+	
+	/**
+	 * Genera una etiqueta para un componente según su tipo.
+	 * 
+	 * @param c				Componente
+	 * @return descripción del componente
+	 */
+	public static String etiqueta(Componente c) {
+		if(c==null) return "Componente";
+		String tipo=tipoComponente(c);
+		String nombre=nombreCorto(c);
+		return tipo+" "+nombre;
+	}
+	
+	/**
+	 * Genera una etiqueta para un cable.
+	 * 
+	 * @param cable			Cable
+	 * @return descripción del cable
+	 */
+	public static String etiqueta(Cable cable) {
+		if(cable==null) return "Cable";
+		String id=cable.getCableId();
+		return "Cable"+(id!=null && !id.isBlank() ? " "+id : "");
+	}
+	
+	/**
+	 * Descripción para la acción de añadir un componente.
+	 * 
+	 * @param c				Componente que se añade
+	 * @return descripción de la acción de añadir
+	 */
+	public static String anadir(Componente c) {
+		return "Añadir "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de eliminar un componente.
+	 * 
+	 * @param c				Componente que se elimina
+	 * @return descripción de la acción de eliminar
+	 */
+	public static String eliminar(Componente c) {
+		return "Eliminar "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de mover un componente.
+	 * 
+	 * @param c				Componente que se mueve
+	 * @return descripción de la acción de mover
+	 */
+	public static String mover(Componente c) {
+		return "Mover "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de cambiar valor de un componente.
+	 * 
+	 * @param c				Componente que se cambia su valor
+	 * @return descripción de la acción de cambiar valor
+	 */
+	public static String cambiarValor(Componente c) {
+		return "Cambiar valor de "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de marcar/desmarcar como carga un componente.
+	 * 
+	 * @param c				Componente que se marca/desmarca
+	 * @return descripción de la acción de marcar/desmarcar
+	 */
+	public static String alternarCarga(Componente c) {
+		return "Alternar carga de "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de editar un nodo de un componente.
+	 * 
+	 * @param c				Componente que se modifica el nodo
+	 * @return descripción de la acción de editar nodo
+	 */
+	public static String editarNodo(Componente c, NodeField nf) {
+		return "Editar "+nombreCampoNodo(nf)+ " de "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de editar el tipo de dependencia de un componente (fuente dependiente)
+	 * 
+	 * @param c				Componente (fuente dependiente)
+	 * @return descripción de la acción de editar tipo de dependencia
+	 */
+	public static String editarTipoDependencia(Componente c) {
+		return "Cambiar tipo de dependencia de "+etiqueta(c);
+	}
+	
+	/**
+	 * Descripción para la acción de añadir un cable.
+	 * 
+	 * @param cable				Cable que se añade
+	 * @return descripción de la acción de añadir cable
+	 */
+	public static String anadir(Cable cable) {
+		return "Añadir "+etiqueta(cable);
+	}
+	
+	/**
+	 * Descripción para la acción de eliminar un cable.
+	 * 
+	 * @param cable				Cable que se elimina
+	 * @return descripción de la acción de eliminar cable
+	 */
+	public static String eliminar(Cable cable) {
+		return "Eliminar "+etiqueta(cable);
+	}
+	
+	/**
+	 * Descripción para la acción de conectar dos componentes.
+	 * 
+	 * @param a				Componente a
+	 * @param b				Componente b
+	 * @return descripción de la acción de conectar dos componentes
+	 */
+	public static String conectar(Componente a, Componente b) {
+		return "Conectar "+etiqueta(a)+" <-> "+etiqueta(b);
+	}
+	
+	/**
+	 * Devuelve nombre genérico para el tipo de componente según su clase.
+	 * 
+	 * @param c				Componente
+	 * @return Nombre genérico del tipo de componente
+	 */
+	private static String tipoComponente(Componente c) {
+		if(c instanceof Resistencia) return "Resistencia";
+		if(c instanceof FuenteTensionInd) return "Fuente de tensión";
+		if(c instanceof FuenteCorrienteInd) return "Fuente de corriente";
+		if(c instanceof FuenteTensionDependiente) return "Fuente de tensión dep.";
+		if(c instanceof FuenteCorrienteDependiente) return "Fuente de corriente dep.";
+		if(c instanceof Tierra) return "Tierra";
+		return "Componente";
+	}
+	
+	/**
+	 * Devuelve un identificador corto para el componente (R1, V1...)
+	 * 
+	 * @param c				Componente
+	 * @return nombre corto del componente
+	 */
+	private static String nombreCorto(Componente c) {
+		String id=asegurarId(c.getId());
+		if(id!=null) {
+			return id;
+		}
+		//Si algún componente llega sin Id (no debería)
+		if(c instanceof Resistencia) return "R?";
+		if(c instanceof FuenteTensionInd) return "V?";
+		if(c instanceof FuenteCorrienteInd) return "I?";
+		if(c instanceof FuenteTensionDependiente) return "Vx?";
+		if(c instanceof FuenteCorrienteDependiente) return "Ix?";
+		if(c instanceof Tierra) return "GND?";
+		return "?";
+	}
+	
+	/**
+	 * Asegura un id o devuelve {@code null} si es nulo o vacío.
+	 * 
+	 * @param id			ID texto del identificador
+	 * @return ID o {@code null} si no es válido
+	 */
+	private static String asegurarId(String id) {
+		id=(id==null) ? "" : id.trim();
+		return id.isEmpty() ? null : id;
+	}
+	
+	/**
+	 * Devuelve un nombre legible para el tipo de nodo.
+	 * 
+	 * @param nf			Tipo de nodo
+	 * @return Nombre del nodo
+	 */
+	private static String nombreCampoNodo(NodeField nf) {
+		if(nf==null) return "nodo";
+		return switch(nf) {
+			case NEGATIVO -> "nodo negativo";
+			case POSITIVO -> "nodo positivo";
+			case CONTROL_NEG -> "nodo control (-)";
+			case CONTROL_POS -> "nodo control (+)";
+			case TIERRA -> "nodo tierra";
+		};
+	}
+}

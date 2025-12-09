@@ -1,0 +1,97 @@
+package com.circuitos.analisiscircuitos.gui.dialog;
+
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.gui.model.NodeField;
+import com.circuitos.analisiscircuitos.gui.util.UIHelper;
+
+import javafx.scene.control.TextInputDialog;
+
+/**
+ * Clase utilitaria para editar los nodos asociados a un componente (solo para usuarios avanzados o depuración).
+ * Puede modificar nodos positivos, negativos, de control o tierra.
+ * Muestra un diálogo para cambiarlos y genera una alerta de confirmación, ya que se trata
+ * de una operación crítica que puede romper el funcionamiento del circuito.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DialogoNodo {
+	private static final Logger logger=Logger.getLogger(DialogoNodo.class.getName());
+	private static final String TITLE_EDIT="Editar nodo de control";
+	
+	private DialogoNodo() { /* No instanciable */ }
+	
+	/**
+	 * Muestra un diálogo para editar un nodo de un componente.
+	 * 
+	 * @param componente			Componente sobre el que se modifica el nodo
+	 * @param tipoNodo				Tipo de nodo a editar
+	 * @param textoActual			Valor actual del nodo
+	 * @return {@code true} si se modifica correctamente, {@code false} si no
+	 */
+	public static boolean editarNodo(Componente componente, NodeField field, String textoActual) {
+		TextInputDialog dialog=new TextInputDialog(textoActual);
+		dialog.setTitle(TITLE_EDIT);
+		dialog.setHeaderText(field.getHeader());
+		dialog.setContentText(field.getContent());
+		Optional<String> input=dialog.showAndWait();
+		if(input.isEmpty()) {
+			return false;
+		}
+		int nuevo;
+		try {
+			nuevo=Integer.parseInt(input.get().trim());
+		} catch(NumberFormatException ex) {
+			UIHelper.mostrarError("Número de nodo no válido. Sólo se admiten números enteros.");
+			return false;
+		}
+		boolean changed=apply(componente, field, nuevo);
+		if(changed) {
+			logger.log(Level.INFO, "Nodo {0} de {1} cambiado a {2}", new Object[] {field, componente.getId(), nuevo});
+		} else {
+			logger.log(Level.FINE, "No se aplicó cambio en {0} de {1}", new Object[] {field, componente.getId()});
+		}
+		return changed;
+	}
+	
+	/**
+	 * Aplica cambio de nodo al componente seleccionado, una vez confirmada la alerta.
+	 * 
+	 * @param comp			Componente al que se cambia el nodo
+	 * @param field			Tipo de nodo
+	 * @param value			Valor del nodo
+	 * @return {@code true} si se cambia, {@code false} si no
+	 */
+	private static boolean apply(Componente comp, NodeField field, int value) {
+		switch(field) {
+			case CONTROL_NEG:
+				if(comp instanceof FuenteTensionDependiente ftd) {
+					ftd.setCtrlNeg(value);
+					return true;
+				}
+				if(comp instanceof FuenteCorrienteDependiente fcd) {
+					fcd.setCtrlNeg(value);
+					return true;
+				}
+				return false;
+			case CONTROL_POS:
+				if(comp instanceof FuenteTensionDependiente ftd2) {
+					ftd2.setCtrlPos(value);
+					return true;
+				}
+				if(comp instanceof FuenteCorrienteDependiente fcd2) {
+					fcd2.setCtrlPos(value);
+					return true;
+				}
+				return false;
+			default:
+				return false;
+		}
+	}
+}

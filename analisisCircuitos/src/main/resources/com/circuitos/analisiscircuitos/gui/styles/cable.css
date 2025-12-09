@@ -1,0 +1,26 @@
+/* =======================================================================
+ * Estilos para la representación visual de cables en el área de diseño.
+ * Archivo: cable.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ====================================================================== */
+
+/* Estilo aplicado a cables correctamente conectados */
+.cable-conectado {
+	-fx-stroke: navy;			/* Color azul marino para trazo del cable */
+	-fx-stroke-width: 2;		/* Grosor del trazo */
+	-fx-fill: null;				/* Sin relleno */
+}
+
+/* Estilo cuando un cable está seleccionado por el usuario */
+.cable-seleccionado {
+	-fx-effect: dropshadow(gaussian, #00aaff, 5, 0.5, 0, 0);  /* Sombra azul clara */
+	-fx-fill: null;
+}
+
+/* Estilo de los puntos de control de los cables */
+.cable-punto-control {
+	-fx-fill: lightblue;		/* Relleno azul celeste */
+	-fx-stroke: darkcyan;		/* Contorno turquesa oscuro */
+	-fx-cursor: hand;			/* Cambia el cursor a mano al pasar por el punto de control */
+}

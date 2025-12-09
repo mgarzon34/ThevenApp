@@ -1,0 +1,214 @@
+package com.circuitos.AnalisisCircuitos.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.model.PuntoConexion.Posicion;
+
+import javafx.geometry.Bounds;
+import javafx.geometry.Point2D;
+import javafx.scene.layout.Pane;
+
+/**
+ * Utilidad para calcular trayectorias entre puntos de conexión.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableTrayectoriaCalculator {
+	private static final Logger logger=Logger.getLogger(CableTrayectoriaCalculator.class.getName());
+	private static final double TOLERANCIA_ALINEACION_HORIZONTAL=10;
+	private static final double TOLERANCIA_VERTICAL_VERTICAL=2;
+	private static final double ALTURA_PUENTE=50;
+	private enum Orientacion {VERTICAL, HORIZONTAL, DIAGONAL}
+	
+	/**
+	 * Constructor
+	 */
+	private CableTrayectoriaCalculator() { /* NO INSTANCIABLE */ }
+	
+	/**
+	 * Determina la orientación de salida de un PuntoConexion.
+	 * 
+	 * @param pc		Punto de conexión
+	 * @return Orientacion puede ser vertical, horizontal o diagonal
+	 */
+	private static Orientacion orientOf(PuntoConexion pc) {
+		if(pc.getPosicion()==null) return Orientacion.DIAGONAL;
+		return switch(pc.getPosicion()) {
+			case ARRIBA, ABAJO -> Orientacion.VERTICAL;
+			case IZQUIERDA, DERECHA -> Orientacion.HORIZONTAL;
+			case INICIO, FIN -> Orientacion.DIAGONAL;
+		};
+	}
+	
+	/**
+	 * Convierte las coordenadas de un PuntoConexion al sistema de coordenadas de un Pane.
+	 * 
+	 * @param pc			Punto de conexión con posición local
+	 * @param pane			Pane donde se posicionará el cable
+	 * @return Punto2D con las coordenadas locales al pane
+	 */
+	private static Point2D toPane(PuntoConexion pc, Pane pane) {
+		Bounds b=pc.localToScene(pc.getBoundsInLocal());
+		return pane.sceneToLocal(b.getMinX()+pc.getRadius(), b.getMinY()+pc.getRadius());
+	}
+	
+	/**
+	 * Obtiene las coordenadas absolutas (en el espacio del pane).
+	 * 
+	 * @param inicio			Punto de conexión inicial
+	 * @param fin				Punto de conexión final
+	 * @param zonaDibujo		Pane donde se realiza la conversión
+	 * @return Coordenadas en el espacio local
+	 */
+	public static Point2D[] obtenerCoordenadasExtremos(PuntoConexion a, 
+								PuntoConexion b, Pane pane) {
+		return new Point2D[] { toPane(a, pane), toPane(b, pane) };
+	}
+	
+	/**
+	 * Calcula la lista de puntos intermedios para la trayectoria de un cable.
+	 * 
+	 * @param inicio				Coordenadas iniciales
+	 * @param fin					Coordenadas finales
+	 * @param conectorInicio		Punto de conexión inicial
+	 * @return Lista de puntos que definen la trayectoria
+	 */
+	public static List<Point2D> calcularTrayectoria(Point2D inicio, 
+								Point2D fin, PuntoConexion conectorA, 
+								PuntoConexion conectorB) {
+		List<Point2D> ruta;
+		
+		double dx=fin.getX()-inicio.getX();
+		double dy=fin.getY()-inicio.getY();
+		
+		Orientacion oA=orientOf(conectorA);
+		Orientacion oB=orientOf(conectorB);
+		
+		if(Math.abs(dx)<=TOLERANCIA_ALINEACION_HORIZONTAL) {
+			ruta=crearTrayectoriaVertical(inicio, fin);
+			return List.copyOf(ruta);
+		}
+		if(oA==Orientacion.VERTICAL && oB==Orientacion.VERTICAL) {
+			ruta=crearTrayectoriaVerticalVertical(inicio, fin, conectorA, conectorB, dx);
+		} else if(conectorA.getPosicion()==null || conectorB.getPosicion()==null ||
+				conectorA.getComponente()==conectorB.getComponente()
+				&& conectorA.getPosicion()==Posicion.IZQUIERDA
+				&& conectorB.getPosicion()==Posicion.DERECHA) {
+			ruta=crearTrayectoriaDiagonal(inicio, fin);
+		} else if(Math.abs(dy)<=TOLERANCIA_ALINEACION_HORIZONTAL) {
+			ruta=crearTrayectoriaHorizontal(inicio,fin);
+		} else if(Math.abs(dx)<=TOLERANCIA_ALINEACION_HORIZONTAL) {
+			ruta=crearTrayectoriaVertical(inicio, fin);
+		} else {
+			ruta=crearTrayectoriaCodo(inicio, fin, oA);
+		}
+		logger.fine(() -> "Trayectoria calculada: "+ruta);
+		return List.copyOf(ruta);
+	}
+	
+	/**
+	 * Crea trayectoria cuandos ambos puntos tienen orientación vertical.
+	 * Se genera un arco elevado o línea directa si dx es pequeño.
+	 * 
+	 * @param inicio			Punto de inicio
+	 * @param fin				Punto fin
+	 * @param conectorA			Punto conexión A para orientar arco
+	 * @param conectorB			Punto conexión B
+	 * @param dx				Diferencia en x
+	 * @return Lista de puntos en U invertida o línea vertical
+	 */
+	private static List<Point2D> crearTrayectoriaVerticalVertical(
+			Point2D inicio, Point2D fin,
+			PuntoConexion conectorA, PuntoConexion conectorB, double dx) {
+		List<Point2D> pts=new ArrayList<>();
+		pts.add(inicio);
+		if(Math.abs(dx)<=TOLERANCIA_VERTICAL_VERTICAL) {
+			pts.add(new Point2D(inicio.getX(), fin.getY()));
+			pts.add(fin);
+			return pts;
+		}
+		boolean ambosArriba=conectorA.getPosicion()==Posicion.ARRIBA &&
+								conectorB.getPosicion()==Posicion.ARRIBA;
+		double yPuente=ambosArriba ? 
+				Math.min(inicio.getY(), fin.getY())-ALTURA_PUENTE :
+				Math.max(inicio.getY(), fin.getY())+ALTURA_PUENTE;
+		pts.add(new Point2D(inicio.getX(), yPuente));
+		pts.add(new Point2D(fin.getX(), yPuente));
+		pts.add(fin);
+		logger.fine(()->"V-V con puente en yPuente="+yPuente);
+		return pts;
+	}
+	
+	/**
+	 * Trayectoria diagonal directa de inicio a fin.
+	 * 
+	 * @param inicio		Punto inicial
+	 * @param fin			Punto final
+	 * @return Lista con dos puntos: inicio y fin
+	 */
+	private static List<Point2D> crearTrayectoriaDiagonal(
+			Point2D inicio, Point2D fin) {
+		logger.fine("Trayectoria diagonal directa");
+		return List.of(inicio,fin);
+	}
+	
+	/**
+	 * Trayectoria en L horizontal.
+	 * 
+	 * @param inicio		Punto inicial
+	 * @param fin			Punto final
+	 * @return Lista de tres puntos: inicio, (fin.x, inicio.y), fin
+	 */
+	private static List<Point2D> crearTrayectoriaHorizontal(
+			Point2D inicio, Point2D fin) {
+		List<Point2D> pts=new ArrayList<>();
+		pts.add(inicio);
+		pts.add(new Point2D(fin.getX(), inicio.getY()));
+		pts.add(fin);
+		logger.fine("Trayectoria horizontal");
+		return pts;
+	}
+	
+	/**
+	 * Trayectoria en L vertical.
+	 * 
+	 * @param inicio		Punto inicial
+	 * @param fin			Punto final
+	 * @return Lista de tres puntos: inicio, (inicio.x, fin.y), fin
+	 */
+	private static List<Point2D> crearTrayectoriaVertical(
+			Point2D inicio, Point2D fin) {
+		List<Point2D> pts=new ArrayList<>();
+		pts.add(inicio);
+		pts.add(new Point2D(inicio.getX(), fin.getY()));
+		pts.add(fin);
+		logger.fine("Trayectoria vertical");
+		return pts;
+	}
+	
+	/**
+	 * Trayectoria con codo de 90 grados.
+	 * 
+	 * @param inicio		Punto inicial
+	 * @param fin			Punto final
+	 * @param oA			Orientación de salida del inicio
+	 * @return Lista de tres puntos: inicio, codok, fin
+	 */
+	private static List<Point2D> crearTrayectoriaCodo(
+			Point2D inicio, Point2D fin, Orientacion oA){
+		List<Point2D> pts=new ArrayList<>();
+		pts.add(inicio);
+		if(oA==Orientacion.VERTICAL) {
+			pts.add(new Point2D(inicio.getX(), fin.getY()));
+		} else {
+			pts.add(new Point2D(fin.getX(), inicio.getY()));
+		}
+		pts.add(fin);
+		logger.fine("Trayectoria codo");
+		return pts;
+	}
+}

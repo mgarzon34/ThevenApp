@@ -1,0 +1,60 @@
+package com.circuitos.AnalisisCircuitos.demo;
+
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.analisis.Analizador;
+import com.circuitos.temporal.analisis.ResultadoNorton;
+import com.circuitos.temporal.analisis.ResultadoThevenin;
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.FuenteCorrienteInd;
+import com.circuitos.temporal.dominio.FuenteTensionInd;
+import com.circuitos.temporal.dominio.Norton;
+import com.circuitos.temporal.dominio.Resistencia;
+import com.circuitos.temporal.dominio.Thevenin;
+import com.circuitos.temporal.dominio.util.CircuitPrinter;
+import com.circuitos.temporal.dominio.util.Unidades.Type;
+
+//Ejemplo más complejo (Vth: 40.64V     Rth: 83,93Ω)
+public class Lanzador11 {
+	public static void main(String[] args) {
+		Circuito circuito=new Circuito();
+		Logger root=Logger.getLogger("");
+		root.setLevel(Level.FINE);
+		for(Handler h:root.getHandlers()) {
+			h.setLevel(Level.FINE);
+		}
+		circuito.addComponente(new Resistencia("2.2k", 0, 1));
+		circuito.addComponente(new Resistencia(750, 1, 2));
+		circuito.addComponente(new FuenteTensionInd(5, 0, 2));
+		circuito.addComponente(new Resistencia(330, 2, 3));
+		circuito.addComponente(new FuenteCorrienteInd("500m", 3, 4));
+		circuito.addComponente(new Resistencia(500, 2, 4));
+		circuito.addComponente(new Resistencia(82, 4, 5));
+		circuito.addComponente(new Resistencia(47, 5, 6));
+		circuito.addComponente(new FuenteTensionInd(12, 7, 6));
+		circuito.addComponente(new Resistencia(27, 7, 4));
+		circuito.addComponente(new Resistencia(100, 0, 7));
+		int nodoA=0, nodoB=7;
+		Analizador analizador=new Analizador();
+		ResultadoThevenin resTh=analizador.calculaThevenin(circuito, nodoA, nodoB);
+		Circuito thevEquiv=new Thevenin(circuito, nodoA, nodoB).getEquivalenteTheveninGrafico();
+		ResultadoNorton resNo=analizador.calculaNorton(circuito, nodoA, nodoB);
+		Circuito nortEquiv=new Norton(circuito, nodoA, nodoB).getNorton();
+		thevEquiv.showCircuito();
+		nortEquiv.showCircuito();
+		System.out.println("\n\nCircuito original.\n");
+		CircuitPrinter.printCircuit(circuito);
+		System.out.println("\nEquivalene de Thevenin:\n");
+		System.out.println("Vth calculado: "+circuito.formatearValor(resTh.getVth(), Type.TENSION));
+		System.out.println("Rth calculado: "+circuito.formatearValor(resTh.getRth(), Type.RESISTENCIA));
+		System.out.println();
+		CircuitPrinter.printCircuit(thevEquiv);
+		
+		System.out.println("\nEquivalente de Norton:");
+		System.out.println("In="+circuito.formatearValor(resNo.getIn(), Type.CORRIENTE));
+		System.out.println("Rn="+circuito.formatearValor(resNo.getRn(), Type.RESISTENCIA));
+		CircuitPrinter.printCircuit(nortEquiv);
+	}
+}

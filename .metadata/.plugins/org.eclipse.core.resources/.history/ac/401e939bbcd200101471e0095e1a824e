@@ -1,0 +1,77 @@
+package com.circuitos.temporal.gui.learning.model;
+
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+
+/**
+ * Clase Factory para generar las tarjetas de ejercicios y el HTML de un tema de teoría.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class LearningFactory {
+	
+	/**
+	 * Crea una tarjeta visual para representar un {@link Ejercicio} en la interfaz.
+	 * 
+	 * @param ej					Ejercicio a representar
+	 * @param onAction				Acción a ejecutar al pulsar "Resolver circuito"
+	 * @return {@link VBox} configurado con todos sus nodos hijos
+	 */
+	public static VBox crearTarjetaEjercicio(Ejercicio ej, Runnable onAction) {
+		VBox card=new VBox();
+		card.getStyleClass().add("exercise-card");
+		card.setPrefSize(220, 300);
+		Label lblDificultad=new Label(ej.getDificultadTexto().toUpperCase());
+		lblDificultad.getStyleClass().add("difficulty-pill");
+		lblDificultad.getStyleClass().add("diff-"+Math.min(ej.getDificultad(), 5));
+		Label lblIcono=new Label("💥");
+		lblIcono.getStyleClass().add("card-icon");
+		Label lblTitulo=new Label(ej.getTitulo());
+		lblTitulo.getStyleClass().add("card-title");
+		lblTitulo.setWrapText(true);
+		Label lblDesc=new Label(ej.getDescripcion());
+		lblDesc.getStyleClass().add("card-desc");
+		lblDesc.setWrapText(true);
+		lblDesc.setMaxHeight(60);
+		Button btnPlay=new Button("Resolver Circuito");
+		btnPlay.getStyleClass().add("action-button");
+		btnPlay.setMaxWidth(Double.MAX_VALUE);
+		btnPlay.setOnAction(_ -> onAction.run());
+		VBox contenidoInfo=new VBox(5, lblTitulo, lblDesc);
+		contenidoInfo.setAlignment(Pos.CENTER);
+		VBox.setVgrow(contenidoInfo, Priority.ALWAYS);
+		card.getChildren().addAll(lblDificultad, lblIcono, contenidoInfo, new Separator(), btnPlay);
+		return card;
+	}
+	
+	/**
+	 * Genera el código HTML asociado a un tema de teoría.
+	 * 
+	 * @param t				Tema teórico
+	 * @return String con el código html
+	 */
+	public static String generarHtmlTeoria(Teoria t) {
+		return """
+				<html>
+				<head>
+					<style>
+						body { font-family: 'Segoe UI', sans-serif; color: #2c3e50; padding: 20px; line-height: 1.6; }
+						h1 { color: #3498db; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
+						p {font-size: 16px; margin-bottom: 15px; }
+						code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+						.destacado { background-color: #e8f6f3; padding: 15px; border-left: 5px solid #2ecc71; margin: 20px 0; }
+					</style>
+				</head>
+				<body>
+					<h1>%s<&h1>
+					<div>%s</div>
+				</body>
+				</html>
+				""".formatted(t.getTitulo(), t.getContenido());
+	}
+}

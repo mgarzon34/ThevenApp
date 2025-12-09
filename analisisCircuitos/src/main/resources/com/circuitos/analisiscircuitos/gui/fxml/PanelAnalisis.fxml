@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de análisis de ThevenApp.
+	Panel principal de análisis de circuitos. Contiene un SplitPane con:
+		- Área de dibujo a la izquierda (zona de Dibujo dentro) donde se dibujará el equivalente.
+		- Panel lateral de propiedades oculto por defecto (panelPropiedades)
+		
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelAnalisisController
+	Utiliza estilo: PanelAnalisis.css
+ -->
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.control.Button?>
+
+
+<SplitPane xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
+		   fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelAnalisisController"
+		   dividerPositions="0.75" fx:id="splitPane">
+	<items>
+		<AnchorPane fx:id="rootAnalisis" >
+			<children>
+				<Pane fx:id="zonaDibujoAnalisis" prefHeight="750" prefWidth="1000" 
+					  styleClass="analisis-panel-con-fondo" AnchorPane.bottomAnchor="0.0"
+					  AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" 
+					  AnchorPane.topAnchor="0.0">
+					  <children>
+					  	<StackPane fx:id="contenedorMiniatura" layoutX="10" layoutY="10"
+					  				styleClass="analisis-stackpane">
+					  		<StackPane>
+					  			<VBox alignment="TOP_CENTER">
+					  				<Label text="Circuito Original" styleClass="analisis-label-title"
+					  						onMousePressed="#onMiniaturaMousePressed" onMouseDragged="#onMiniaturaMouseDragged"/>
+					 				<ImageView	fx:id="imagenMiniatura"
+					  			 	   			fitWidth="200.0" fitHeight="150.0"
+					 				  			onMouseClicked="#onMiniaturaClick"
+					 				  			onMousePressed="#onMiniaturaMousePressed"
+					 				  			onMouseDragged="#onMiniaturaMouseDragged"
+					  							pickOnBounds="true" preserveRatio="true"
+					  							styleClass="analisis-imagen-miniatura" />
+					  			</VBox> 
+					  		</StackPane>
+					  		<Region fx:id="redimensionarManual" styleClass="analisis-redimensionar-corner"
+					  				StackPane.alignment="BOTTOM_RIGHT" prefWidth="12" prefHeight="12"
+					  				onMousePressed="#onRedimensionarManualPressed" onMouseDragged="#onRedimensionarManualDragged" />
+					  		<Label fx:id="botonCerrarMiniatura" text="x" 
+					  				styleClass="analisis-boton-cerrar" onMouseClicked="#onCerrarMiniatura"
+					  				StackPane.alignment="TOP_LEFT" />
+					 	 </StackPane>
+					 </children>
+				</Pane>
+				<Button fx:id="btnTogglePropiedades" text="❮" onAction="#onTogglePropiedades" 
+							prefWidth="18" maxWidth="18" minWidth="18" prefHeight="80"
+							AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="200.0" styleClass="analisis-toggle-propiedades" />
+			</children>		
+		</AnchorPane>
+		<AnchorPane fx:id="panelPropiedadesAnalisisContainer" prefWidth="260.0" visible="false" managed="false">
+			<children>
+				<fx:include fx:id="panelPropiedadesAnalisis" source="PanelPropiedadesAnalisis.fxml"
+						AnchorPane.topAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.bottomAnchor="0.0" /> 
+			</children>
+		</AnchorPane>
+	</items>
+</SplitPane>

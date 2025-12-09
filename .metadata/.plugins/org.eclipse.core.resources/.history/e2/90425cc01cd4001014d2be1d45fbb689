@@ -1,0 +1,445 @@
+package com.circuitos.analisiscircuitos.gui.builder;
+
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.Net;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.label.EtiquetaBindingService;
+import com.circuitos.analisiscircuitos.gui.service.state.VisualOptionsService;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil;
+import com.circuitos.analisiscircuitos.gui.util.PosicionUtil;
+
+import javafx.geometry.Bounds;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Clase "factoría" para crear representaciones visuales de componentes del circuito.
+ * Según el tipo de componente (resistencia, fuentes, tierra, etc.) construye un StackPane
+ * adecuado con su icono, tamaño, puntos de conexión, etc.
+ * Hace uso de {@link ComponenteFactory} para crear el componente del dominio.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ * 
+ */
+public class ComponenteVisualFactory {
+	private static final Logger logger=Logger.getLogger(ComponenteVisualFactory.class.getName());
+	private static final String PATH_ICONOS="/com/circuitos/AnalisisCircuitos/gui/iconos/";
+	private static final double PAD_TOP=4;
+	private static final Map<TipoComponenteVisual, Double> PAD_SIDE=Map.of(
+			TipoComponenteVisual.RESISTOR, -35.0,
+			TipoComponenteVisual.FTD, 18.0,
+			TipoComponenteVisual.FCD, 18.0,
+			TipoComponenteVisual.TIERRA, 15.0);
+	private static final double PAD_SIDE_DEFAULT=10.0;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param etiquetaService		Servicio de creación de etiquetas de componentes
+	 * @param optionsService		Servicio de opciones visuales
+	 */
+	public ComponenteVisualFactory(EtiquetaBindingService etiquetaService,
+			VisualOptionsService optionsService) {
+	}
+
+	/**
+	 * Crea y posiciona un componente visual en el área de dibujo.
+	 * 
+	 * @param tipo					Nombre del archivo de icono
+	 * @param x						Coordenada X donde colocar el panel
+	 * @param y						Coordenada Y donde colocar el panel
+	 * @param conector				Gestor de puntos de conexión al que registrar los puntos
+	 * @param areaDibujo			Contenedor padre donde se pintará el componente
+	 * @param seleccionListener		Escuchador invocado al seleccionar componente
+	 * @param onMoverTerminado		Actualizador de movimiento terminado
+	 * @return stackPane			StackPane con el componente visual o null si el tipo no es válido
+	 * @throws IllegalArgumentException si no existe el recurso de imagen
+	 */
+	public static StackPane crearVisual(
+    		String tipoIcono, 
+    		double x, 
+    		double y, 
+    		ConectorPuntos conector, 
+    		Pane areaDibujo, 
+    		Consumer<Componente> seleccionListener,
+    		Consumer<Componente> onMoverTerminado) {
+		TipoComponenteVisual tipo=TipoComponenteVisual.fromIcono(tipoIcono);
+		ImageView icono=crearIcono(tipo);
+    	Componente componente=tipo.crearComponente();
+    	StackPane panel=construirPanel(tipo, icono, x, y, componente);
+    	agregarPuntosConexion(tipo, componente, panel, conector);
+    	registrarInteracciones(panel, componente, areaDibujo, seleccionListener, onMoverTerminado);
+    	agregarLabelComponente(panel, componente, tipo);
+    	logger.fine("Construyendo visual para "+componente.getId());
+    	return panel;
+    }
+    
+	/**
+	 * Parte de un componente existente y crea su visual y lo posiciona en el área de dibujo.
+	 * 
+	 * @param tipo					Nombre del archivo de icono
+	 * @param x						Coordenada X donde colocar el panel
+	 * @param y						Coordenada Y donde colocar el panel
+	 * @param conector				Gestor de puntos de conexión al que registrar los puntos
+	 * @param areaDibujo			Contenedor padre donde se pintará el componente
+	 * @param seleccionListener		Escuchador invocado al seleccionar componente
+	 * @param onMoverTerminado		Actualizador de movimiento terminado
+	 * @param compExistente			Componente sobre el que creamos el visual
+	 * @return stackPane			StackPane con el componente visual o null si el tipo no es válido
+	 * @throws IllegalArgumentException si no existe el recurso de imagen
+	 */
+	public static StackPane crearVisual(
+		    String tipoIcono,
+		    double x, double y,
+		    ConectorPuntos conector,
+		    Pane areaDibujo,
+		    Consumer<Componente> seleccionListener,
+		    Consumer<Componente> onMoverTerminado,
+		    Componente compExistente) {
+		logger.fine("Construyendo visual para componente existente: "+compExistente.getId());
+		TipoComponenteVisual tipo = TipoComponenteVisual.fromIcono(tipoIcono);
+		ImageView icono = crearIcono(tipo);
+		StackPane panel = construirPanel(tipo, icono, x, y, compExistente);
+		agregarPuntosConexion(tipo, compExistente, panel, conector);
+		registrarInteracciones(panel, compExistente, areaDibujo, seleccionListener, onMoverTerminado);
+		agregarLabelComponente(panel, compExistente, tipo);
+		javafx.application.Platform.runLater(() -> {
+		    actualizarPosicionEtiqueta(panel);
+		    panel.layoutBoundsProperty().addListener((_, _, _) -> actualizarPosicionEtiqueta(panel));
+		});
+
+
+		return panel;
+	}
+	
+	/**
+	 * Crea un componente visual del componente de dominio existente. 
+	 * Se usa al cargar circuitos desde archivo.
+	 * 
+	 * @param componente				Componente del dominio
+	 * @param tipoIcono					Tipo de icono del componente
+	 * @param x							Coordenada X de su posición
+	 * @param y							Coordenada Y de su posición
+	 * @param rotacion					Rotación del icono del componente
+	 * @param conector					Conector del componente
+	 * @param areaDibujo				Área de dibujo donde se pone el componente
+	 * @param seleccionListener			Escuchador al seleccionar componente
+	 * @param onMoverTerminado		Actualizador de movimiento terminado
+	 * @return panel					StackPane del componente
+	 */
+	public static StackPane crearDesdeComponenteExistente(Componente componente, String tipoIcono,
+	        double x, double y, int rotacion, ConectorPuntos conector, Pane areaDibujo,
+	        Consumer<Componente> seleccionListener, Consumer<Componente> onMoverTerminado) {
+		logger.fine("Construyendo visual desde componente de dominio existente: "+componente.getId());
+	    TipoComponenteVisual tipo=TipoComponenteVisual.fromIcono(tipoIcono);
+	    ImageView icono=crearIcono(tipo);
+	    StackPane panel=construirPanel(tipo, icono, x, y, componente);
+	    panel.setRotate(rotacion);
+
+	    agregarPuntosConexion(tipo, componente, panel, conector);
+	    registrarInteracciones(panel, componente, areaDibujo, seleccionListener, onMoverTerminado);
+	    agregarLabelComponente(panel, componente, tipo);
+
+	    javafx.application.Platform.runLater(() -> {
+	        actualizarPosicionEtiqueta(panel);
+	        panel.layoutBoundsProperty().addListener((_, _, _) -> actualizarPosicionEtiqueta(panel));
+	    });
+	    return panel;
+	}
+
+	/**
+	 * Crea un componente visual para un circuito equivalente de Thévenin o Norton.
+	 * Reutiliza toda la lógica pero configura la etiqueta para usar un prefijo concreto
+	 * (Vth, Rth, In, Rn) y un estilo propio.
+	 * 
+	 * @param componente				Componente del dominio
+	 * @param tipoIcono					Tipo de icono del componente
+	 * @param x							Coordenada X de su posición
+	 * @param y							Coordenada Y de su posición
+	 * @param rotacion					Rotación del icono del componente
+	 * @param conector					Conector del componente
+	 * @param areaDibujo				Área de dibujo donde se pone el componente
+	 * @param seleccionListener			Escuchador al seleccionar componente
+	 * @param onMoverTerminado		Actualizador de movimiento terminado
+	 * @param prefijoEtiqueta			Prefijo a mostrar (Vth, Rth, In, Rn)
+	 * @return panel					StackPane del componente
+	 */
+	public static StackPane crearDesdeComponenteEquivalente(Componente componente, String tipoIcono,
+	        double x, double y, int rotacion, ConectorPuntos conector, Pane areaDibujo,
+	        Consumer<Componente> seleccionListener, Consumer<Componente> onMoverTerminado, String prefijoEtiqueta) {
+		StackPane panel=crearDesdeComponenteExistente(componente, tipoIcono, x, y, rotacion,
+									conector, areaDibujo, seleccionListener, onMoverTerminado);
+		if(panel==null) {
+			return null;
+		}
+		Label etiqueta=panel.getChildren().stream()
+				.filter(n -> n instanceof Label)
+				.map(n -> (Label) n)
+				.findFirst()
+				.orElse(null);
+		if(etiqueta!=null) {
+			EtiquetaBindingService.configurarEtiquetaEquivalente(etiqueta, componente, prefijoEtiqueta);
+			actualizarPosicionEtiqueta(panel);
+		}
+		return panel;
+	}
+
+	/**
+	 * Crea un icono para un componente a partir de una imagen, con uno tamaño adecuado al panel.
+	 * 
+	 * @param tipo			Tipo de componente del que se crea el icono	
+	 * @return icono		Icono del componente
+	 */
+    private static ImageView crearIcono(TipoComponenteVisual tipo) {
+    	logger.fine("Creando icono tipo: "+tipo.name());
+    	String ruta=PATH_ICONOS+tipo.getIcono();
+    	var recurso=ComponenteVisualFactory.class.getResource(ruta);
+    	if(recurso==null) {
+    		throw new IllegalArgumentException("Imagen no encontrada: "+ruta);
+    	}
+    	
+        ImageView icono = new ImageView(new Image(recurso.toExternalForm()));
+        icono.setPreserveRatio(true);
+        icono.setFitWidth(tipo.getAnchoIcono());
+        return icono;
+    }
+
+    /**
+     * Construye un StackPane alrededor del icono para interactuar con el componente.
+     * 
+     * @param tipo				Tipo de componente sobre el que se crea
+     * @param icono				Icono del componente
+     * @param x					Coordenada X donde se crea
+     * @param y					Coordenada Y donde se crea
+     * @param c					Componente en cuestión
+     * @return panel			Panel donde se situa el componente
+     */
+    private static StackPane construirPanel(TipoComponenteVisual tipo, ImageView icono, double x, double y, Componente c) {
+        logger.fine("Construyendo stackPane del icono: "+tipo.name());
+    	StackPane panel = new StackPane(icono);
+        panel.setLayoutX(x);
+        panel.setLayoutY(y);
+        panel.setUserData(c);
+        panel.setPrefSize(tipo.getAnchoPanel(), tipo.getAltoPanel());
+        panel.setMinSize(panel.getPrefWidth(), panel.getPrefHeight());
+        panel.setMaxSize(panel.getPrefWidth(), panel.getPrefHeight());
+        return panel;
+    }
+    
+    /**
+     * Agrega los puntos de conexión al componente en los lugares adecuados del panel que lo envuelve.
+     * 
+     * @param tipo				Tipo de componente
+     * @param c					Componente sobre el que se agregan los puntos
+     * @param panel				Panel que envuelve al componente y su icono
+     * @param conector			Conector eléctrico donde se establece la conexión
+     */
+	private static void agregarPuntosConexion(TipoComponenteVisual tipo, Componente c, StackPane panel, ConectorPuntos conector) {
+        logger.fine("Agregando puntos de conexión al componente: "+c.getId());
+    	int rot0=0;
+        PuntoConexion puntoPositivo = new PuntoConexion(c, true, 
+        							PosicionUtil.calcularPosicion(c, true, rot0));
+        PuntoConexion puntoNegativo = new PuntoConexion(c, false,
+        							PosicionUtil.calcularPosicion(c, false, rot0));
+        garantizarSwitch(puntoPositivo, puntoNegativo);
+        
+        posicionarPuntos(tipo, puntoPositivo, puntoNegativo);
+        Net netPos=conector.crearNet();
+        Net netNeg=conector.crearNet();
+        netPos.addPin(puntoPositivo);
+        netNeg.addPin(puntoNegativo);
+        panel.getChildren().addAll(puntoNegativo, puntoPositivo);
+        
+        //Registra y habilita la interacción
+        conector.registrarPunto(puntoNegativo);
+        conector.registrarPunto(puntoPositivo);
+        panel.rotateProperty().addListener((_, _, newDeg) -> {
+        	int rot=((int) Math.round(newDeg.doubleValue()))%360;
+        	puntoPositivo.setPosicion(PosicionUtil.calcularPosicion(c, true, rot));
+        	puntoNegativo.setPosicion(PosicionUtil.calcularPosicion(c, false, rot));
+        });
+    }
+    
+	/**
+	 * Garantiza que ambos pines positivo y negativo siguen el mismo switch.
+	 * 
+	 * @param positivo			Punto de conexión positivo
+	 * @param negativo			Punto de conexión negativo
+	 */
+	private static void garantizarSwitch(PuntoConexion positivo, PuntoConexion negativo) {
+        positivo.visibleProperty().unbind();
+        negativo.visibleProperty().unbind();
+        positivo.visibleProperty().bind(VisualOptionsService.showAllControlElementsProperty());
+        negativo.visibleProperty().bind(VisualOptionsService.showAllControlElementsProperty());
+        positivo.mouseTransparentProperty().bind(positivo.visibleProperty().not());
+        negativo.mouseTransparentProperty().bind(negativo.visibleProperty().not());
+        positivo.managedProperty().bind(positivo.visibleProperty());
+        negativo.managedProperty().bind(negativo.visibleProperty());
+	}
+	
+    /**
+     * Registra interacciones que se hacen sobre el componente, tal como selección, arrastre, etc.
+     * 	
+     * @param panel					Panel que contiene el componente
+     * @param c						Componente con el que se interactúa
+     * @param areaDibujo			Área de dibujo donde se situa el componente
+     * @param listener				Escuchador para eventos
+     */
+    private static void registrarInteracciones(StackPane panel, Componente c, Pane areaDibujo, 
+    						Consumer<Componente> listener, Consumer<Componente> onMoverTerminado) {
+    	InteraccionComponenteUtil.aplicarEventos(panel, areaDibujo, listener, onMoverTerminado);
+    	
+    }
+    
+    /**
+     * Devuelve el nombre de la imagen o icono que representa a cada componente.
+     * 
+     * @param c				Componente del que obtenemos su icono
+     * @return Nombre del archivo de icono del componente
+     */
+    public static String getTipoImagen(Componente c) {
+    	return TipoComponenteVisual.fromComponente(c).getIcono();
+    }
+    
+    /**
+     * Obtiene el punto de conexión de un icono visual que representa a un componente.
+     * 
+     * @param visual			Pane que contiene la imagen del componente
+     * @param positivo			Valor booleano que decide si es el nodo positivo o negativo
+     * @return	Punto de Conexión positivo o negativo
+     */
+    public static PuntoConexion obtenerPuntoConexion(StackPane visual, boolean positivo) {
+    	for(Node node : visual.getChildren()) {
+    		if(node instanceof PuntoConexion pc && pc.esPositivo()==positivo) {
+    			return pc;
+    		}
+    	}
+    	return null;
+    }
+    
+    /**
+     * Posiciona los puntos de conexión según el tipo de componente.
+     * 
+     * @param tipo					tipo de componente
+     * @param puntoPositivo			nodo positivo del componente
+     * @param puntoNegativo			nodo negativo del componente
+     */
+    private static void posicionarPuntos(TipoComponenteVisual tipo, PuntoConexion puntoPositivo, PuntoConexion puntoNegativo) {
+        switch(tipo) {
+        	case RESISTOR -> {
+        		puntoNegativo.setTranslateX(-56);
+        		puntoPositivo.setTranslateX(56);
+        	} 	
+        	case TIERRA -> {
+            puntoPositivo.setTranslateY(-33);
+            puntoNegativo.visibleProperty().unbind();
+            puntoNegativo.managedProperty().unbind();
+            puntoNegativo.mouseTransparentProperty().unbind();
+            puntoNegativo.setVisible(false);
+            puntoNegativo.setManaged(false);
+            puntoNegativo.setMouseTransparent(false);
+        	}
+        	case FCI, FCD -> {
+        		puntoPositivo.setTranslateY(43);
+        		puntoNegativo.setTranslateY(-45);
+        	}
+        	default -> {
+        		puntoPositivo.setTranslateY(-45);
+        		puntoNegativo.setTranslateY(43);
+        	}
+        }
+    }
+    
+    /**
+     * Agrega una etiqueta visual al componente indicando su Id y su valor actual.
+     * Se puede mostrar u ocultar con el checkbox superior "Mostrar etiquetas".
+     * 
+     * @param panel				Panel que contiene el componente
+     * @param comp				Componente al que se agrega la etiqueta
+     * @param tipo				Tipo de componente visual
+     */
+    private static void agregarLabelComponente(
+    		StackPane panel,
+    		Componente comp,
+    		TipoComponenteVisual tipo) {
+    	logger.fine("Agregando etiqueta al componente: "+comp.getId());
+    	panel.getChildren().removeIf(n -> n instanceof Label);
+    	Label etiqueta=EtiquetaBindingService.construirEtiqueta(comp);
+
+    	//La etiqueta se mantiene "derecha"
+    	etiqueta.rotateProperty().bind(panel.rotateProperty().multiply(-1));
+    	etiqueta.visibleProperty().bind(VisualOptionsService.showLabelsProperty());
+    	
+    	panel.getChildren().add(etiqueta);
+    	
+    	ImageView icono=(ImageView) panel.getChildren().get(0);
+    	Runnable posicionarEtiqueta=() -> {
+    		double angulo=(tipo.getDefaultOrientationAngle() + panel.getRotate()) % 360;
+    		if(angulo<0) angulo+=360;
+    		boolean horizontal=(angulo<=45 || angulo>=315) || (angulo>=135 && angulo<=225);
+    		Bounds b=icono.getBoundsInParent();
+    		double iconW=b.getWidth();
+    		double iconH=b.getHeight();
+    		
+    		double padSide=PAD_SIDE.getOrDefault(tipo, PAD_SIDE_DEFAULT);
+
+    		double dxW, dyW;
+    		if(horizontal) {
+    			dxW=0;
+    			dyW=-(iconH/2 + PAD_TOP);
+    		} else {
+    			dxW=(iconW/2 + padSide);
+    			dyW=0;
+    		}
+    		
+    		double theta=Math.toRadians(panel.getRotate());
+    		double cos=Math.cos(theta);
+    		double sin=Math.sin(theta);
+    		double dxL=dxW*cos+dyW*sin;
+    		double dyL=-dxW*sin+dyW*cos;
+    		//Offsets para modificar posición de alguna etiqueta en algún lugar concreto
+    		Object offXObj=etiqueta.getProperties().getOrDefault("offsetTagX", 0.0);
+    		Object offYObj=etiqueta.getProperties().getOrDefault("offsetTagY", 0.0);
+    		double offX=(offXObj instanceof Number nX) ? nX.doubleValue() : 0.0;
+    		double offY=(offYObj instanceof Number nY) ? nY.doubleValue() : 0.0;
+    		
+    		etiqueta.setTranslateX(dxL+offX);
+    		etiqueta.setTranslateY(dyL+offY);
+    	};
+    	
+    	etiqueta.getProperties().put("posicionarEtiqueta", posicionarEtiqueta);
+    	etiqueta.textProperty().addListener((_, _, _) -> posicionarEtiqueta.run());
+    	panel.rotateProperty().addListener((_, _, _) -> posicionarEtiqueta.run());
+    	
+    	javafx.application.Platform.runLater(posicionarEtiqueta);
+    } 
+    
+    /**
+     * Actualiza la posición de la etiqueta asociada al componente visual al moverlo.
+     * 
+     * @param panel 		Panel que contiene el componente
+     */
+    public static void actualizarPosicionEtiqueta(StackPane panel) {
+    	Label etiqueta=panel.getChildren().stream()
+    			.filter(n->n instanceof Label)
+    			.map(n->(Label)n)
+    			.findFirst().orElse(null);
+    	
+    	if(etiqueta!=null) {
+    		etiqueta.getProperties().getOrDefault("posicionarEtiqueta", (Runnable) ()->{});
+    		Runnable runnable=(Runnable) etiqueta.getProperties().get("posicionarEtiqueta");
+    		if(runnable!=null) runnable.run();
+    	}
+    }
+} 
+

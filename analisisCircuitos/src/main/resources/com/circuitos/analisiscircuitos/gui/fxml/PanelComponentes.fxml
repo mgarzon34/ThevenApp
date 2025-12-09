@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de componentes de ThevenApp.
+	Panel lateral con los distintos componentes eléctricos arrastrables al área de diseño.
+	
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelComponentesController
+	Utiliza estilo: componentes.css
+ -->
+ 
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.shape.Rectangle?>
+
+<ScrollPane fx:id="scrollPane" fitToHeight="true" fitToWidth="true" prefHeight="643.0" prefWidth="228.0" 
+			styleClass="comp-panel-background" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" 
+			fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelComponentesController">
+    <content>
+        <VBox alignment="TOP_CENTER" prefWidth="228.0" spacing="15.0" styleClass="comp-panel-title-background">
+            
+            <!-- Título -->
+            <Label alignment="CENTER" prefHeight="45.0" prefWidth="187.0" styleClass="comp-panel-title" text="Caja de componentes" underline="true" />
+
+            <!-- Zona de componentes -->
+            <VBox alignment="TOP_CENTER" VBox.vgrow="ALWAYS" prefHeight="581.0" prefWidth="216.0" spacing="20.0" styleClass="comp-panel-background">
+                              <Region prefHeight="0.0" prefWidth="226.0" />
+                              
+                        <!-- Componente: Resistencia -->
+                        <VBox alignment="CENTER" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Resistencia" />
+                            <StackPane fx:id="stackResist" maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconResist" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/resistor.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+
+                        <!-- Componente: Fuente de Tensión Independiente -->
+                        <VBox alignment="CENTER" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Fuente de Tensión Independiente" />
+                            <StackPane fx:id="stackFti" maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconFti" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/fti.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+
+                        <!-- Componente: Fuente de Corriente Independiente -->
+                        <VBox alignment="CENTER" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Fuente de Corriente Independiente" />
+                            <StackPane fx:id="stackFci" maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconFci" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/fci.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+
+                        <!-- Componente: Fuente de Tensión Dependiente -->
+                        <VBox alignment="CENTER" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Fuente de Tensión Dependiente" />
+                            <StackPane fx:id="stackFtd"  maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconFtd" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/ftd.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+
+                        <!-- Componente: Fuente de Corriente Dependiente -->
+                        <VBox alignment="CENTER" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Fuente de Corriente Dependiente" />
+                            <StackPane fx:id="stackFcd" maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconFcd" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/fcd.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+
+                        <!-- Componente: Tierra -->
+                        <VBox alignment="CENTER" prefHeight="64.0" prefWidth="226.0" spacing="5.0">
+                            <Label styleClass="comp-white-text" text="Tierra" />
+                            <StackPane fx:id="stackTierra" maxWidth="125" maxHeight="55">
+                            	<ImageView fx:id="iconTierra" fitHeight="55.0" fitWidth="125.0" preserveRatio="true">
+                                	<image>
+                                    	<Image url="@../iconos/tierra.png" />
+                               		 </image>
+                           		 </ImageView>
+                           	</StackPane>
+                        </VBox>
+                </VBox>
+        </VBox>
+    </content>
+</ScrollPane>

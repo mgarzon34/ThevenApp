@@ -1,0 +1,809 @@
+package com.circuitos.analisiscircuitos.gui.service.cable;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.WeakHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.util.GestorIds;
+import com.circuitos.analisiscircuitos.gui.commands.AddCableCommand;
+import com.circuitos.analisiscircuitos.gui.commands.RemoveCableCommand;
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+import com.circuitos.analisiscircuitos.gui.model.CableBuilder;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion;
+import com.circuitos.analisiscircuitos.gui.service.nodes.NodoManager;
+import com.circuitos.analisiscircuitos.gui.service.undo.UndoRedoManager;
+
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.layout.Pane;
+import javafx.scene.shape.Polyline;
+
+/**
+ * Gestiona operaciones sobre cables: eliminación, fusión y actualización.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableManager {
+	private static final Logger logger=Logger.getLogger(CableManager.class.getName());
+	private static final String ID_PREFIX="Cable-";
+	
+	private final Pane zonaDibujo;
+	private final ConectorPuntos conector;
+	private final UndoRedoManager undoRedo;
+	
+	private final List<Cable> cables=new ArrayList<>();
+	private final Map<String, Cable> indexPorId=new HashMap<>();
+	private final WeakHashMap<Cable, CablePuntosControlManager> managersPuntos=new WeakHashMap<>();
+	private Cable cableSeleccionado=null;
+	private boolean modoEdicionAvanzada=false;
+	
+	/**
+	 * Snapshot de un cable para undo/redo sin DTOs externos.
+	 */
+	public static final class CableSnapshot {
+		public final String id;
+		public final PuntoConexion inicio;
+		public final PuntoConexion fin;
+		public final List<Double> trayectoria;
+		
+		public CableSnapshot(String id, PuntoConexion inicio, PuntoConexion fin, List<Double> trayectoria) {
+			this.id=id;
+			this.inicio=inicio;
+			this.fin=fin;
+			this.trayectoria=trayectoria!=null ? new ArrayList<>(trayectoria) : List.of();
+		}
+	}
+	
+	/**
+	 * Constructor de la clase.
+	 * 
+	 * @param zonaDibujo				Zona sobre la que se dibujan los cables y se manipulan.
+	 * @param conector					Conector para componentes y cables
+	 * @param nodoManager				Gestor de nodos (asignación y revocación)
+	 */
+	public CableManager(Pane zonaDibujo, ConectorPuntos conector, NodoManager nodoManager, UndoRedoManager undoRedo) {
+		this.zonaDibujo=zonaDibujo;
+		this.conector=conector;
+		this.undoRedo=undoRedo;
+		logger.info("CableManager inicializado");
+	}
+	
+	/**
+	 * Constructor simplificado cuando no se dispone de un {@link UndoRedoManager}.
+	 * 
+	 * @param zonaDibujo				Zona de dibujo donde se añaden los cables
+	 * @param conector					Conector que gestiona las uniones entre puntos
+	 * @param nodoManager				Gestor de nodos
+	 */
+	public CableManager(Pane zonaDibujo, ConectorPuntos conector, NodoManager nodoManager) {
+		this(zonaDibujo, conector, nodoManager, null);
+	}
+	
+	/**
+	 * Creación de cables con algoritmo de ruteo.
+	 * Usa {@link CableTrayectoriaCalculator} para establecer la ruta.
+	 * 
+	 * @param inicio			Punto de inicio
+	 * @param fin				Punto final
+	 * @return {@link Cable} que conecta ambos puntos
+	 */
+	public Optional<Cable> crearCable(PuntoConexion inicio, PuntoConexion fin) {
+		if(inicio==null || fin==null) {
+			logger.warning("No se puede crear cable: puntos de conexión nulos");
+			return Optional.empty();
+		}
+		if(inicio==fin) {
+			logger.warning("No se puede crear cable: puntos de conexión idénticos");
+			return Optional.empty();
+		}
+		//Comprobar si existe cable entre estos dos puntos
+		Cable cableExistente=buscarCableEntrePuntos(inicio, fin);
+		if(cableExistente!=null) {
+			logger.fine("Cable ya existe entre puntos especificados");
+			return Optional.of(cableExistente);
+		}
+		try {
+			String id=GestorIds.getInstance().generarId(ID_PREFIX);
+			Cable nuevoCable=new CableBuilder()
+					.desde(inicio)
+					.hasta(fin)
+					.conId(id)
+					.en(zonaDibujo)
+					.usando(conector)
+					.construir();
+			configurarPuntosControl(nuevoCable);
+			
+			if(undoRedo!=null) {
+				undoRedo.ejecutarComando(new AddCableCommand(nuevoCable, zonaDibujo, cables));
+			} else {
+				registrarCableInterno(nuevoCable);
+			}
+			logger.info("Cable creado: "+id+" entre puntos");
+			return Optional.of(nuevoCable);
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error creando cable", e);
+			return Optional.empty(); 
+		}
+	}
+	
+	/**
+	 * Actualiza la trayectoria de todos los cables conectados a un componente cuando se mueve.
+	 * 
+	 * @param componente			Componente movido
+	 */
+	public void actualizarConexiones(Componente componente) {
+		if(componente==null) return;
+		for(Cable cable : cables) {
+			boolean conectadoInicio=cable.getInicio()!=null && cable.getInicio().getComponente()==componente;
+			boolean conectadoFin=cable.getFin()!=null && cable.getFin().getComponente()==componente;
+			if(conectadoInicio || conectadoFin) {
+				try {
+					cable.actualizarCable(cable.getInicio(), cable.getFin());
+				} catch(Exception e) {
+					logger.log(Level.WARNING, "Error actualizando conexión de cable: "+cable.getCableId(), e);
+				}
+			}
+		}
+	}
+	/**
+	 * Configura los puntos de control para los cables. 
+	 * 
+	 * @param cable			Cable sobre el que se manejan sus puntos de control
+	 */
+	private void configurarPuntosControl(Cable cable) {
+		if(cable==null) return;
+		try {
+			if(modoEdicionAvanzada) {
+				CablePuntosControlManager manager=obtenerPuntosControlManager(cable);
+				if(manager!=null) {
+					manager.setModoEdicionAvanzada(true);
+				}
+			}
+			//Configurar manejadores de interacción para control
+			configurarInteraccionesAvanzadas(cable);
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error configurando puntos de control", e);
+		}
+	}
+	
+	/**
+	 * Configura las interacciones con los cables para el usuario.
+	 * Añade soporte para multiples puntos de control en modo de edición avanzada.
+	 * 
+	 * @param cable			Cable sobre el que se gestiona la interacción
+	 */
+	private void configurarInteraccionesAvanzadas(Cable cable) {
+		Polyline cablePolyline=cable.getCablePolyline();
+		//Limpieza previa por seguridad
+		cablePolyline.setOnMouseClicked(null);
+		cablePolyline.setOnMousePressed(null);
+		
+		cablePolyline.setOnMouseClicked(e -> {
+			if(e.isControlDown() && e.getClickCount()==1) {
+				//Ctrl+Click: añade nuevo punto de control
+				agregarPuntosControlEnPosicion(cable, e.getX(), e.getY());
+				e.consume();
+			} else if(e.getClickCount()==2) {
+				//Doble click: modo de edición avanzada para este cable
+				toggleEdicionAvanzadaCable(cable);
+				e.consume();
+			}
+		});
+		cablePolyline.setOnMousePressed(e -> {
+			seleccionarCable(cable);
+			e.consume();
+		});
+	}
+	
+	/**
+	 * Agrega un punto de control en una posición específica permitiendo a los
+	 * usuarios añadir puntos de ruta personalizados.
+	 * 
+	 * @param cable				Cable sobre el que se añade un punto de control
+	 * @param x					Posición X del punto de control
+	 * @param y					Posicion Y del punto de control
+	 */
+	private void agregarPuntosControlEnPosicion(Cable cable, double x, double y) {
+		try {
+			CablePuntosControlManager manager=obtenerPuntosControlManager(cable);
+			if(manager!=null) {
+				manager.agregarNuevoPuntoControl(new Point2D(x, y));
+				logger.info("Punto de control agregado en cable "+cable.getCableId());
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error agregando punto de control", e);
+		}
+	}
+	
+	/**
+	 * Método para control avanzado de edición de cable. 
+	 * Proporciona a los usuarios un control granular sobre la edición del cable. 
+	 * 
+	 * @param cable a modificar
+	 */
+	private void toggleEdicionAvanzadaCable(Cable cable) {
+		try {
+			CablePuntosControlManager manager=obtenerPuntosControlManager(cable);
+			if(manager!=null) {
+				boolean nuevoModo=!manager.isModoEdicionAvanzada();
+				manager.setModoEdicionAvanzada(nuevoModo);
+				logger.info("Modo edición avanzada " + (nuevoModo ? "activado" : "desactivado") + 
+						" para cable "+cable.getCableId());
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error toggleando edición avanzada", e);
+		}
+	}
+	
+	/**
+	 * Selecciona un cable visualmente, deseleccionando si hubiera alguno anterior.
+	 * 
+	 * @param cable Cable que se selecciona
+	 */
+	public void seleccionarCable(Cable cable) {
+		//Deselecciona si había otro cable seleccionado
+		if(cableSeleccionado!=null && cableSeleccionado!=cable) {
+			cableSeleccionado.deseleccionar();
+		}
+		//Selecciona el nuevo cable
+		cableSeleccionado=cable;
+		if(cable!=null) {
+			cable.seleccionar();
+			logger.fine("Cable seleccionado: "+cable.getCableId());
+		}
+	}
+	
+	/**
+	 * Elimina un cable del esquema realizando limpieza de nodos.
+	 * 
+	 * @param cable			Cable a eliminar
+	 * @return {@code true} si se elimina correctamente, {@code false} si no
+	 */
+	public boolean eliminarCable(Cable cable) {
+		if(cable==null) return false;
+		
+		try {
+			if(cables.contains(cable)) {
+				if(undoRedo!=null) {
+					undoRedo.ejecutarComando(new RemoveCableCommand(cable, zonaDibujo, cables));
+				} else {
+				retirarCableInterno(cable);
+				}
+				GestorIds.getInstance().liberarId(cable.getCableId(), ID_PREFIX);
+				if(cableSeleccionado==cable) cableSeleccionado=null;
+			} else {
+				eliminarCableSeguro(cable);
+			}
+			limpiarPuntosConexionHuerfanosGlobal();
+			limpiarPuntosConexionHuerfanosEscena();
+			fusionarCables(null);
+			logger.info("Cable eliminado: "+cable.getCableId());
+			return true;
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error eliminando cable", e);
+			return false;
+		}
+	}
+	
+	/**
+	 * Elimina un cable de forma segura. Si el cable está registrado delega en
+	 * {@link #eliminarCable(Cable)} y si no limpia sus conexiones, elimina listeners y lo
+	 * retira de la escena.
+	 * 
+	 * @param cable		Cable a eliminar de forma segura
+	 */
+	private void eliminarCableSeguro(Cable cable) {
+		try {
+			//si está registrado, usa el método normal
+			if(cables.contains(cable)) {
+				eliminarCable(cable);
+				return;
+			}
+			//Si no está registrado -> eliminar de escena y limpiar nets
+			limpiarConexionesCable(cable);
+			Polyline poly=cable.getCablePolyline();
+			poly.setOnMouseClicked(null);
+			poly.setOnMousePressed(null);
+			if(zonaDibujo.getChildren().contains(cable)) {
+				zonaDibujo.getChildren().remove(cable);
+			}
+			//quita índices si hubiera
+			indexPorId.remove(cable.getCableId());
+			managersPuntos.remove(cable);
+			logger.info("Cable (no registrado) eliminado de forma segura: "+cable.getCableId());
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error en eliminarCableSeguro", e);
+		}
+	}
+	
+	/**
+	 * Registra internamente un cable sin añadir duplicados.
+	 * 
+	 * @param cable			Cable a registrar
+	 */
+	private void registrarCableInterno(Cable cable) {
+		if(!cables.contains(cable)) {
+			cables.add(cable);
+			indexPorId.put(cable.getCableId(), cable);
+		}
+		if(!zonaDibujo.getChildren().contains(cable)) {
+			zonaDibujo.getChildren().add(cable);
+		}
+	}
+	
+	/**
+	 * Retira internamente un cable limpiando nets, desconectando manejadores, etc.
+	 * 
+	 * @param cable			Cable a retirar
+	 */
+	private void retirarCableInterno(Cable cable) {
+		//Limpieza selección
+		if(cableSeleccionado==cable) {
+			cableSeleccionado=null;
+		}
+		//Limpieza nets antes de retirar
+		limpiarConexionesCable(cable);
+		//Retirar listeners de interacción
+		Polyline poly=cable.getCablePolyline();
+		poly.setOnMouseClicked(null);
+		poly.setOnMousePressed(null);
+		
+		//Retirar de area de dibujo
+		zonaDibujo.getChildren().remove(cable);
+		cables.remove(cable);
+		indexPorId.remove(cable.getCableId());
+		managersPuntos.remove(cable);
+	}
+	
+	/**
+	 * Registra un cable existente (al cargar desde archivo o DTO).
+	 * 
+	 * @param cable			Cable a registrar en el sistema visual y lógico.
+	 */
+	public void registrarCable(Cable cable) {
+		if(cable==null) {
+			logger.warning("No se puede registrar cable: objeto nulo");
+			return;
+		}
+		registrarCableInterno(cable);
+		logger.fine("Cable registrado externamente: "+cable.getCableId());
+	}
+	
+	/**
+	 * Busca un cable entre dos puntos de conexión.
+	 * 
+	 * @param inicio		Punto inicial
+	 * @param fin			Punto final
+	 * @return cable entre los dos puntos
+	 */
+	private Cable buscarCableEntrePuntos(PuntoConexion inicio, PuntoConexion fin) {
+		return cables.stream()
+				.filter(cable -> cable.conecta(inicio, fin))
+				.findFirst()
+				.orElse(null);
+	}
+	
+	/**
+	 * Obtiene el gestor de puntos de control asociado a un cable.
+	 * 
+	 * @param cable			Cable sobre el que se desea el gestor
+	 * @return {@link CablePuntosControlManager} o {@code null} si no se puede crear u obtener
+	 */
+	private CablePuntosControlManager obtenerPuntosControlManager(Cable cable) {
+		if(cable==null) return null;
+		return managersPuntos.computeIfAbsent(cable, c -> {
+			try {
+				CablePuntosControlManager m=c.getPuntosControlManager();
+				if(modoEdicionAvanzada) m.setModoEdicionAvanzada(true);
+				return m;
+			} catch(Exception e) {
+				logger.log(Level.WARNING, "No se puede crear el CablePuntosControlManager", e);
+				return null;
+			}
+		});
+	}
+	
+	/**
+	 * Limpia las conexiones de cable eliminando puntos de sus nets. 
+	 */
+	private void limpiarConexionesCable(Cable cable) {
+		try {
+			PuntoConexion inicio=cable.getInicio();
+			PuntoConexion fin=cable.getFin();
+			
+			//Eliminar puntos de sus nets (metodo de desconexión correcto)
+			if(inicio!=null && inicio.getNet()!=null) {
+				inicio.getNet().eliminarPin(inicio);
+			}
+			if(fin!=null && fin.getNet()!=null) {
+				fin.getNet().eliminarPin(fin);
+			}
+			logger.fine("Conexiones de cable limpiadas correctamente");
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error limpiando conexiones de cable", e);
+		}
+	}
+	
+	/**
+	 * Establece el modo de edición avanzada global que permite a los
+	 * usuarios activar modo avanzado para todos los cables nuevos.
+	 * 
+	 * @param modo		true or false
+	 */
+	public void setModoEdicionAvanzadaGlobal(boolean modo) {
+		this.modoEdicionAvanzada=modo;
+		
+		//Aplicar a cables existentes
+		for(Cable cable : cables) {
+			CablePuntosControlManager manager=obtenerPuntosControlManager(cable);
+			if(manager!=null) {
+				manager.setModoEdicionAvanzada(modo);
+			}
+		}
+		logger.info("Modo edición avanzada global: "+(modo ? "activado" : "desactivado"));
+	}
+	
+	/**
+	 * Optimiza la trayectoria para mejorar las rutas.
+	 */
+	public void optimizarTrayectoriasCables() {
+		logger.info("Optimizando trayectorias de "+cables.size() + " cables...");
+		int optimizados=0;
+		for(Cable cable : cables) {
+			try {
+				//Recalcular trayectoria
+				cable.actualizarCable(cable.getInicio(), cable.getFin());
+				optimizados++;
+			} catch(Exception e) {
+				logger.log(Level.WARNING, "Error optimizando cable "+cable.getCableId(), e);
+			}
+		}
+		logger.info("Trayectorias optimizadas: "+optimizados+"/"+cables.size());
+	}
+	
+	/**
+	 * Limpia todos los cables del área de dibujo.
+	 */
+	public void limpiarTodos() {
+		logger.info("Limpiando "+cables.size()+" cables...");
+		//Crear copia para evitar modificación
+		List<Cable> cablesToRemove=new ArrayList<>(cables);
+		for(Cable cable : cablesToRemove) {
+			eliminarCable(cable);
+		}
+		cables.clear();
+		cableSeleccionado=null;
+		logger.info("Todos los cables limpiados");
+	}
+	
+	/**
+	 * Limpia los puntos de conexión intermedios huérfanos (sin componente asociado) de cada cable.
+	 */
+	public void limpiarPuntosConexionHuerfanosGlobal() {
+		for(Cable c : new ArrayList<>(cables)) {
+			c.limpiarPuntosConexionHuerfanos();
+		}
+	}
+	
+	/**
+	 * Recorre la escena y elimina los puntos huérfanos que no están conectados ni a cable ni a componente.
+	 */
+	public void limpiarPuntosConexionHuerfanosEscena() {
+		List<Node> aEliminar=new ArrayList<>();
+		for(Node n : new ArrayList<>(zonaDibujo.getChildren())) {
+			if(!(n instanceof PuntoConexion pc)) continue;
+			boolean esExtremo=cables.stream().anyMatch(c -> c.getInicio()==pc || c.getFin()==pc);
+			boolean esIntermedio=cables.stream().anyMatch(c -> c.getPuntosConexionIntermedios().contains(pc));
+			if(!esExtremo && !esIntermedio && pc.getComponente()==null) {
+				try {
+					if(pc.getNet()!=null) {
+						pc.getNet().eliminarPin(pc);
+					}
+				} catch(Exception ignore) { }
+				fusionarCables(pc);
+				aEliminar.add(pc);
+			}
+		}
+		if(!aEliminar.isEmpty()) {
+			zonaDibujo.getChildren().removeAll(aEliminar);
+			logger.info("Puntos de conexión huérfanos eliminados de la escena: "+aEliminar.size());
+		}
+	}
+	
+	/**
+	 * Getters para accesos externos.
+	 */
+	public List<Cable> getCables() {
+		return new ArrayList<>(cables);
+	}
+	public Cable getCableSeleccionado() {
+		return cableSeleccionado;
+	}
+	public int getCantidadCables() {
+		return cables.size();
+	}
+
+	/**
+	 * Indica si el modo de edición avanzada está activo.
+	 * 
+	 * @return {@code true} si el modo avanzado está activo, {@code false} si no
+	 */
+	public boolean isModoEdicionAvanzada() {
+		return modoEdicionAvanzada;
+	}
+	
+	/**
+	 * Muestra estadísticas para monitoreo y depuración.
+	 * Proporciona información detallada sobre el estado de los cables.
+	 */
+	public void logEstadisticas() {
+		logger.info("Estadísticas del CableManager:");
+		logger.info(" - Total cables: "+cables.size());
+		logger.info(" - Cable seleccionado: "+(cableSeleccionado!=null ? cableSeleccionado.getCableId() : "ninguno"));
+		logger.info(" - Modo edición avanzada: "+modoEdicionAvanzada);
+		
+		long cablesConPuntosControl=cables.stream()
+				.filter(cable -> {
+					var manager=obtenerPuntosControlManager(cable);
+					return manager!=null && manager.getPuntosControl().size()>2;
+				})
+				.count();
+		logger.info(" - Cables con puntos de control: "+cablesConPuntosControl);
+	}
+	
+	/**
+	 * Elimina un cable y actualiza los nodos correspondientes.
+	 * 
+	 * @param cable			Cable que se elimina
+	 */
+	public void eliminarCableActualizarNodos(Cable cable) {
+		if(cable==null) {
+			logger.warning("No se puede eliminar cable: objeto nulo");
+			return;
+		}
+		if(!cables.contains(cable)) {
+			logger.warning("No se puede eliminar cable: no está registrado");
+			return;
+		}
+		if(cableSeleccionado==cable) {
+			cableSeleccionado=null;
+		}
+		if(zonaDibujo.getChildren().contains(cable)) {
+			zonaDibujo.getChildren().remove(cable);
+		}
+		cables.remove(cable);
+		GestorIds.getInstance().liberarId(cable.getCableId(), ID_PREFIX);
+		logger.info("Cable eliminado y nodos actualizados: "+cable.getCableId());
+	}
+	
+	/**
+	 * Fusiona, si se puede, dos tramos de cable en uno solo (tras eliminar algún componente intermedio).
+	 * 
+	 * @param punto			Punto sobre el que se fusionan
+	 */
+	public void fusionarCables(PuntoConexion punto) {
+		List<PuntoConexion> candidatos=new ArrayList<>();
+		if(punto!=null) {
+			candidatos.add(punto);
+		} else {
+			for(Node n : new ArrayList<>(zonaDibujo.getChildren())) {
+				if(n instanceof PuntoConexion pc && pc.getComponente()==null) {
+					candidatos.add(pc);
+				}
+			}
+		}
+		List<PuntoConexion> puntosEliminar=new ArrayList<>();
+		for(PuntoConexion pc : candidatos) {
+			List<Cable> conectados=new ArrayList<>();
+			for(Cable c : new ArrayList<>(cables)) {
+				if(c.getInicio()==pc || c.getFin()==pc) {
+					conectados.add(c);
+				}
+			}
+			for(Node n : new ArrayList<>(zonaDibujo.getChildren())) {
+				if(n instanceof Cable c) {
+					if(!conectados.contains(c) && (c.getInicio()==pc || c.getFin()==pc)) {
+						conectados.add(c);
+						if(!cables.contains(c)) {
+							indexPorId.put(c.getCableId(), c);
+							cables.add(c);
+						}
+					}
+				}
+			}
+			if(conectados.size()==2) {
+				Cable c1=conectados.get(0);
+				Cable c2=conectados.get(1);
+				PuntoConexion extremo1=(c1.getInicio()==pc) ? c1.getFin() : c1.getInicio();
+				PuntoConexion extremo2=(c2.getInicio()==pc) ? c2.getFin() : c2.getInicio();
+				try {
+					//Eliminar cables antiguos
+					eliminarCableSeguro(c1);
+					eliminarCableSeguro(c2);
+					//Crear cable nuevo
+					crearCable(extremo1, extremo2);
+					try {
+						if(pc.getNet()!=null) {
+							pc.getNet().eliminarPin(pc);
+						}
+					} catch(Exception ignore) { }
+					if(pc.getParent() instanceof Pane pane) {
+						pane.getChildren().remove(pc);
+					}
+					puntosEliminar.add(pc);
+					logger.info("Fusión automática realizada entre "+extremo1+" y "+extremo2);
+				} catch(Exception e) {
+					logger.log(Level.WARNING, "Error fusionando cables automáticamente", e);
+				}
+			}
+		}
+		if(!puntosEliminar.isEmpty()) {
+			zonaDibujo.getChildren().removeAll(puntosEliminar);
+			logger.info("Puntos intermedios eliminados tras fusión: "+puntosEliminar.size());
+		}
+	}
+	
+	/**
+	 * Obtiene el objeto cable dado por su ID.
+	 * 
+	 * @param cableId		Id del cable a obtener su "objeto"
+	 * @return objeto cable
+	 */
+	public Object getCable(String cableId) {
+		if(cableId==null || cableId.isEmpty()) {
+			logger.warning("No se puede obtener cable: ID nulo o vacío");
+			return null;
+		}
+		return cables.stream()
+				.filter(cable -> cable.getCableId().equals(cableId))
+				.findFirst()
+				.orElse(null);
+	}
+	
+	/**
+	 * Devuelve todos los cables que están conectados al punto de conexión indicado.
+	 * 
+	 * @param pc				Punto de conexión a comprobar
+	 * @return Lista de cables conectados al punto
+	 */
+	public List<Cable> obtenerCablesConectadosAlPunto(PuntoConexion pc) {
+		if(pc==null) return List.of();
+		List<Cable> res=new ArrayList<>();
+		for(Cable c : new ArrayList<>(cables)) {
+			if(c.getInicio()==pc || c.getFin()==pc) res.add(c);
+		}
+		return res;
+	}
+	
+	/**
+	 * Crea una instantánea de un cable para recrearlo posteriormente (uso en undo/redo)
+	 * 
+	 * @param c				Cable del que se captura el estado
+	 * @return Snapshot con la información del cable o {@code null} si el cable es nulo
+	 */
+	public CableSnapshot snapshot(Cable c) {
+		if(c==null) return null;
+		List<Double> pts=new ArrayList<>(c.getCablePolyline().getPoints());
+		return new CableSnapshot(c.getCableId(), c.getInicio(), c.getFin(), pts);
+	}
+	
+	/**
+	 * Reconstruye un cable a partir de un snapshot.
+	 * 
+	 * @param snap			Snapshot del cable
+	 * @return {@link Optional} con el cable creado, o vacío si no se puede crear
+	 */
+	public Optional<Cable> crearCableDesdeSnapshot(CableSnapshot snap) {
+		if(snap==null || snap.inicio==null || snap.fin==null) return Optional.empty();
+		Optional<Cable> opt=crearCable(snap.inicio, snap.fin);
+		if(opt.isEmpty()) return Optional.empty();
+		try {
+			Cable cable=opt.get();
+			List<Double> pts=snap.trayectoria;
+			if(pts!=null && pts.size()>=4) {
+				CablePuntosControlManager m=obtenerPuntosControlManager(cable);
+				if(m!=null) {
+					for(int i=2; i<pts.size()-2; i+=2) {
+						double x=pts.get(i);
+						double y=pts.get(i+1);
+						m.agregarNuevoPuntoControl(new Point2D(x, y));
+					}
+				}
+			}
+			return Optional.of(cable);
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error recreando cable desde snapshot", e);
+			return opt;
+		}
+	}
+	
+	/**
+	 * Fusiona dos cables que comparten un punto de conexión y devuelve el nuevo cable.
+	 * 
+	 * @param punto 			Punto de conexión común
+	 * @return {@link Optional} con el cable fusionado o vacío
+	 */
+	public Optional<Cable> fusionarCablesYDevolver(PuntoConexion punto) {
+		if(punto==null) return Optional.empty();
+		List<Cable> conectados=obtenerCablesConectadosAlPunto(punto);
+		if(conectados.size()!=2) return Optional.empty();
+		
+		Cable c1=conectados.get(0);
+		Cable c2=conectados.get(1);
+		PuntoConexion extremo1=(c1.getInicio()==punto) ? c1.getFin() : c1.getInicio();
+		PuntoConexion extremo2=(c2.getInicio()==punto) ? c2.getFin() : c2.getInicio();
+		try {
+			eliminarCableSeguro(c1);
+			eliminarCableSeguro(c2);
+			Optional<Cable> nuevo=crearCable(extremo1, extremo2);
+			try {
+				if(punto.getNet()!=null)
+					punto.getNet().eliminarPin(punto);
+			} catch(Exception ignore) {}
+			if(punto.getParent() instanceof Pane pane) pane.getChildren().remove(punto);
+			return nuevo;
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error fusionando cables (retorno) en "+punto, e);
+			return Optional.empty();
+		}
+	}
+	
+	/**
+	 * Elimina un cable identificado por su ID y libera el ID.
+	 * 
+	 * @param id 			Identificador del cable a eliminar
+	 */
+	public void eliminarCablePorId(String id) {
+		if(id==null) return;
+		Cable c=indexPorId.get(id);
+		if(c!=null) {
+			eliminarCableSeguro(c);
+			GestorIds.getInstance().liberarId(id, ID_PREFIX);
+			return;
+		}
+		for(Cable x : new ArrayList<>(cables)) {
+			if(id.equals(x.getCableId())) {
+				eliminarCableSeguro(x);
+				GestorIds.getInstance().liberarId(id, ID_PREFIX);
+				break;
+			}
+		}
+	}
+	
+	/**
+	 * Dibuja en la escena una colección de cables a partir de snapshots.
+	 * 
+	 * @param snaps				Lista de snapshots de cables
+	 */
+	public void renderCables(List<CableSnapshot> snaps) {
+		if(snaps==null || snaps.isEmpty()) return;
+		for(CableSnapshot s : snaps) {
+			try {
+				crearCableDesdeSnapshot(s);
+			} catch(Exception e) {
+				logger.log(Level.WARNING, "Error renderizando cable desde snapshot", e);
+			}
+		}
+	}
+	
+	/**
+	 * Actualiza los cables limpiandos sus puntos huérfanos y recalculando trayectorias si es necesario.
+	 */
+	public void actualizarEtiquetasYRutas() {
+		try {
+			limpiarPuntosConexionHuerfanosGlobal();
+			limpiarPuntosConexionHuerfanosEscena();
+			optimizarTrayectoriasCables();
+		} catch(Exception e) {
+			logger.log(Level.FINE, "actualizar etiquetas/rutas noop", e);
+		}
+	}
+}

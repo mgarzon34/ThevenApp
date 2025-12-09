@@ -1,0 +1,288 @@
+package com.circuitos.AnalisisCircuitos.gui.util;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dto.CableDto;
+import com.circuitos.temporal.gui.controller.PanelDisenoController;
+import com.circuitos.temporal.gui.model.Cable;
+import com.circuitos.temporal.gui.model.CableBuilder;
+import com.circuitos.temporal.gui.model.PuntoConexion;
+import com.circuitos.temporal.gui.service.label.EtiquetaNodoService;
+
+import javafx.scene.Node;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Clase encargada de renderizar visualmente los cables a partir de los datos guardados en archivo.
+ * Usa la zona de dibujo para redibujar los cables nuevamente.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableRender {
+	private static final Logger logger=Logger.getLogger(CableRender.class.getName());
+	
+	private final PanelDisenoController panel;
+	private final Map<String, PuntoConexion> anchorsCoord=new HashMap<>();
+	private Pane cablesLayer;
+	
+	/**
+	 * Constructor.
+	 * 
+	 * @param panel Área de dibujo
+	 */
+	public CableRender(PanelDisenoController panel) {
+		this.panel=Objects.requireNonNull(panel, "PanelDisenoController no puede ser null");
+	}
+	
+	/**
+	 * Garantiza que exista la capa de cables y la sitúa delante.
+	 * 
+	 * @param zona			Zona donde se dibujan los cables
+	 * @return Grupo de la capa de cables
+	 */
+	private Pane ensureCablesLayer(Pane zona) {
+		if(cablesLayer==null || !zona.getChildren().contains(cablesLayer)) {
+			cablesLayer=new Pane();
+			cablesLayer.setManaged(false);
+			cablesLayer.setMouseTransparent(false);
+			cablesLayer.setPickOnBounds(false);
+			zona.getChildren().add(cablesLayer);
+		}
+		cablesLayer.toFront();
+		return cablesLayer;
+ 	}
+	
+	/**
+	 * Añade un nodo a un padre solo si aún no tiene parent.
+	 * 
+	 * @param parent		Padre al que se añade el nodo
+	 * @param node			Nodo que se añade a parent
+	 */
+	private void addOnce(Pane parent, Node node) {
+		if(node.getParent()==null) {
+			parent.getChildren().add(node);
+		} else if(node.getParent()!=parent) {
+			logger.warning(() -> "Intento de reañadir nodo con otro parent: "+node);
+		}
+	}
+	
+	/**
+	 * Construye clave de texto para identificar punto de anclaje por sus
+	 * coordenadas redondeadas a enteros
+	 * 
+	 * @param x 			Coordenada X
+	 * @param y				Coordenada Y
+	 * @return String con las coordenadas redondeadas a enteros
+	 */
+	private static String key(double x, double y) {
+		return Math.round(x)+":"+Math.round(y);
+	}
+	
+	/**
+	 * Renderiza visualmente todos los cables de un circuito en la zona de dibujo.
+	 * Utiliza la clase {@link CableDto}.
+	 * 
+	 * @param cablesDto Lista de cables con trayectorias y conexiones
+	 */
+	public void renderCables(List<CableDto> cablesDto) {
+		final Pane zona=panel.getZonaDibujo();
+		final Pane layer=ensureCablesLayer(zona);
+		layer.getChildren().clear();
+		anchorsCoord.clear();
+		logger.log(Level.INFO, "Renderizando {0} cables", cablesDto.size());
+		for(CableDto dto : cablesDto) {
+			final List<Double> trayectoria=dto.puntos().stream()
+					.flatMap(p -> List.of(p.x(), p.y()).stream())
+					.collect(Collectors.toList());
+			
+			final PuntoConexion pInicial=resolverExtremo(dto, true, trayectoria.get(0), trayectoria.get(1));
+			final int n=trayectoria.size();
+			final PuntoConexion pFinal=resolverExtremo(dto, false, trayectoria.get(n-2), trayectoria.get(n-1));
+
+			final Cable cable=new CableBuilder()
+					.desde(pInicial)
+					.hasta(pFinal)
+					.en(layer)						//Dibuja en capa de cables
+					.usando(panel.getConector())
+					.conTrayectoria(trayectoria)
+					.construir();
+			try {
+				cable.setId(dto.id());
+			} catch(Throwable ignore) {}
+			panel.getCableManager().registrarCable(cable);
+			propagarNodoExtremos(pInicial, pFinal);
+			logger.log(Level.FINE, () -> "Cable renderizado: "+dto.id());
+		}
+		//Tras renderizar cables, se da visibilidad a anclas y etiquetas.
+		traerAlFrente(zona);
+	}
+	
+	/**
+	 * Recorre el área de dibujo y trae al frente todos los puntos de conexión y 
+	 * las etiquetas de nodo.
+	 * 
+	 * @param zona 			zona de dibujo
+	 */
+	private void traerAlFrente(Pane zona) {
+		var anchors=zona.getChildren().stream()
+				.filter(n -> n instanceof PuntoConexion)
+				.toList();
+		for(var n : anchors) {
+			n.toFront();
+		}
+		var etiquetas=zona.lookupAll(".etiqueta-nodo");
+		for(var n : etiquetas) {
+			n.toFront();
+		}
+	}
+	
+	/**
+	 * Resuelve el extremo del cable (origen o destino) buscando el punto de conexión
+	 * del componente o creando uno libre si no existe.
+	 * 
+	 * @param dto				Cable del que buscamos el extremo
+	 * @param origen			Punto origen desde el que parte el cable
+	 * @param x					Coordenada X
+	 * @param y					Coordenada Y
+	 * @return Punto de conexión del cable
+	 */
+	private PuntoConexion resolverExtremo(CableDto dto, boolean origen, double x, double y) {
+		String compId=origen ? dto.origenId() : dto.destinoId();
+		PuntoConexion.Posicion pos=origen ? dto.origenPos() : dto.destinoPos();
+		boolean positivo=origen ? dto.origenPositivo() : dto.destinoPositivo();
+		
+		if(compId!=null) {
+			PuntoConexion pc=findPuntoConexion(compId, pos, positivo);
+			try {EtiquetaNodoService.actualizarEtiquetaNodo(pc, panel.getZonaDibujo()); } catch(Exception ignore) {}
+			return pc;
+		}
+		String k=key(x, y);
+		PuntoConexion anchor=anchorsCoord.get(k);
+		if(anchor!=null) {
+			try { EtiquetaNodoService.actualizarEtiquetaNodo(anchor, panel.getZonaDibujo()); } catch(Exception ignore) {}
+			logger.finer(()->"Reutilizando anchor existente para nodo "+k);
+			return anchor;
+		}
+		anchor=crearNodoLibre(-1, x, y);
+		anchorsCoord.put(k, anchor);
+		return anchor;
+	}
+	
+	/**
+	 * Busca un {@link PuntoConexion} dentro de un componente específico por su ID, posición y polaridad.
+	 * 
+	 * @param componenteId			ID del componente
+	 * @param posicion				Posición del punto dentro del componente
+	 * @param esPositivo			Indicador de polaridad (positivo o negativo)
+	 * @return Punto de conexión
+	 * @throws IllegalStateException si no se encuentra el componente o punto correspondiente
+	 */
+	private PuntoConexion findPuntoConexion(String componenteId, PuntoConexion.Posicion posicion,
+											boolean esPositivo) {
+		StackPane pane=panel.getZonaDibujo().getChildren().stream()
+				.filter(n->n instanceof StackPane)
+				.map(StackPane.class::cast)
+				.filter(sp -> {
+					Object ud=sp.getUserData();
+					return(ud instanceof Componente comp && comp.getId().equals(componenteId));
+				}).findFirst()
+				.orElseThrow(() -> new IllegalStateException("Visual de componente no encontrado: "+componenteId));
+		return pane.getChildren().stream()
+				.filter(n -> n instanceof PuntoConexion)
+				.map(PuntoConexion.class::cast)
+				.filter(pc ->
+					pc.getPosicion()==posicion && pc.esPositivo()==esPositivo)
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("PuntoConexion no encontrado en "+componenteId+
+															" pos="+posicion+" positivo="+esPositivo));
+	}
+	
+	/**
+	 * Crea un nuevo {@link PuntoConexion} libre en una posición concreta y lo registra en la 
+	 * red de nodos del circuito.
+	 * 
+	 * @param nodo		Nodo al que pertenece el punto de conexión
+	 * @param x			Coordenada X del punto
+	 * @param y			Coordenada Y del punto
+	 * @return Nuevo punto de conexión creado
+	 */
+	private PuntoConexion crearNodoLibre(int nodo, double x, double y) {
+		for(var n : panel.getZonaDibujo().getChildren()) {
+			if(n instanceof PuntoConexion pc && pc.getComponente()==null) {
+				double dx=Math.abs(pc.getLayoutX()-x);
+				double dy=Math.abs(pc.getLayoutY()-y);
+				if(dx<1 && dy<1) {
+					try {
+						if(nodo>=0) pc.setNodo(nodo);
+					} catch(Throwable ignore) {}
+					return pc;
+				}
+			}
+		}
+		PuntoConexion nuevo=new PuntoConexion(null, false);
+		double radio=nuevo.getRadius();
+		nuevo.setLayoutX(x-radio);
+		nuevo.setLayoutY(y-radio);
+		try {
+			nuevo.setNodo(nodo);
+		} catch(Throwable ignore) {}
+		addOnce(panel.getZonaDibujo(), nuevo);
+		try {
+			EtiquetaNodoService.actualizarEtiquetaNodo(nuevo, panel.getZonaDibujo());
+		} catch(Exception e) {
+			logger.log(Level.FINER, "EtiquetaNodoService fallo: "+e.getMessage(), e);
+		}
+		logger.log(Level.FINE, "Nodo libre creado: {0} en ({1},{2})", new Object[] {nodo, x, y});
+		return nuevo;
+	}
+	
+	/**
+	 * Propaga el número de nodo entre los extremos de un cable cuando solo uno de ellos tiene
+	 * net asignado. Si uno tiene net y el otro no, se asigna el mismo al otro extremos.
+	 * 
+	 * @param a			Extremo A del cable
+	 * @param b			Extremo B del cable
+	 */
+	private void propagarNodoExtremos(PuntoConexion a, PuntoConexion b) {
+		int nodoA=(a.getNodo()>=0) ? a.getNodo() : (a.getNet()!=null ? a.getNet().getId() : -1);
+		int nodoB=(b.getNodo()>=0) ? b.getNodo() : (b.getNet()!=null ? b.getNet().getId() : -1);
+		if(nodoA>=0 && nodoB<0) {
+			asignarNodoNet(b, nodoA);
+			EtiquetaNodoService.actualizarEtiquetaNodo(b, panel.getZonaDibujo());
+		} else if(nodoB>=0 && nodoA<0) {
+			asignarNodoNet(a, nodoB);
+			EtiquetaNodoService.actualizarEtiquetaNodo(a, panel.getZonaDibujo());
+		}
+	}
+	
+	/**
+	 * Asigna un número de nodo a un {@link PuntoConexion} que tenga una net asociada y registra
+	 * el pin en ella.
+	 * 
+	 * @param pc			Punto de conexión
+	 * @param nodo			Identificador de nodo
+	 */
+	private void asignarNodoNet(PuntoConexion pc, int nodo) {
+		try { pc.setNodo(nodo); } catch(Throwable ignore) {}
+		var con=panel.getConector();
+		var net=con.getNetId(nodo);
+		if(net==null) {
+			net=con.crearNet();
+			net.setId(nodo);
+		}
+		if(pc.getNet()!=net) {
+			net.addPin(pc);
+			pc.setNet(net);
+		}
+		con.incrementarUsoNodo(nodo);
+	}
+}

@@ -1,0 +1,320 @@
+package com.circuitos.temporal.gui.renderer;
+
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.gui.builder.ComponenteVisualFactory;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.model.PuntoConexion.Posicion;
+import com.circuitos.analisiscircuitos.gui.service.label.EtiquetaBindingService;
+
+import javafx.application.Platform;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Clase encargada de renderizar visualmente circuitos equivalentes (Thevenin o Norton).
+ * Genera los componentes visuales, conectarlos y añadir Tierra.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitoEquivalenteRenderer {
+	private static final Logger logger=Logger.getLogger(CircuitoEquivalenteRenderer.class.getName());
+	
+	private final Pane zona;
+	private final ConectorPuntos conector;
+	private final Consumer<Componente> onSeleccionar;
+	private final ConexionesRenderer conexionesR;
+	
+	/**
+	 * Constructor. 
+	 * 
+	 * @param zona						Zona dibujo del equivalente
+	 * @param conector					Conector para conectar componentes
+	 * @param onSeleccionar				Handler para gestionar eventos
+	 */
+	public CircuitoEquivalenteRenderer(Pane zona, ConectorPuntos conector, Consumer<Componente> onSeleccionar) {
+		this.zona=zona;
+		this.conector=conector;
+		this.onSeleccionar=onSeleccionar;
+		this.conexionesR=new ConexionesRenderer(zona, conector);
+	}
+	
+	/**
+	 * Renderiza un circuito equivalente: fuente, resistencia de Thevenin, resistencia de carga.
+	 * Usa posiciones fijas. 
+	 * 
+	 * @param fuente					Fuente de tensión de Thevenin
+	 * @param rThevenin					Resistencia de Thevenin
+	 * @param rCarga					Resistencia de Carga
+	 */
+	public void renderizarThevenin(Componente fuente, Resistencia rEquivalente, Resistencia rCarga,
+							VisualPos posFuente, VisualPos posR, VisualPos posCarga) {
+		logger.info("Iniciando renderizado de circuito equivalente...");
+		zona.getChildren().clear();
+		conector.reset();
+		
+		StackPane vFuente=crearVisual(fuente, posFuente);
+		StackPane vR=crearVisual(rEquivalente, posR);
+		StackPane vCarga=crearVisual(rCarga, posCarga);
+		
+		configurarEtiquetaEquivalente(vFuente, fuente, "Vth", posFuente.rotacion());
+		configurarEtiquetaEquivalente(vR, rEquivalente, "Rth", posR.rotacion());
+		
+		zona.getChildren().addAll(vFuente, vR, vCarga);
+		Platform.runLater(() -> conexionesR.conectarThevenin(vFuente, vR, vCarga));
+	}
+	
+	/**
+	 * Renderiza un circuito equivalente de Thevenin SIN resistencia de carga, es decir,
+	 * fuente + Rth + tierra, bornes de salida abiertos.
+	 * 
+	 * @param fuente				Fuente de tensión de Thevenin
+	 * @param rEquivalente			Resistencia de Thevenin
+	 * @param posFuente				Posición de la fuente
+	 * @param posR					Posición de la resistencia
+	 */
+	public void renderizarSinCarga(Componente fuente, Resistencia rEquivalente,
+								VisualPos posFuente, VisualPos posR) {
+		logger.info("Renderizando circuito equivalente de Thevenin SIN carga...");
+		zona.getChildren().clear();
+		conector.reset();
+		
+		StackPane vFuente=crearVisual(fuente, posFuente);
+		StackPane vR=crearVisual(rEquivalente, posR);
+		
+		configurarEtiquetaEquivalente(vFuente, fuente, "Vth", posFuente.rotacion());
+		configurarEtiquetaEquivalente(vR, rEquivalente, "Rth", posR.rotacion());
+		
+		zona.getChildren().addAll(vFuente, vR);
+		Platform.runLater(() -> conexionesR.conectarSinCarga(vFuente, vR));
+	}
+	
+	/**
+	 * Renderiza un circuito equivalente de Norton: fuente de corriente en paralelo con Rn y 
+	 * en paralelo con la carga.
+	 * 
+	 * @param fuente				Fuente de corriente de Norton
+	 * @param rEquivalente			Resistencia equivalente de Norton
+	 * @param rCarga				Resistencia de carga
+	 * @param posFuente				Posicion de la fuente In
+	 * @param posR					Posicion de la resistencia Rn
+	 * @param posCarga				Posicion de la resistencia de carga
+	 */
+	public void renderizarNorton(Componente fuente, Resistencia rEquivalente, Resistencia rCarga,
+								VisualPos posFuente, VisualPos posR, VisualPos posCarga) {
+		logger.info("Renderizando circuito equivalente de Norton...");
+		zona.getChildren().clear();
+		conector.reset();
+		
+		StackPane vFuente=crearVisual(fuente, posFuente);
+		StackPane vR=crearVisual(rEquivalente, posR);
+		StackPane vCarga=crearVisual(rCarga, posCarga);
+		
+		configurarEtiquetaEquivalente(vFuente, fuente, "In", posFuente.rotacion());
+		configurarEtiquetaEquivalente(vR, rEquivalente, "Rn", posR.rotacion());
+		
+		zona.getChildren().addAll(vFuente, vR, vCarga);
+		Platform.runLater(() -> conexionesR.conectarNorton(vFuente, vR, vCarga));
+	}
+	
+	/**
+	 * Renderiza un circuito equivalente de Norton sin resistencia de carga, dejando 
+	 * sólo la fuente de corriente en paralelo con Rn.
+	 * 
+	 * @param fuente				Fuente de corriente de Norton
+	 * @param rEquivalente			Resistencia equivalente de Norton
+	 * @param posFuente				Posición de la fuente
+	 * @param posR					Posición de la resistencia
+	 */
+	public void renderizarNortonSinCarga(Componente fuente, Resistencia rEquivalente, 
+										VisualPos posFuente, VisualPos posR) {
+		logger.info("Renderizando circuito equivalente de Norton sin carga...");
+		zona.getChildren().clear();
+		conector.reset();
+		
+		StackPane vFuente=crearVisual(fuente, posFuente);
+		StackPane vR=crearVisual(rEquivalente, posR);
+		zona.getChildren().addAll(vFuente, vR);
+		
+		configurarEtiquetaEquivalente(vFuente, fuente, "In", posFuente.rotacion());
+		configurarEtiquetaEquivalente(vR, rEquivalente, "Rn", posR.rotacion());
+		
+		Platform.runLater(() -> conexionesR.conectarNortonSinCarga(vFuente, vR));
+	}
+	
+	/**
+	 * Crea y posiciona visualmente un componente del circuito.
+	 * 
+	 * @param componente			Componente del circuito equivalente
+	 * @param pos					Posición del componente
+	 * @return visual de la fuente
+	 */
+	private StackPane crearVisual(Componente componente, VisualPos pos) {
+		StackPane visual=ComponenteVisualFactory.crearVisual(
+				ComponenteVisualFactory.getTipoImagen(componente), pos.x(), pos.y(), 
+				conector, zona, onSeleccionar, null, componente);
+		visual.setRotate(pos.rotacion());
+		return visual;
+	}
+	
+	/**
+	 * Configura las posiciones de los pines de la fuente, la resistencia equivalente y
+	 * la resistencia de carga según la orientación visual.
+	 * 
+	 * @param pinesFuente		Pines de la fuente
+	 * @param pinesR			Pines de la resistencia equivalente
+	 * @param pinesCarga		Pines de la resistencia de carga
+	 */
+	public void setOrientacionPines(PinesComponente pinesFuente, 
+			PinesComponente pinesR, PinesComponente pinesCarga) {
+		this.conexionesR.setPines(pinesFuente, pinesR, pinesCarga);
+	}
+
+	/**
+	 * Configura la etiqueta de la fuente y la resistencia de un circuito equivalente de Thévenin o Norton.
+	 * 
+	 * @param visual		Visual del componente	
+	 * @param comp			Componente del dominio (FTI, FCI, R)
+	 * @param pref			Prefijo que se añade a la etiqueta
+	 */
+	private void configurarEtiquetaEquivalente(StackPane visual, Componente comp, String pref, double rotacionComp) {
+		Label etiqueta=buscarEtiquetaComponente(visual);
+		if(etiqueta==null) {
+			logger.warning(() -> "No se encontró etiqueta de componente para aplicar prefijo: "+pref);
+			return;
+		}
+		aplicarEstilosBase(etiqueta, comp, pref, rotacionComp);
+		String textoF=generarTextoEtiqueta(comp, pref);
+		etiqueta.setText(textoF);
+		aplicarDesplazamiento(visual, etiqueta, pref, rotacionComp);
+	}
+	
+	/**
+	 * Aplica estilo CSS a las etiquetas de los componentes del circuito equivalente (Th/No).
+	 * 
+	 * @param etiqueta			Etiqueta del componente
+	 * @param comp				Componente
+	 * @param pref				Prefijo
+	 * @param rotacion			Rotación del componente
+	 */
+	private void aplicarEstilosBase(Label etiqueta, Componente comp, String pref, double rotacion) {
+		EtiquetaBindingService.configurarEtiquetaEquivalente(etiqueta, comp, pref);
+		if(!etiqueta.getStyleClass().contains("etiqueta-analisis-componente")) {
+			etiqueta.getStyleClass().add("etiqueta-analisis-componente");
+		}
+		if(etiqueta.rotateProperty().isBound()) etiqueta.rotateProperty().unbind();
+		etiqueta.setRotate(-rotacion);
+		
+		//Con esto evitamos el recorte por tamaño de la etiqueta
+		etiqueta.setWrapText(false);		//no saltar de línea
+		etiqueta.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);			//lo que ocupe el texto
+		etiqueta.setPrefWidth(javafx.scene.layout.Region.USE_COMPUTED_SIZE); 	//ancho según contenido
+		etiqueta.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);			//sin límite
+		if(etiqueta.textProperty().isBound()) etiqueta.textProperty().unbind();
+	}
+	
+	/**
+	 * Genera el texto para aplicar a la etiqueta de componentes del ciruito equivalente (Th/No).
+	 * 
+	 * @param comp				Componente
+	 * @param pref				Prefijo
+	 * @return Texto de la etiqueta
+	 */
+	private String generarTextoEtiqueta(Componente comp, String pref) {
+		double valorReal=0.0;
+		if(comp instanceof FuenteTensionInd f) valorReal=f.getValor();
+		else if(comp instanceof FuenteCorrienteInd f) valorReal=f.getValor();
+		else if(comp instanceof Resistencia r) valorReal=r.getValor();
+		
+		String unidad=(pref.startsWith("R")) ? "Ω" : (pref.startsWith("V") ? "V" : "A");
+		return pref+" = "+formatearValor(valorReal)+unidad;
+	}
+	
+	/**
+	 * Posiciona la etiqueta del componente del circuito equivalente respecto al propio componente.
+	 * 
+	 * @param visual			Visual del componente
+	 * @param etiqueta			Etiqueta
+	 * @param pref				Prefijo
+	 * @param rotacion			Rotación
+	 */
+	private void aplicarDesplazamiento(StackPane visual, Label etiqueta, String pref, double rotacion) {
+		double offX=0;
+		double offY=0;
+		switch(pref) {
+			case "Vth" -> { offX=20; offY=0; }
+			case "Rth" -> { offX=0; offY=0; }
+			case "In"  -> { offX=0; offY=-40; }
+			case "Rn"  -> { offX=0; offY=-20; }
+		}
+		if(Math.abs(rotacion-180)<0.1) {
+			offX=-offX;
+			offY=-offY;
+		}
+		etiqueta.getProperties().put("offsetTagX", offX);
+		etiqueta.getProperties().put("offsetTagY", offY);
+		ComponenteVisualFactory.actualizarPosicionEtiqueta(visual);
+	}
+	
+	/**
+	 * Busca la etiqueta de componente dentro de su StackPane. Intenta localizar por la clase y si no
+	 * devuelve la primera asociada.
+	 * 
+	 * @param visual			StackPane del componente
+	 * @return Etiqueta asociada al componente
+	 */
+	private Label buscarEtiquetaComponente(StackPane visual) {
+		for(Node n : visual.getChildren()) {
+			if(n instanceof Label label) {
+				if(label.getStyleClass().contains("etiqueta-componente") ||
+						label.getStyleClass().contains("etiqueta-componente-carga")) {
+					return label;
+				}
+			}
+		}
+		for(Node n : visual.getChildren()) {
+			if(n instanceof Label label) {
+				return label;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Formatea un valor numérico a un formato legible para usar en las etiquetas de los componentes.
+	 * 
+	 * @param valor				Valor a formatear
+	 * @return String con el valor formateado
+	 */
+	private String formatearValor(double valor) {
+		if(Double.isNaN(valor)) return "-";
+		if(valor==0) return "0";
+		double abs=Math.abs(valor);
+		String prefijo="";
+		double divisor=1.0;
+		if(abs>=1_000_000) { prefijo="M"; divisor=1_000_000; }
+		else if(abs>=1_000) { prefijo="k"; divisor=1_000; }
+		else if(abs>=1) { prefijo=""; divisor=1; }
+		else if(abs>=0.001) { prefijo="m"; divisor=0.001; }
+		else if(abs>=0.000001) { prefijo="µ"; divisor=0.000001; }
+		return String.format("%.2f %s",  valor/divisor, prefijo).trim();
+	}
+	
+	/**
+	 * Registro que representa la posición visual de un componente.
+	 */
+	public record VisualPos(double x, double y, double rotacion) { }
+	
+	/**
+	 * Registro que representa la posición visual de los pines de un componente.
+	 */
+	public record PinesComponente(Posicion pin1, Posicion pin2) { }
+}

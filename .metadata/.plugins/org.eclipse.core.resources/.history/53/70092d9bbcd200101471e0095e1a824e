@@ -1,0 +1,389 @@
+package com.circuitos.temporal.gui.learning.database;
+
+import java.util.List;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.gui.learning.model.Ejercicio;
+import com.circuitos.temporal.gui.learning.model.EstadisticasProgreso;
+import com.circuitos.temporal.gui.learning.model.PdfDocument;
+import com.circuitos.temporal.gui.learning.model.Teoria;
+import com.circuitos.temporal.gui.learning.model.User;
+
+/**
+ * Servicio de aprendizaje que gestiona la lógica educativa.
+ * Integra el motor de análisis existente con el sistema de ejercicios.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class LearningService {
+	private static final Logger logger=Logger.getLogger(LearningService.class.getName());
+	
+	private final DatabaseService databaseService;
+	private User usuarioActual;
+	
+	/**
+	 * Constructor.
+	 */
+	public LearningService() {
+		this.databaseService=new DatabaseService();
+	}
+	
+	/**
+	 * Autentica un usuario.
+	 * 
+	 * @param username			Nombre de usuario
+	 * @param password			Contraseña
+	 * @return {@code true} si la autenticación tuvo éxito 
+	 */
+	public boolean login(String username, String password) {
+		usuarioActual=databaseService.getUserData().autenticarUsuario(username, password);
+		if(usuarioActual!=null) {
+			logger.info("Usuario autenticado: "+username+" ("+usuarioActual.getRole()+")");
+			return true;
+		}
+		logger.warning("Fallo de autenticación para usuario: "+username);
+		return false;
+	}
+	
+	/**
+	 * Registra un nuevo usuario.
+	 * 
+	 * @param username		Nombre de usuario
+	 * @param password		Contraseña
+	 * @param role			Rol (ESTUDIANTE/PROFESOR)
+	 * @param fullName		Nombre completo
+	 * @return {@code true} si el registro tuvo éxito
+	 */
+	public boolean registrar(String username, String password, String nombre, 
+							String apellido1, String apellido2, String role,
+							String preguntaSeguridad, String respuestaSeguridad) {
+		boolean exito=databaseService.getUserData().crearUsuario(username, password, nombre, apellido1, apellido2, 
+												role, preguntaSeguridad, respuestaSeguridad);
+		if(exito) {
+			logger.info("Usuario registrado: "+username+" ("+role+")");
+		} else {
+			logger.warning("Fallo de registro para usuario: "+username);
+		}
+		return exito;
+	}
+	
+	/**
+	 * Cierra la sesión del usuario actual.
+	 */
+	public void logout() {
+		if(usuarioActual!=null) {
+			logger.info("Usuario desconectado: "+usuarioActual.getUsername());
+			this.usuarioActual=null;
+		}
+	}
+	
+	/**
+	 * Obtiene el usuario actual autenticado.
+	 *
+	 * @return Usuario actual o {@code null} si no hay usuario autenticado
+	 */
+	public User getUsuarioActual() {
+		return usuarioActual;
+	}
+	
+	/**
+	 * Busca un usuario por su nombre de usuario (para recuperación de contraseña).
+	 * 
+	 * @param username				Nombre de usuario
+	 * @return El objeto User o {@code null} si no existe
+	 */
+	public User buscarUsuario(String username) {
+		return databaseService.getUserData().buscarUsuarioPorNombre(username);
+	}
+	
+	/**
+	 * Cambia la contraseña de un usuario (cuando ha olvidado la contraseña).
+	 * 
+	 * @param username					Nombre de usuario
+	 * @param nuevaPassword				Nueva contraseña
+	 * @return {@code true} si la cambia con éxito, {@code false} si no
+	 */
+	public boolean cambiarPassword(String username, String nuevaPassword) {
+		boolean exito=databaseService.getUserData().cambiarPassword(username, nuevaPassword);
+		if(exito) {
+			logger.info("Contraseña cambiada para el usuario: "+username);
+		} else {
+			logger.warning("Error al cambiar contraseña para: "+username);
+		}
+		return exito;
+	}
+	
+	/**
+	 * Verifica si el usuario actual es profesor.
+	 * 
+	 * @return {@code true} si es profesor
+	 */
+	public boolean esProfesor() {
+		return usuarioActual!=null && usuarioActual.esProfesor();
+	}
+	
+	/**
+	 * Verifica si el usuario actual es estudiante.
+	 * 
+	 * @return {@code true} si es estudiante
+	 */
+	public boolean esEstudiante() {
+		return usuarioActual!=null && usuarioActual.esEstudiante();
+	}
+	
+	/**
+	 * Obtiene todo el contenido de teoría.
+	 * 
+	 * @return Lista de contenido de teoría
+	 */
+	public List<Teoria> getTeoria() {
+		return databaseService.getContenidoData().getTeoria();
+	}
+	
+	/**
+	 * Guarda un contenido teórico en la base de datos.
+	 * 
+	 * @param t			Teoría a guardar
+	 * @return {@code true} si se guarda correctamente
+	 */
+	public boolean guardarTeoria(Teoria t) {
+		return databaseService.getContenidoData().guardarTeoria(t);
+	}
+	
+	/**
+	 * Elimina un contenido teórico de la base de datos.
+	 * 
+	 * @param id		ID del contenido a eliminar
+	 * @return {@code true} si se elimina correctamente
+	 */
+	public boolean eliminarTeoria(int id) {
+		return databaseService.getContenidoData().eliminarTeoria(id);
+	}
+	
+	/**
+	 * Obtiene todos los ejercicios disponibles.
+	 * 
+	 * @return Lista de ejercicios
+	 */
+	public List<Ejercicio> getEjercicios() {
+		return databaseService.getContenidoData().getEjercicios();
+	}
+	
+	/**
+	 * Guarda un ejercicio en la base de datos.
+	 * 
+	 * @param e			Ejercicio a guardar
+	 * @return {@code true} si se guarda correctamente
+	 */
+	public boolean guardarEjercicio(Ejercicio e) {
+		return databaseService.getContenidoData().guardarEjercicio(e);
+	}
+	
+	/**
+	 * Elimina un ejercicio de la base de datos.
+	 * 
+	 * @param id		ID del ejercicio a eliminar
+	 * @return {@code true} si se elimina correctamente
+	 */
+	public boolean eliminarEjercicio(int id) {
+		return databaseService.getContenidoData().eliminarEjercicio(id);
+	}
+	
+	/**
+	 * Marca un ejercicio como completado asignándole un 10.0.
+	 * 
+	 * @param ejercicioId 		Id del ejercicio a marcar
+	 */
+	public void marcarEjercicioCompletado(int ejercicioId) {
+		if(esEstudiante()) {
+			databaseService.getContenidoData().guardarProgresoEjercicio(usuarioActual.getId(), ejercicioId, 10.0);
+		}
+	}
+	
+	/**
+	 * Obtiene los Id de los ejercicios completados por el usuario.
+	 * 
+	 * @return Lista de Ids de los ejercicios completados
+	 */
+	public List<Integer> getEjerciciosCompletadosIds() {
+		if(!esEstudiante()) return List.of();
+		return databaseService.getContenidoData().getIdsEjerciciosCompletados(usuarioActual.getId());
+	}
+	
+	/**
+	 * Obtiene todos los documentos PDF disponibles.
+	 */
+	public List<PdfDocument> getPdfs() {
+		return databaseService.getPdfData().getPdfs();
+	}
+	
+	/**
+	 * Obtiene una lista de todos los estudiantes registrados en la base de datos.
+	 */
+	public List<User> getEstudiantes() {
+		return databaseService.getUserData().getEstudiantes();
+	}
+	
+	/**
+	 * Cuenta los ejercicios resueltos por un estudiante.
+	 * 
+	 * @param alId				ID del alumno
+	 * @return número de ejercicios resueltos
+	 */
+	public int ejerciciosCompAlumno(int alId) {
+		return databaseService.getContenidoData().contarEjerciciosResueltos(alId);
+	}
+	
+	/**
+	 * Cuenta los temas leídos por un estudiante.
+	 * 
+	 * @param alId				ID del alumno
+	 * @return número de temas leídos
+	 */
+	public int temasLeidosAlumno(int alId) {
+		return databaseService.getContenidoData().contarTemasLeidos(alId);
+	}
+	
+	/**
+	 * Obtiene el número total de ejercicios publicados.
+	 * 
+	 * @return total de ejercicios
+	 */
+	public int getTotalEjercicios() {
+		return getEjercicios().size();
+	}
+	
+	/**
+	 * Obtiene el número total de temas publicados.
+	 * 
+	 * @return total de temas
+	 */
+	public int getTotalTeoria() {
+		return getTeoria().size();
+	}
+	
+	/**
+	 * Actualiza la calificación general de un estudiante en la base de datos.
+	 * 
+	 * @param userId		Id del usuario
+	 * @param nota			Calificación nueva
+	 * @return {@code true} si se actualiza, {@code false} si no
+	 */
+	public boolean actualizarCalificacion(int userId, double nota) {
+		return databaseService.getProgresoData().actualizarCalificacionEstudiante(userId, nota);
+	}
+	
+	/**
+	 * Actualiza los comentarios de un profesor acerca de un estudiante en la base de datos.
+	 * 
+	 * @param userId		Id del usuario
+	 * @param mensaje		Mensaje nuevo del profesor
+	 * @return {@code true} si se actualiza, {@code false} si no
+	 */
+	public boolean actualizarComentarios(int userId, String mensaje) {
+		return databaseService.getProgresoData().actualizarComentariosProfesor(userId, mensaje);
+	}
+	
+	/**
+	 * Marca un tema de teoría como "leído" si un estudiante lo ha leído.
+	 * 
+	 * @param teoriaId		ID de la teoría
+	 */
+	public void marcarTeoriaLeida(int teoriaId) {
+		if(esEstudiante()) {
+			databaseService.getContenidoData().marcarTeoriaLeida(usuarioActual.getId(), teoriaId);
+		}
+	}
+	
+	/**
+	 * Comprueba si el usuario ha completado un tema de teoría.
+	 * 
+	 * @param teoriaId			ID del tema de teoría
+	 * @return {@code true} si lo ha completado, {@code false} si no
+	 */
+	public boolean isTeoriaLeida(int teoriaId) {
+		if(!esEstudiante() || usuarioActual==null) return false;
+		return databaseService.getContenidoData().isTeoriaLeida(usuarioActual.getId(), teoriaId);
+	}
+	
+	/**
+	 * Guarda un nuevo documento PDF (sólo para profesores).
+	 */
+	public boolean guardarDocumentoPdf(PdfDocument pdf) {
+		if(!esProfesor()) {
+			logger.warning("Intento de subir PDF por usuario no profesor: "+
+					(usuarioActual!=null ? usuarioActual.getUsername() : "null"));
+			return false;
+		}
+		boolean exito=databaseService.getPdfData().guardarDocumentoPdf(pdf);
+		if(exito) {
+			logger.info("PDF guardado por profesor "+usuarioActual.getUsername()+": "+pdf.getTitulo());
+		} else {
+			logger.warning("Error guardando PDF: "+pdf.getTitulo());
+		}
+		return exito;
+	}
+	
+	/**
+	 * Elimina un documento PDF (sólo para profesores).
+	 */
+	public boolean eliminarDocumentoPdf(int pdfId) {
+		if(!esProfesor()) {
+			logger.warning("Intento de eliminar PDF por usuario no profesor: "+
+					(usuarioActual!=null ? usuarioActual.getUsername() : "null"));
+			return false;
+		}
+		boolean exito=databaseService.getPdfData().eliminarDocumentoPdf(pdfId);
+		if(exito) {
+			logger.info("PDF eliminado por profesor "+usuarioActual.getUsername()+": ID "+pdfId);
+		} else {
+			logger.warning("Error eliminando PDF: ID "+pdfId);
+		}
+		return exito;
+	}
+	
+	/**
+	 * Obtiene estadísticas de progreso del estudiante actual.
+	 * 
+	 * @return estadísticas de progreso
+	 */
+	public EstadisticasProgreso getEstadisticasProgreso() {
+		if(!esEstudiante()) return new EstadisticasProgreso();
+		EstadisticasProgreso stats=new EstadisticasProgreso();
+		
+		int totalEj=getEjercicios().size();
+		int hechosEj=databaseService.getContenidoData().contarEjerciciosResueltos(usuarioActual.getId());
+		stats.setTotalEjercicios(totalEj);
+		stats.setEjerciciosCompletados(hechosEj);
+		
+		int totalTeo=getTeoria().size();
+		int temasLeidos=databaseService.getContenidoData().contarTemasLeidos(usuarioActual.getId());
+		
+		User u=databaseService.getUserData().buscarUsuarioPorNombre(usuarioActual.getUsername());
+		if(u!=null) {
+			this.usuarioActual=u;
+			stats.setPuntuacionPromedio(u.getCalificacionGeneral());
+		}
+		double porcEj=(totalEj==0) ? 0 : (double) hechosEj/totalEj;
+		double porcTeo=(totalTeo==0) ? 0 : (double) temasLeidos/totalTeo;
+		stats.setProgresoTotal((porcEj+porcTeo)/2.0);
+		return stats;
+	}
+	
+	/**
+	 * Resetea el progreso de un estudiante poniendo todo a cero (progreso general, ejercicios,
+	 * calificación y comentarios del profesor) (Sólo se puede usar con rol de profesor).
+	 * 
+	 * @param userId			ID del usuario que vamos a resetear
+	 * @return {@code true} si se ha reseteado, {@code false} si no
+	 */
+	public boolean resetearProgreso(int userId) {
+		if(!esProfesor()) return false;
+		boolean exito=databaseService.getProgresoData().resetearProgresoEstudiante(userId);
+		if(exito) {
+			logger.info("Progreso reseteado para alumno ID: "+userId);
+		}
+		return exito;
+	}
+}

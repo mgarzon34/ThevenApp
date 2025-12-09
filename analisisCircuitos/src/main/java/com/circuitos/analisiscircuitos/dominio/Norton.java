@@ -1,0 +1,112 @@
+package com.circuitos.analisiscircuitos.dominio;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.util.*;
+
+import javafx.util.Pair;
+
+/**
+ * Clase que calcula el circuito equivalente de Norton de un circuito dado
+ * visto entre dos nodos (nodoA, nodoB) (Reutiliza la clase Thevenin para cálculos).
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class Norton {
+	private static final Logger logger=Logger.getLogger(Norton.class.getName());
+	private final Circuito circuito;
+	private final int nodoA, nodoB;
+	private final Thevenin th;
+
+	/**
+	 * Constructor. Crea el circuito equivalente al que se le añadirán los componentes.
+	 * 
+	 * @param circuito 	circuito equivalente de Norton
+	 * @param nodoA		nodo terminal
+	 * @param nodoB		nodo terminal
+	 */
+	public Norton(Circuito circuito, int nodoA, int nodoB) {
+		this.circuito=Objects.requireNonNull(circuito, "Circuito no puede ser null");
+		this.nodoA=nodoA;
+		this.nodoB=nodoB;
+		this.th=new Thevenin(circuito, nodoA, nodoB);
+		if(circuito.getNodos().isEmpty()) {
+			NodeMapUtil.actualizarMapaNodos(circuito.getNodos(), circuito.getComponentes());
+		}
+		if(!CircuitUtil.esConexo(circuito)) {
+			throw new IllegalStateException("No hay conexión entre nodos "+nodoA+ " y "+nodoB+" para Norton.");
+		}
+	}
+	
+	/**
+	 * Calcula el equivalente de Norton utilizando la corriente y la resistencia de Norton.
+	 * Crea un nuevo circuito con dos nodos (0 y 1) y con estos dos componentes en paralelo,
+	 * añade el resto de componentes entre nodo A y nodo B que se habían eliminado y devuelve el equivalente.
+	 * 
+	 * @throws IllegalStateException	si Rth es inválida o el circuito no es conexo
+	 * @return norton					circuito equivalente de Norton
+	 */
+	public Circuito getNorton() {
+		logger.log(Level.INFO, "Obteniendo Norton entre nodos {0}-{1}", new Object[] {nodoA, nodoB});
+		Pair<Double, Double> params=calcularParametros();
+		double vth=params.getKey();
+		double rth=params.getValue();
+		
+		double iN=calcularINorton(vth, rth);
+		double rN=rth;
+		
+		//Construir circuito con 2 nodos (0 y 1)
+		Circuito norton=new Circuito();
+		if(iN>=0) {
+			norton.addComponente(new FuenteCorrienteInd(iN, 0, 1));
+		} else {
+			norton.addComponente(new FuenteCorrienteInd(-iN, 1, 0));
+		}
+		if(rN>0) {
+			norton.addComponente(new Resistencia(rN, 0, 1));
+		} else {
+			logger.log(Level.WARNING, "RNorton=0, no se añade resistencia");
+		}
+		
+		//Recuperar componentes originales que había entre nodo A y B y añadirlos al circuito.
+		List<Componente> cargas=CircuitUtil.obtenerComponentesCarga(circuito, nodoA, nodoB);
+		List<Resistencia> cargasResis=cargas.stream()
+				.filter(c -> c instanceof Resistencia)
+				.map(c -> (Resistencia) c)
+				.toList();
+		if(cargasResis.size()==1) {
+			Resistencia carga=cargasResis.get(0);
+			norton.addComponente(carga.clonarConNuevosNodos(0, 1));
+		} else if(!cargas.isEmpty()) {
+			logger.log(Level.INFO, "Se han encontrado {0} componentes de carga entre {1} y {2}, "
+					+ "pero no exactamente una resistencia. El equivalente "
+					+" gráfico de Norton se mostrará sin rama de carga.",
+					new Object[] { cargas.size(), nodoA, nodoB });
+		}
+		return norton;
+	}
+	
+	/**
+	 * Obtiene los parámetros de Thevenin (Vth, Rth)
+	 */
+	private Pair<Double, Double> calcularParametros() {
+		return th.calcularParametros();
+	}
+	
+	/**
+	 * Obtiene la corriente de Norton (de cortocircuito) entre A y B (reutiliza Thevenin).
+	 * Hace uso de la Ley de Ohm para obtener la corriente de Norton. IN=Vth/Rth (LEY DE OHM).
+	 * 
+	 * @return i o Positive_Infinity		corriente de Norton I o infinita (si rth=0)
+	 */
+	public double calcularINorton(double vth, double rth) {
+		if(rth==0.0) {
+			return Double.POSITIVE_INFINITY;
+		}
+		return vth/rth;
+	}
+}

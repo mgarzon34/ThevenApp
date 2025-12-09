@@ -1,0 +1,42 @@
+package com.circuitos.temporal.gui.commands;
+
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+/**
+ * Comando para uso de undo/redo en las acciones de cambio de parámetros de los componentes.
+ * Usa genéricos para evitar hacer una clase para cada tipo de parámetro.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ChangeParamCommand<T> implements Command {
+	private final String desc;
+	private final Consumer<T> setter;
+	private final T oldVal;
+	private final T newVal;
+	
+	public ChangeParamCommand(String desc, Supplier<T> getter, Consumer<T> setter, T newVal) {
+		this.desc=desc;
+		this.setter=setter;
+		this.oldVal=getter.get();
+		this.newVal=newVal;
+	}
+	
+	/* Implementación métodos de la interfaz */ 
+	
+	@Override
+	public void ejecutar() {
+		setter.accept(newVal);
+	}
+
+	@Override
+	public void deshacer() {
+		setter.accept(oldVal);
+	}
+
+	@Override
+	public String getDescripcion() {
+		return desc;
+	}
+}

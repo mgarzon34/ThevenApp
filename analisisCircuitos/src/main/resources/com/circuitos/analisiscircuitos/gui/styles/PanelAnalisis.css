@@ -1,0 +1,94 @@
+/* ========================================================
+ * Estilos para el panel de análisis de circuitos.
+ * Archivo: PanelAnálisis.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+
+/* Fondo del área de dibujo con imagen precargada, centrada y cubriendo el área */
+.analisis-panel-con-fondo {
+	-fx-background-image: url("../images/sandBlue.jpg");
+	-fx-background-repeat: no-repeat;
+	-fx-background-position: center center;
+	-fx-background-size: cover;
+}
+
+/* Estilo para marcar un elemento seleccionado */
+.analisis-seleccionado {
+	-fx-border-color: #00aaff;						/* Cuadro borde azul */
+	-fx-border-width: 2px;
+	-fx-border-radius: 4px;
+	-fx-background-color: rgba(0,170,255,0.1); 		/* Relleno azulado */
+}
+
+.analisis-imagen-miniatura {
+	-fx-effect: dropshadow(gaussian, black, 4, 0, 0, 0);
+	-fx-border-color: white;
+	-fx-border-width: 1;
+}
+
+.analisis-stackpane {
+	-fx-background-color: rgba(0,0,0,0.2);
+	-fx-border-color: white;
+	-fx-border-radius: 5;
+}
+
+.analisis-label-title {
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-background-color: rgba(0,0,0,0.5);
+	-fx-padding: 4 8;
+	-fx-background-radius: 4;
+}
+
+.analisis-redimensionar-corner {
+	-fx-background-color: transparent;
+	-fx-cursor: se-resize;
+	-fx-opacity: 0.0;
+	-fx-max-width: 12;
+	-fx-max-height: 12;
+	-fx-min-width: 12;
+	-fx-min-height: 12;
+	-fx-background-insets: 0;
+	-fx-background-radius: 0;
+	-fx-shape: null;
+}
+
+.analisis-stackpane:hover .analisis-redimensionar-corner {
+	-fx-background-color: transparent;
+	-fx-opacity: 0.8;
+}
+
+.analisis-imagen-miniatura,
+.analisis-label-title {
+	-fx-cursor: hand;
+}
+
+.analisis-boton-cerrar {
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-font-size: 14px;
+	-fx-background-color: transparent;
+	-fx-padding: 2 6;
+	-fx-background-radius: 4;
+	-fx-cursor: hand;
+}
+
+.analisis-boton-cerrar:hover {
+	-fx-background-color: rgba(0, 0, 0, 0.5);
+}
+
+.analisis-toggle-propiedades {
+	-fx-background-color: #0085C5;
+	-fx-text-fill: white;
+	-fx-background-radius: 8 0 0 8;		/* Borde redondeado en lado derecho */
+	-fx-cursor: hand;
+	-fx-padding: 4 2 4 2;
+	-fx-effect: dropshadow(gaussian, transparent, 0, 0, 0, 0);
+	-fx-background-insets: 0;
+}
+
+.analisis-toggle-propiedades:hover {
+	-fx-background-color: #0095D8;
+	-fx-effect: dropshadow(gaussian, rgba(0,180,255,0.9), 12, 0.3, 0, 0);
+}

@@ -1,0 +1,5 @@
+package com.circuitos.AnalisisCircuitos.gui.commands;
+
+public class CompositeCommand {
+
+}

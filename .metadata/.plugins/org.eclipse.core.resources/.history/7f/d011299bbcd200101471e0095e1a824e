@@ -1,0 +1,210 @@
+package com.circuitos.temporal.gui.service.io;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Circuito;
+
+import javafx.beans.property.StringProperty;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.layout.Pane;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Window;
+
+/**
+ * Servicio encargado de abrir, guardar y gestionar archivos 
+ * en la aplicación.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class GestionArchivoService {
+	
+	private static final Logger logger=Logger.getLogger(GestionArchivoService.class.getName());
+	private static final String APP_TITLE_PREFIX="ThevenApp 1.0 - ";
+	private static final String RECENT_DESC="Circuito ThevenApp (*.json)";
+	private static final String RECENT_EXT="*.json";
+	
+	private final CircuitoSerializerService serializer;
+	private final StringProperty windowTitle;
+	private final Menu menuReciente;
+	private final Window owner;
+	
+	/**
+	 * Constructor 
+	 * 
+	 * @param serializer		Serializador de archivo JSON
+	 * @param windowTitle		Título de la ventana
+	 * @param menuReciente		Menú de archivos recientes
+	 * @param owner				Ventana que lo contiene
+	 */
+	public GestionArchivoService(CircuitoSerializerService serializer,
+			StringProperty windowTitle, Menu menuReciente, Window owner) {
+		this.serializer=serializer;
+		this.windowTitle=windowTitle;
+		this.menuReciente=menuReciente;
+		this.owner=owner;
+	}
+	
+	/**
+	 * Abre un archivo desde el cuadro de diálogo.
+	 * 
+	 * @return archivo a leer
+	 */
+	public Optional<File> open() {
+		FileChooser chooser=crearChooser("Abrir proyecto", null);
+		File f=chooser.showOpenDialog(owner);
+		Optional<File> opt=Optional.ofNullable(f);
+		if(opt.isPresent()) {
+			File file=opt.get();
+			logger.info("Archivo abierto: "+file.getAbsolutePath());
+			actualizarTitulo(file);
+			registrarReciente(file);
+		} else {
+			logger.fine("Diálogo de abrir cancelado por el usuario");
+		}
+		return opt;
+	}
+	
+	/**
+	 * Guarda una copia del proyecto actual en un archivo json.
+	 * 
+	 * @param actual archivo actual
+	 * @return archivo nuevo donde se guarda
+	 */
+	public Optional<File> saveAs(File actual) {
+		String inicial=(actual!=null ? actual.getName() : "nuevoCircuito.json");
+		FileChooser chooser=crearChooser("Guardar proyecto como", inicial);
+		File f=chooser.showSaveDialog(owner);
+		if(f!=null) {
+			f=asegurarExtensionJson(f);
+			logger.info("Guardar como: "+f.getAbsolutePath());
+		}
+		return Optional.ofNullable(f);
+	}
+	
+	/**
+	 * Guarda el circuito actual en un archivo.
+	 * 
+	 * @param target		Archivo donde se guarda
+	 * @param circuito		Circuito actual que se va a guardar
+	 * @param zonaDibujo	Área de dibujo del circuito
+	 * @return	{@code true} si lo ha guardado correctamente, {@code false} si no
+	 */
+	public boolean save(File target, Circuito circuito, Pane zonaDibujo) {
+		try {
+			serializer.guardarCircuitoArchivo(target, circuito, zonaDibujo);
+			actualizarTitulo(target);
+			registrarReciente(target);
+			logger.info("Circuito guardado en: "+target.getAbsolutePath());
+			return true;
+		} catch (IOException ex) {
+			logger.log(Level.SEVERE, "Error guardando archivo", ex);
+			return false;
+		}
+	}
+	
+	/**
+	 * Crea y configura un FileChooser para archivos JSON.
+	 * 
+	 * @param title				Titulo del chooser
+	 * @param initialName		Nombre inicial del archivo JSON
+	 * @return	FileChooser para elección de archivo
+	 */
+	private FileChooser crearChooser(String title, String initialName) {
+		FileChooser chooser=new FileChooser();
+		chooser.setTitle(title);
+		chooser.getExtensionFilters().add(new ExtensionFilter(RECENT_DESC, RECENT_EXT));
+		if(initialName!=null) {
+			chooser.setInitialFileName(initialName);
+		}
+		return chooser;
+	}
+	
+	/**
+	 * Asegura que el archivo tenga extensión .json
+	 * 
+	 * @param f			Archivo seleccionado
+	 * @return File archivo con extensión json
+	 */
+	private File asegurarExtensionJson(File f) {
+		String name=f.getName().toLowerCase();
+		if(!name.endsWith(".json")) {
+			return new File(f.getParentFile(), f.getName()+".json");
+		}
+		return f;
+	}
+	
+	/**
+	 * Actualiza el título de la ventana.
+	 * 
+	 * @param f		Archivo de carga
+	 */
+	private void actualizarTitulo(File f) {
+		windowTitle.set(APP_TITLE_PREFIX + f.getName());
+	}
+	
+	/**
+	 * Registra la ruta del archivo en el historial de archivos recientes.
+	 * 
+	 * @param f		Archivo de carga
+	 */
+    private void registrarReciente(File f) {
+        try {
+            ArchivosRecientesService.agregarArchivoReciente(f.getAbsolutePath());
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "No se pudo agregar archivo a recientes", e);
+        }
+    }
+	
+	/**
+	 * Gestiona el menú de archivos recientes, permitiendo abrir uno 
+	 * 
+	 * @param onSelect
+	 * @throws IOException 
+	 */
+	public void actualizarMenuRecientes(Consumer<File> onOpen, Runnable onClear) throws IOException {
+		Objects.requireNonNull(onOpen, "onOpen no puede ser null");
+		Objects.requireNonNull(onClear, "onClear no puede ser null");
+		
+		menuReciente.getItems().clear();
+		var recs=ArchivosRecientesService.obtenerArchivosRecientes();
+		logger.log(Level.FINE, "Refrescando menú recientes ({0} entradas)", recs.size());
+		if(recs.isEmpty()) {
+			MenuItem mi=new MenuItem("No hay archivos recientes");
+			mi.setDisable(true);
+			menuReciente.getItems().add(mi);
+		} else {
+			for(String path : recs) {
+				File f=new File(path);
+				if(!f.exists()) continue;
+				MenuItem mi=new MenuItem(f.getName());
+				mi.setOnAction(_ -> {
+					logger.log(Level.INFO, "Abriendo archivo reciente: {0}", f);
+					onOpen.accept(f);
+				});
+				menuReciente.getItems().add(mi);
+			}
+		}
+		menuReciente.getItems().add(new SeparatorMenuItem());
+		MenuItem clear=new MenuItem("Borrar historial");
+		clear.setOnAction(_ -> {
+			logger.info("Borrando historial de recientes");
+			try {
+				ArchivosRecientesService.limpiarLista();
+			} catch (IOException e1) {
+				logger.log(Level.WARNING, "No se pudo borrar historial de recientes", e1);
+			}
+			onClear.run();
+		});
+		menuReciente.getItems().add(clear);
+	}
+}

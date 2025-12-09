@@ -1,0 +1,56 @@
+package com.circuitos.temporal.gui.controller;
+
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.Tierra;
+import com.circuitos.temporal.gui.model.NodeField;
+
+/**
+ * Interface para editar propiedades de componentes desde la interfaz gráfica.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public interface PropiedadesEditor {
+	
+	/**
+	 * Edita el valor o unidad de un componente.
+	 * 
+	 * @param comp		Componente a editar
+	 * @param texto		Texto actual del valor mostrado
+	 * @return {@code true} si hubo cambios, {@code false} si no 
+	 */
+	boolean editarValorUnidad(Componente comp, String texto);
+	
+	/**
+	 * Alterna la condición de carga de un componente.
+	 * 
+	 * @param comp		Componente a gestionar
+	 * @return {@code true} si hubo cambios, {@code false} si no
+	 */
+	boolean gestionarCarga(Componente comp);
+	
+	/**
+	 * Edita el nodo de un componente.
+	 * 
+	 * @param comp		Componente a editar
+	 * @param tipo		"negativo", "positivo" o "tierra"
+	 * @param texto		Texto actual del nodo mostrado
+	 * @return {@code true} si hubo cambios, {@code false} si no
+	 */
+	boolean editarNodo(Componente comp, NodeField field, String texto);
+	
+	/**
+	 * Alterna el modo de dependencia de una fuente dependiente.
+	 * 
+	 * @param comp 		Componente dependiente a alternar
+	 * @return {@code true} si hubo cambios, {@code false} si no
+	 */
+	boolean alternarDependencia(Componente comp);
+	
+	/**
+	 * Versión especializada para Tierra
+	 */
+	default boolean editarNodo(Tierra tierra, NodeField field, String texto) {
+		return editarNodo((Componente) tierra, field, texto);
+	}
+}

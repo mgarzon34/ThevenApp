@@ -1,0 +1,183 @@
+package com.circuitos.AnalisisCircuitos.dominio.util;
+
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Componente;
+import com.circuitos.temporal.dominio.FuenteCorrienteInd;
+import com.circuitos.temporal.dominio.FuenteTensionDependiente;
+import com.circuitos.temporal.dominio.FuenteTensionInd;
+import com.circuitos.temporal.dominio.Resistencia;
+
+/**
+ * Clase con funciones útiles para análisis de circuitos.
+ * Contiene test de conectividad, elección de nodo de referencia y desactivación de fuentes.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+public class CircuitUtil {
+	private static final Logger logger=Logger.getLogger(CircuitUtil.class.getName());
+	
+	private CircuitUtil() { /* No instanciable */ }
+	
+	/**
+	 * Comprueba si un circuito es conexo.
+	 * 
+	 * @param circuito		circuito de comprobación
+	 * @return true/false	true si es conexo, false si no
+	 */
+	@SuppressWarnings("unused")
+	public static boolean esConexo(Circuito circuito) {
+		Objects.requireNonNull(circuito, "Circuito no puede ser null");
+		Map<Integer, Integer> nodos=circuito.getNodos();
+		if(nodos.isEmpty()) {
+			logger.log(Level.WARNING, "Circuito sin nodos");
+			return false;
+		}
+		Map<Integer, Set<Integer>> adj=new HashMap<>();
+		circuito.getComponentes().forEach(comp -> {
+			int n1=comp.getNodo1();
+			int n2=comp.getNodo2();
+			adj.computeIfAbsent(n1, k -> new HashSet<>()).add(n2);
+			adj.computeIfAbsent(n2, k -> new HashSet<>()).add(n1);
+		});
+		Integer start=nodos.keySet().iterator().next();
+		Set<Integer> vistos=new HashSet<>();
+		Queue<Integer> cola=new ArrayDeque<>();
+		cola.add(start);
+		while(!cola.isEmpty()) {
+			int u=cola.poll();
+			if(!vistos.add(u)) continue;
+			for(Integer nInt : adj.getOrDefault(u, Collections.emptySet())) {
+				if(!vistos.contains(nInt)) cola.add(nInt);
+			}
+		}
+		boolean conexo=vistos.size()==nodos.size();
+		logger.log(Level.FINE, "Conectividad: esperado {0}, visto {1}, conexo={2}",
+				new Object[] {nodos.size(), vistos.size(), conexo});
+		return conexo;
+	}
+	
+	/**
+	 * Obtiene el nodo de referencia de un circuito para análisis.
+	 * 
+	 * @param circuito						circuito para análisis
+	 * @throws IllegalArgumentException		si el mapa de nodos está vacío
+	 * @return ref							nodo de referencia
+	 */
+	public static int obtenerNodoReferencia(Circuito circuito) {
+		Objects.requireNonNull(circuito, "Circuito no puede ser null");
+		Map <Integer, Integer> map=circuito.getNodos();
+		if(map.isEmpty())
+			throw new IllegalArgumentException("El circuito no tiene nodos para elegir referencia");
+		//Si el identificador 0 está presente, usarlo:
+		if(map.containsKey(0))
+			return map.get(0);
+		
+		//Si no buscar el nodo con más conexiones
+		Map<Integer, Integer> grado=new HashMap<>();
+		for(Componente c : circuito.getComponentes()) {
+			grado.merge(c.getNodo1(), 1, Integer::sum);
+			grado.merge(c.getNodo2(), 1, Integer::sum);
+		}
+		
+		int mejorNodo=-1, maxG=-1;
+		for(Map.Entry<Integer, Integer> e : grado.entrySet()) {
+			if(e.getValue()>maxG) {
+				mejorNodo=e.getKey();
+				maxG=e.getValue();
+			}
+		}
+		logger.log(Level.FINE, "Nodo referencia: {0} (grado {1})", 
+				new Object[] {mejorNodo, grado.get(mejorNodo)});
+		return map.getOrDefault(mejorNodo, map.values().iterator().next());
+	}
+	
+	/**
+	 * Desactiva las fuentes de un circuito (cortocircuitar fuentes de tensión
+	 * y abrir fuentes de corriente).
+	 * 
+	 * @param original					circuito original
+	 * @throws NullPointerException 	si circuito original es null
+	 * @return copia					circuito con fuentes desactivadas
+	 */
+	public static Circuito desactivarFuentes(Circuito original) {
+		Objects.requireNonNull(original, "El circuito original no puede ser null");
+		Circuito copia=new Circuito();
+		for(Componente c : original.getComponentes()) {
+			if(c instanceof FuenteTensionInd) {
+				FuenteTensionInd v=(FuenteTensionInd) c;
+				//Cortocircuitar: 0V entre mismos nodos
+				copia.addComponente(new FuenteTensionInd(0.0, v.getNodo1(), v.getNodo2()));
+				continue;
+			}
+			if(c instanceof FuenteCorrienteInd) {
+				//Abrir circuito... No se copia
+				continue;
+			}
+			copia.addComponente(c.clonar());
+		}
+		NodeMapUtil.actualizarMapaNodos(copia.getNodos(), copia.getComponentes());
+		return copia;
+	}
+	
+	/**
+	 * Devuelve una lista de componentes de carga entre dos nodos.
+	 * 
+	 * @param c			circuito de estudio
+	 * @param A			nodo A
+	 * @param B			nodo B
+	 * @return lista	componentes de carga entre los nodos A y B
+	 */
+	public static List<Componente> obtenerComponentesCarga(Circuito c, int A, int B) {
+		Objects.requireNonNull(c, "Circuito no puede ser null");
+		List<Componente> cargasEntreNodos=c.getComponentes().stream()
+				.filter(Componente::isCarga)
+				.filter(comp ->
+						(comp.getNodo1()==A && comp.getNodo2()==B) ||
+						(comp.getNodo1()==B && comp.getNodo2()==A))
+				.toList();
+		if(cargasEntreNodos.isEmpty()) {
+			return List.of();
+		}
+		List<Componente> cargasResistivas=cargasEntreNodos.stream()
+				.filter(comp -> comp instanceof Resistencia)
+				.toList();
+		//Una sola reistencia, se devuelve
+		if(cargasResistivas.size()==1) {
+			return cargasResistivas;
+		}
+		//Varias cargas o no resistencia, devuelve lista vacía
+		Logger.getLogger(CircuitUtil.class.getName()).info(() ->
+			String.format(
+					"Hay %d componentes de carga entre nodos %d-%d (resistencias=%d). "+
+					"Se muestra el equivalente sin rama de carga explícita.",
+					cargasEntreNodos.size(), A, B, cargasResistivas.size()));
+		return List.of();
+	}
+	
+	/**
+	 * Devuelve la lista de todas las fuentes de tensión en el circuito.
+	 * 
+	 * @param c							circuito original
+	 * @return lista					lista de fuentes de tensión
+	 */
+	public static List<Componente> obtenerFuentesTension(Circuito c) {
+		Objects.requireNonNull(c, "Circuito no puede ser null");
+		return c.getComponentes().stream()
+				.filter(comp -> comp instanceof FuenteTensionInd
+							||	comp instanceof FuenteTensionDependiente)
+				.toList();
+	}
+}

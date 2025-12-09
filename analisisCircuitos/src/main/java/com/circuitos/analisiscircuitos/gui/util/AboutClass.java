@@ -1,0 +1,73 @@
+package com.circuitos.analisiscircuitos.gui.util;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+
+/**
+ * Clase auxiliar para mostrar un cuadro de diálogo cuando se pulsa en "Ayuda/Acerca de" con
+ * información sobre la aplicación y su desarrollador.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class AboutClass {
+	
+	private static final Logger logger=Logger.getLogger(AboutClass.class.getName());
+	
+	/**
+	 * Muestra el diálogo "Acerca De".
+	 */
+	public static void mostrarAcercaDe() {
+		Dialog<Void> dialog=new Dialog<>();
+		dialog.setTitle("Acerca de ThevenApp");
+		dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);	//Botón cerrar
+		VBox content=new VBox(10);										//Contenedor principal
+		content.setAlignment(Pos.CENTER);
+		content.setPadding(new Insets(20));
+		content.setStyle("-fx-background-color: white;");
+		ImageView logo=new ImageView();									//Imagen de logo
+		try {
+			String rutaLogo="/com/circuitos/analisiscircuitos/gui/images/logoThevenApp.png";
+			var url=AboutClass.class.getResource(rutaLogo);
+			if(url!=null) {
+				logo.setImage(new Image(url.toExternalForm()));
+				logo.setFitWidth(120);
+				logo.setFitHeight(120);
+				logo.setPreserveRatio(true);
+			} else {
+				logger.warning("No se encontró el logo en :"+rutaLogo);
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "Error al cargar el logo en el diálogo 'Acerca de'", e);
+		}
+		Label lblTitulo=new Label("ThevenApp");
+		lblTitulo.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #0078d7;");
+		Label lblVersion=new Label("Version 1.0.0");
+		lblVersion.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-font-weight: bold;" );
+		Label lblDesc=new Label("Aplicación educativa para de Análisis de Circuitos\n"
+				+"Simulación y E-Learning, enfocada en los teoremas de Thévenin y Norton.");
+		lblDesc.setStyle("-fx-text-alignment: center; -fx-font-size: 13px;");
+		lblDesc.setWrapText(true);
+		Label lblAutor=new Label("Desarrollado por:\nMarco Antonio Garzón Palos");
+		lblAutor.setStyle("-fx-text-alignment: center; -fx-font-weight: bold; -fx-padding: 10 0 0 0;");
+		Label lblAnio=new Label("© 2025");
+		lblAnio.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6;");
+		if(logo.getImage()!=null) {
+			content.getChildren().add(logo);
+		}
+		content.getChildren().addAll(lblTitulo, lblVersion, lblDesc, lblAutor, lblAnio);
+		dialog.getDialogPane().setContent(content);
+		dialog.showAndWait();
+	}
+}

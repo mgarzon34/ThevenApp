@@ -1,0 +1,248 @@
+package com.circuitos.temporal.gui.learning.model;
+
+/**
+ * Clase que define un usuario (estudiante o profesor) en la base de datos
+ * de la sección de E-Learning.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class User {
+	private int id;
+	private String username;
+	private String role;
+	private String nombre;
+	private String apellido1;
+	private String apellido2;
+	private String password;
+	private String preguntaSeguridad;
+	private String respuestaSeguridad;
+	private double calificacionGeneral;
+	private String comentariosProfesor;
+	
+	/**
+	 * Obtiene el ID del usuario.
+	 * 
+	 * @return ID del usuario
+	 */
+	public int getId() { 
+		return id; 
+	}
+	
+	/**
+	 * Modifica el ID del usuario.
+	 * 
+	 * @param id		ID nuevo
+	 */
+	public void setId(int id) { 
+		this.id=id; 
+	}
+	
+	/**
+	 * Obtiene el nombre de usuario.
+	 * 
+	 * @return	username (nombre de usuario)
+	 */
+	public String getUsername() { 
+		return username; 
+	}
+	
+	/**
+	 * Modifica el nombre de usuario.
+	 * 
+	 * @param username nuevo
+	 */
+	public void setUsername(String username) { 
+		this.username=username; 
+	}
+	
+	/**
+	 * Obtiene el rol del usuario (Estudiante/Profesor).
+	 * 
+	 * @return rol del usuario
+	 */
+	public String getRole() { 
+		return role; 
+	}
+	
+	/**
+	 * Modifica el rol del usuario a estudiante o a profesor.
+	 * 
+	 * @param role		Rol del usuario (estudiante/profesor)
+	 */
+	public void setRole(String role) { 
+		this.role=role; 
+	}
+	
+	/**
+	 * Obtiene el nombre del usuario.
+	 * 
+	 * @return Nombre completo del usuario
+	 */
+	public String getName() { 
+		return nombre; 
+	}
+	
+	/**
+	 * Modifica el nombre del usuario.
+	 * 
+	 * @param fullName		Nombre nuevo
+	 */
+	public void setName(String nombre) { 
+		this.nombre=nombre; 
+	}
+	
+	/**
+	 * Obtiene el primer apellido del usuario.
+	 * 
+	 * @return Primer apellido del usuario
+	 */
+	public String getApellido1() {
+		return apellido1;
+	}
+	
+	/**
+	 * Modifica el primer apellido del usuario.
+	 * 
+	 * @param apellido1		Primer apellido nuevo
+	 */
+	public void setApellido1(String apellido1) {
+		this.apellido1=apellido1;
+	}
+	
+	/**
+	 * Obtiene el segundo apellido del usuario.
+	 * 
+	 * @return Segundo apellido del usuario
+	 */
+	public String getApellido2() {
+		return apellido2;
+	}
+	
+	/**
+	 * Modifica el segundo apellido del usuario.
+	 * 
+	 * @param apellido2		Segundo apellido nuevo
+	 */
+	public void setApellido2(String apellido2) {
+		this.apellido2=apellido2;
+	}
+	
+	/**
+	 * Obtiene la contraseña del usuario.
+	 * 
+	 * @return password Contraseña del usuario
+	 */
+	public String getPassword() {
+		return password;
+	}
+	
+	/**
+	 * Modifica la contraseña del usuario.
+	 * 
+	 * @param password contraseña nueva
+	 */
+	public void setPassword(String password) {
+		this.password=password;
+	}
+	
+	/**
+	 * Obtiene la pregunta de seguridad del usuario.
+	 * 
+	 * @return Pregunta de seguridad del usuario
+	 */
+	public String getPreguntaSeguridad() {
+		return preguntaSeguridad;
+	}
+	
+	/**
+	 * Modifica la pregunta de seguridad.
+	 * 
+	 * @param preguntaSeguridad nueva
+	 */
+	public void setPreguntaSeguridad(String preguntaSeguridad) {
+		this.preguntaSeguridad=preguntaSeguridad;
+	}
+	
+	/**
+	 * Obtiene la respuesta de seguridad del usuario.
+	 * 
+	 * @return respuesta de seguridad
+	 */
+	public String getRespuestaSeguridad() {
+		return respuestaSeguridad;
+	}
+	
+	/**
+	 * Modifica la respuesta de seguridad del usuario.
+	 * 
+	 * @param respuestaSeguridad nueva
+	 */
+	public void setRespuestaSeguridad(String respuestaSeguridad) {
+		this.respuestaSeguridad=respuestaSeguridad;
+	}
+	
+	/**
+	 * Obtiene la calificación general del usuario.
+	 * 
+	 * @return calificación general
+	 */
+	public double getCalificacionGeneral() {
+		return calificacionGeneral;
+	}
+	
+	/**
+	 * Modifica la calificación general del usuario.
+	 * 
+	 * @param calificación nueva
+	 */
+	public void setCalificacionGeneral(double calificacionGeneral) {
+		this.calificacionGeneral=calificacionGeneral;
+	}
+	
+	/**
+	 * Obtiene los comentarios del profesor acerca de un estudiante.
+	 * 
+	 * @return comentarios del profesor
+	 */
+	public String getComentariosProfesor() {
+		return comentariosProfesor;
+	}
+	
+	/**
+	 * Modifica los comentarios del profesor acerca de un usuario.
+	 * 
+	 * @param comentarios nuevos
+	 */
+	public void setComentariosProfesor(String comentariosProfesor) {
+		this.comentariosProfesor=comentariosProfesor;
+	}
+	
+	/**
+	 * Comprueba si el rol del usuario es 'Profesor'.
+	 * 
+	 * @return {@code true} si es profesor, {@code false} si es estudiante
+	 */
+	public boolean esProfesor() { 
+		return "PROFESOR".equals(role); 
+	}
+	
+	/**
+	 * Comprueba si el rol del usuario es 'Estudiante'.
+	 * 
+	 * @return {@code true} si es estudiante, {@code false} si es profesor
+	 */
+	public boolean esEstudiante() { 
+		return "ESTUDIANTE".equals(role); 
+	}
+	
+	/**
+	 * Verifica que una respuesta de seguridad es la registrada por el usuario (ignora mayúsuculas y minúsculas).
+	 * 
+	 * @param respuesta			Respuesta a verificar
+	 * @return {@code true} si se ha verificado, {@code false} si no
+	 */
+	public boolean verificarRespuestaSeguridad(String respuesta) {
+		return this.respuestaSeguridad!=null && this.respuestaSeguridad.equalsIgnoreCase(respuesta);
+	}
+}

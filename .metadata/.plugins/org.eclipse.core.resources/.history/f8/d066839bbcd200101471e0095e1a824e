@@ -1,0 +1,178 @@
+package com.circuitos.temporal.gui.controller;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.service.io.ArchivosRecientesService;
+
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.VBox;
+
+/**
+ * Controlador del panel de bienvenida.
+ * Muestra un mensaje con el logo de la aplicación y unos enlaces para comenzar
+ * creando un circuito nuevo o cargando un circuito existente.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PanelBienvenidaController {
+	private static final Logger logger=Logger.getLogger(PanelBienvenidaController.class.getName());
+	private static final String IMG_BIENVENIDA="/com/circuitos/AnalisisCircuitos/gui/images/bienvenida.jpg";
+	private static final int MAX_RECIENTES=10;
+	
+	@FXML private Hyperlink enlaceNuevo;
+	@FXML private Hyperlink enlaceCargar;
+	@FXML private ImageView imagenLogo;
+	@FXML private VBox contenedorRecientes;
+	@FXML private Hyperlink borrarHistorial;
+	@FXML private Button botonElearning;
+	
+	private Runnable onNuevoCircuito;
+	private Runnable onAbrirArchivo;
+	private Runnable onAbrirElearning;
+	private Consumer<File> onAbrirArchivoReciente;
+	
+	/**
+	 * Inicializa la interfaz del panel de bienvenida, carga la imagen de fondo
+	 * y configura los enlaces.
+	 */
+	public void initialize() {
+		try {
+			var url=getClass().getResource(IMG_BIENVENIDA);
+			if(url!=null) {
+				imagenLogo.setImage(new Image(url.toExternalForm()));
+				logger.fine("Imagen de bienvenida cargada");
+			}
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "No se pudo cargar la imagen de bienvenida", e);
+		}
+		
+		enlaceNuevo.setOnAction(_ -> {
+			if(onNuevoCircuito!=null) {
+				logger.fine("Opción seleccionada: Crear nuevo circuito");
+				onNuevoCircuito.run();
+			} else {
+				logger.warning("Acción onNuevoCircuito no funcionó");
+			}
+		});
+		
+		enlaceCargar.setOnAction(_ -> {
+			if(onAbrirArchivo!=null) {
+				logger.fine("Opción seleccionada: Cargar circuito");
+				onAbrirArchivo.run();
+			} else {
+				logger.warning("Acción onAbrirArchivo no funcionó");
+			}
+		});
+		if(botonElearning!=null) {
+			botonElearning.setOnAction(_ -> {
+				if(onAbrirElearning!=null) {
+					logger.fine("Opción seleccionada: Ir a e-Learning");
+					onAbrirElearning.run();
+				} else {
+					logger.warning("Acción onAbrirElearning no configurada");
+				}
+			});
+		}
+		cargarEnlacesRecientes();
+	}
+	
+	/**
+	 * Establece la acción a ejecutar cuando se pulsa "Crear circuito nuevo".
+	 */
+	public void setOnNuevoCircuito(Runnable r) {
+		this.onNuevoCircuito=r;
+	}
+	
+	/**
+	 * Establece la acción a ejecutar cuando se pulsa "Cargar circuito".
+	 */
+	public void setOnAbrirArchivo(Runnable r) {
+		this.onAbrirArchivo=r;
+	}
+	
+	/**
+	 * Establece la acción a ejecutar cuando se pulsa "Abrir E-Learning".
+	 */
+	public void setOnAbrirElearning(Runnable r) {
+		this.onAbrirElearning=r;
+	}
+	
+	/**
+	 * Establece la acción a ejecutar al pulsar uno de los enlaces de la sección de archivos recientes.
+	 * 
+	 * @param consumidor 	Escuchador del enlace que hemos pulsado
+	 */
+	public void setOnAbrirArchivoReciente(Consumer<File> consumidor) {
+		this.onAbrirArchivoReciente=consumidor;
+	}
+	
+	/**
+	 * Carga la lista de archivos recientes en el sector correspondiente del panel de bienvenida.
+	 */
+	private void cargarEnlacesRecientes() {
+		if(contenedorRecientes==null) return;
+		contenedorRecientes.getChildren().clear();
+		final List<String> recientes;
+		try {
+			recientes = ArchivosRecientesService.obtenerArchivosRecientes();
+		} catch (IOException e) {
+			logger.log(Level.WARNING, "No se pudieron leer los archivos recientes", e);
+			Label error=new Label("Error al cargar archivos recientes");
+			error.getStyleClass().add("bienvenida-error");
+			contenedorRecientes.getChildren().add(error);
+			if(borrarHistorial!=null) borrarHistorial.setVisible(false);
+			return;
+		}
+		var vistos=new HashSet<String>(recientes.size());
+		int anadidos=0;
+		for(String ruta : recientes) {
+			if(ruta==null || !vistos.add(ruta)) continue;
+			File archivo=new File(ruta);
+			if(!archivo.exists()) continue;
+			
+			Hyperlink link=new Hyperlink(archivo.getName());
+			link.setOnAction(_ -> {
+				if(onAbrirArchivoReciente!=null) {
+					logger.log(Level.INFO, "Abriendo archivo reciente: {0}", archivo.getName());
+					onAbrirArchivoReciente.accept(archivo);
+				} else {
+					logger.warning("Acción onAbrirArchivoReciente no funcionó");
+				}
+			});
+			contenedorRecientes.getChildren().add(link);
+			if(++anadidos>=MAX_RECIENTES) break;
+		}
+		if(anadidos==0) {
+			Label vacio=new Label("No hay archivos recientes");
+			vacio.getStyleClass().add("bienvenida-vacio");
+			contenedorRecientes.getChildren().add(vacio);
+			if(borrarHistorial!=null) borrarHistorial.setVisible(false);
+			logger.fine("No hay entradas recientes para mostrar");
+			return;
+		}
+		if(borrarHistorial!=null) {
+			borrarHistorial.setVisible(true);
+			borrarHistorial.setOnAction(_ -> {
+				try {
+					logger.info("Borrando historial de recientes");
+					ArchivosRecientesService.limpiarLista();
+					cargarEnlacesRecientes();
+				} catch(IOException ex) {
+					logger.log(Level.WARNING, "Error al limpiar el historial reciente", ex);
+				}
+			});
+		}
+	}
+}

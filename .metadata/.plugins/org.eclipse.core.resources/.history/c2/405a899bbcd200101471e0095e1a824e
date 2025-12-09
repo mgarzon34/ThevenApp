@@ -1,0 +1,89 @@
+package com.circuitos.temporal.gui.learning.database;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class ProgresoData {
+
+	private static final Logger logger=Logger.getLogger(ProgresoData.class.getName());
+	private final DatabaseService db;
+	
+	public ProgresoData(DatabaseService db) {
+		this.db=db;
+	}
+	
+	/**
+	 * Actualiza la calificación de un estudiante.
+	 * 
+	 * @param userId			Id del estudiante
+	 * @param nota				Calificación nueva
+	 * @return {@code true} si se actualizó, {@code false} si no
+	 */
+	public boolean actualizarCalificacionEstudiante(int userId, double nota) {
+		String sql="UPDATE users SET calificacion_general=? WHERE id=?";
+		try(Connection conn=db.getConnection();
+				PreparedStatement pstmt=conn.prepareStatement(sql)) {
+			pstmt.setDouble(1, nota);
+			pstmt.setInt(2, userId);
+			return pstmt.executeUpdate()>0;
+		} catch(SQLException e) {
+			logger.log(Level.WARNING, "Error actualizando calificación", e);
+			return false;
+		}
+	}
+	/**
+	 * Actualiza los comentarios del profesor para un estudiante.
+	 * 
+	 * @param userId				Id del usuario
+	 * @param mensaje				Mensaje del profesor
+	 * @return {@code true} si se actualiza, {@code false} si no
+	 */
+	public boolean actualizarComentariosProfesor(int userId, String mensaje) {
+		String sql="UPDATE users SET comentarios_profesor=? WHERE id=?";
+		try(Connection conn=db.getConnection();
+				PreparedStatement pstmt=conn.prepareStatement(sql)) {
+			pstmt.setString(1, mensaje);
+			pstmt.setInt(2, userId);
+			return pstmt.executeUpdate()>0;
+		} catch(SQLException e) {
+			logger.log(Level.WARNING, "Error actualizando calificación", e);
+			return false;
+		}
+	}
+	
+	/**
+	 * Resetea el progreso de un estudiante (calificación a 0, teoría y ejercicios reseteados).
+	 * 
+	 * @param userId			Id del usuario
+	 * @return {@code true} si se resetea, {@code false} si no
+	 */
+	public boolean resetearProgresoEstudiante(int userId) {
+		String sql1="DELETE FROM progreso_estudiante WHERE estudiante_id=?";
+		String sql2="DELETE FROM progreso_teoria WHERE user_id=?";
+		String sql3="UPDATE users SET calificacion_general=0, comentarios_profesor='' WHERE id=?";
+		try(Connection conn=db.getConnection()) {
+			conn.setAutoCommit(false);  //Transacción para que se borre todo o nada
+			try(PreparedStatement p1=conn.prepareStatement(sql1);
+				PreparedStatement p2=conn.prepareStatement(sql2);
+				PreparedStatement p3=conn.prepareStatement(sql3)) {
+				p1.setInt(1, userId);
+				p1.executeUpdate();
+				p2.setInt(1, userId);
+				p2.executeUpdate();
+				p3.setInt(1, userId);
+				p3.executeUpdate();
+				conn.commit();
+				return true;
+			} catch(SQLException ex) {
+				conn.rollback();
+				throw ex;
+			}
+		} catch(SQLException e) {
+			logger.log(Level.WARNING, "Error reseteando progreso de estudiante "+userId, e);
+			return false;
+		}
+	}
+}

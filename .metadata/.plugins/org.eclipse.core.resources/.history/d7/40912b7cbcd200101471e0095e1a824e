@@ -1,0 +1,29 @@
+package com.circuitos.AnalisisCircuitos.dominio.util;
+
+import com.circuitos.temporal.dominio.Componente;
+
+/**
+ * Clase de utilidad para operaciones relacionadas con componentes eléctricos.
+ * 
+ * @author Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class ComponenteUtil {
+	
+	/**
+	 * Devuelve un nombre descriptivo y legible para el tipo de componente.
+	 * 
+	 * @param comp		componente del que se obtiene un nombre legible
+	 * @return nombre	nombre amigable del componente o "Componente" si es nulo
+	 */
+	public static String nombreNice(Componente comp) {
+		if(comp==null) return "Componente";
+		if (comp instanceof com.circuitos.temporal.dominio.Resistencia) return "Resistencia";
+		if (comp instanceof com.circuitos.temporal.dominio.FuenteTensionInd) return "Fuente de Tensión Independiente";
+		if (comp instanceof com.circuitos.temporal.dominio.FuenteCorrienteInd) return "Fuente de Corriente Independiente";
+		if (comp instanceof com.circuitos.temporal.dominio.FuenteTensionDependiente) return "Fuente de Tensión Dependiente";
+		if (comp instanceof com.circuitos.temporal.dominio.FuenteCorrienteDependiente) return "Fuente de Corriente Dependiente";
+		if (comp instanceof com.circuitos.AnalisisCircuitos.dominio.Tierra) return "Conexión Tierra";
+		return "Componente";
+	}
+}

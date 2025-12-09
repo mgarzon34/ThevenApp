@@ -1,0 +1,60 @@
+package com.circuitos.temporal.analisis;
+
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.temporal.dominio.Circuito;
+import com.circuitos.temporal.dominio.Thevenin;
+
+import javafx.util.Pair;
+
+/**
+ * Puerta de entrada para tests: recibe un Circuito y dos nodos, 
+ * devuelve un ResultadoThevenin con Vth y Rth.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class Analizador {
+	private static final Logger logger=Logger.getLogger(Analizador.class.getName());
+	/**
+	 * Calcula el circuito equivalente de Thevenin de un circuito.
+	 * 
+	 * @param c					Circuito original
+	 * @param nodoA				Nodo de control sobre el que se hace el cálculo
+	 * @param nodoB				Nodo de control sobre el que se hace el cálculo
+	 * @return equiv			Circuito equivalente de Thevenin
+	 */
+	public ResultadoThevenin calculaThevenin(Circuito c, int nodoA, int nodoB) {
+		Objects.requireNonNull(c, "Circuito no puede ser null");
+		logger.log(Level.INFO, "Analizando Thevenin para nodos {0}-{1}", new Object[] {nodoA, nodoB});
+		Thevenin th=new Thevenin(c, nodoA, nodoB);
+		Pair<Double, Double> params=th.calcularParametros();
+		return new ResultadoThevenin(params.getKey(), params.getValue());
+	}
+	
+	/**
+	 * Calcula el circuito equivalente de Norton de un circuito.
+	 * 
+	 * @param c					Circuito original
+	 * @param nodoA				Nodo de control sobre el que se hace el cálculo
+	 * @param nodoB				Nodo de control sobre el que se hace el cálculo
+	 * @return equiv			Circuito equivalente de Norton
+	 */
+	public ResultadoNorton calculaNorton(Circuito c, int nodoA, int nodoB) {
+		Objects.requireNonNull(c, "Circuito no puede ser null");
+		logger.log(Level.INFO, "Analizando Norton para nodos {0}-{1}", new Object[] {nodoA, nodoB});
+		Thevenin th=new Thevenin(c, nodoA, nodoB);
+		Pair<Double, Double> params=th.calcularParametros();
+		double vth=params.getKey();
+		double rth=params.getValue();
+		double in;
+		if(rth==0.0) {
+			in=Double.POSITIVE_INFINITY;
+		} else {
+			in=vth/rth;
+		}
+		return new ResultadoNorton(in, rth);
+	}
+}

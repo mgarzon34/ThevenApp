@@ -1,0 +1,104 @@
+package com.circuitos.temporal.gui.util;
+
+import java.util.function.Function;
+
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+
+/**
+ * Clase de utilidad para interfaz de usuario reutilizable.
+ * Incluye métodos para configurar listas y mostrar alertas informativas o errores.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class UIHelper {
+	
+	/**
+	 * Constructor no instanciable.
+	 */
+	private UIHelper() { /* No instanciable */ }
+	
+	/**
+	 * Configura un {@link ListView} para mostrar elementos usando un mapeo a texto.
+	 * Establece una celda que usa la función de mapeo de texto para obtener el texto
+	 * que se mostrará en ella. 
+	 * 
+	 * @param <T>					Tipo de elementos de la lista
+	 * @param lista					Lista a configurar
+	 * @param textMapper			Función que convierte un elemento en el texto a mostrar
+	 */
+	public static <T> void configurarLista(ListView<T> lista, Function<T, String> textMapper) {
+		if(lista==null) return;
+		lista.setCellFactory(_ -> new ListCell<>() {
+			@Override
+			protected void updateItem(T item, boolean empty) {
+				super.updateItem(item, empty);
+				if(empty || item==null) {
+					setText(null);
+				} else {
+					setText(textMapper.apply(item));
+				}
+			}
+		});
+	}
+	
+	/**
+	 * Muestra una alerta de error con un mensaje informativo.
+	 * 
+	 * @param mensaje			Mensaje con el error
+	 */
+	public static void mostrarError(String mensaje) {
+		mostrarAlerta(AlertType.ERROR, "Error", mensaje);
+	}
+	
+	/**
+	 * Muestra una alerta de advertencia con un mensaje.
+	 * 
+	 * @param titulo			Título de la advertencia
+	 * @param mensaje			Mensaje
+	 */
+	public static void mostrarWarning(String titulo, String mensaje) {
+		mostrarAlerta(AlertType.WARNING, titulo, mensaje);
+	}
+	
+	/**
+	 * Muestra un alerta informativa con un mensaje.
+	 * 
+	 * @param mensaje			Mensaje informativo
+	 */
+	public static void mostrarInfo(String mensaje) {
+		mostrarAlerta(AlertType.INFORMATION, "Información", mensaje);
+	}
+	
+	/**
+	 * Muestra un cuadro de diálogo con alerta genérico.
+	 * 
+	 * @param tipo				Tipo de alerta
+	 * @param titulo			Título de la alerta
+	 * @param contenido			Mensaje a mostrar
+	 */
+	public static void mostrarAlerta(AlertType tipo, String titulo, String contenido) {
+		Alert alert=new Alert(tipo);
+		alert.setTitle(titulo);
+		alert.setHeaderText(null);
+		alert.setContentText(contenido);
+		alert.showAndWait();
+	}
+	
+	/**
+     * Muestra un diálogo de confirmación (Aceptar/Cancelar).
+     * 
+     * @return {@code true} si pulsa aceptar, {@code false} si pulsa cancelar
+     */
+    public static boolean mostrarConfirmacion(String titulo, String contenido) {
+        Alert alert = new Alert(AlertType.CONFIRMATION);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(contenido);
+        return alert.showAndWait().filter(bt -> bt==ButtonType.OK).isPresent();
+    }
+}

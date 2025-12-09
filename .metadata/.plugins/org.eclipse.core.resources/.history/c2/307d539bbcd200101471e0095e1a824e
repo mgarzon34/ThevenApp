@@ -1,0 +1,114 @@
+package com.circuitos.temporal.dominio;
+
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
+
+/**
+ * Interfaz que define el comportamiento de fuentes dependientes (tensión o corriente).
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public interface FuenteDependiente {
+	@JsonIgnore
+	IntegerProperty ctrlNegProperty();
+	@JsonIgnore
+	IntegerProperty ctrlPosProperty();
+	@JsonIgnore
+	ObjectProperty<ControlType> controlTypeProperty();
+	
+	/**
+	 * Enumerado para el tipo de control de la fuente dependiente.
+	 */
+	enum ControlType { TENSION, CORRIENTE }
+	
+	/**
+	 * Obtiene el factor de ganancia de la fuente dependiente.
+	 * 
+	 * @return Factor de ganancia de la fuente
+	 */
+	double getValor();
+	
+	/**
+	 * Modifica el valor de la ganancia de la fuente dependiente.
+	 * 
+	 * @param ganancia Nuevo valor de ganancia de la fuente
+	 */
+	void setValor(double ganancia);
+	
+	/**
+	 * Devuelve el nodo de control negativo.
+	 * 
+	 * @return Nodo de control negativo
+	 * @throws IllegalStateException si el valor de la propiedad es negativo
+	 */
+	@JsonProperty("ctrlNeg")
+	default int getCtrlNeg() {
+		int val=ctrlNegProperty().get();
+		if(val<0) {
+			throw new IllegalStateException("ctrlNeg no puede ser negativo: "+val);
+		}
+		return val;
+	}
+	
+	/**
+	 * Modifica el nodo de control negativo.
+	 * 
+	 * @param ctrlNeg 	Nuevo nodo de control negativo
+	 * @throws IllegalArgumentException si {@code ctrlNeg<0}  
+	 */
+	default void setCtrlNeg(int ctrlNeg) {
+		if(ctrlNeg<0) {
+			throw new IllegalArgumentException("ctrlNeg debe ser >= 0: "+ctrlNeg);
+		}
+		ctrlNegProperty().set(ctrlNeg);
+	}
+	
+	/**
+	 * Devuelve el nodo de control positivo.
+	 * 
+	 * @return Nodo de control positivo
+	 * @throws IllegalStateException si el valor de la propiedad es negativo
+	 */
+	@JsonProperty("ctrlPos")
+	default int getCtrlPos() {
+		int val=ctrlPosProperty().get();
+		if(val<0) {
+			throw new IllegalStateException("ctrlPos no puede ser negativo: "+val);
+		}
+		return val;
+	}
+
+	/**
+	 * Modifica el nodo de control positivo.
+	 * 
+	 * @param ctrlPos	Nuevo nodo de control positivo
+	 * @throws IllegalArgumentException si {@code ctrlPos<0}
+	 */
+	default void setCtrlPos(int ctrlPos) {
+		if(ctrlPos<0) {
+			throw new IllegalArgumentException("ctrlPos debe ser >= 0: "+ctrlPos);
+		}
+		ctrlPosProperty().set(ctrlPos);
+	}
+	
+	/**
+	 * Obtiene el tipo de control de la fuente (tensión o corriente).
+	 * 
+	 * @return Tipo de control de la fuente (tensión o corriente)
+	 */
+	@JsonProperty("controlType")
+	ControlType getControlType();
+	
+	/**
+	 * Modifica el tipo de control de la fuente (tensión o corriente).
+	 * 
+	 * @param controlType		Nuevo tipo de control (tensión o corriente)
+	 * @throws NullPointerException si {@code controlType} es null
+	 */
+	void setControlType(ControlType controlType);
+}

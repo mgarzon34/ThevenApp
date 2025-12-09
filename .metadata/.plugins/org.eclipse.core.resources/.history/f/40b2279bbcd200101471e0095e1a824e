@@ -1,0 +1,29 @@
+package com.circuitos.temporal.dominio.util;
+
+import java.util.Objects;
+
+import com.circuitos.temporal.dominio.util.Unidades.Type;
+
+/**
+ * Clase que da formato a un valor de un componente del circuito para evitar decimales.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0 (2025)
+ */
+
+public class FormatUtil {
+	private FormatUtil() { /* No instanciable */ }
+	
+	/**
+	 * Da formato a un valor double según su tipo (Tensión o Corriente).
+	 * 
+	 * @param v						valor que formatear
+	 * @param tipo					tipo de valor (tensión o corriente)
+	 * @throws NullPointerException	si el tipo es null	
+	 * @return vF					valor formateado
+	 */
+	public static String format(double v, Type tipo) {
+		Objects.requireNonNull(tipo, "El tipo no puede ser null");
+		return Unidades.format(v, tipo);
+	}
+}
