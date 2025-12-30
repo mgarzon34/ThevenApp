@@ -3,7 +3,7 @@
 
 ThevenApp is a comprehensive desktop application designed for electrical engineering education. It combines a powerful **circuit simulation engine** with a full **Learning Management System (LMS)** to help students master Thévenin and Norton theorems through an intuitive, modern interface.
 
-![Main Interface](screenshots/diseno.jpg)
+![Main Interface](screenshots/diseno.png)
 
 ## 🌟 Key Features
 
@@ -26,15 +26,15 @@ ThevenApp is a comprehensive desktop application designed for electrical enginee
 ## 📸 Screenshots
 
 ### Circuit Analysis & Equivalent Generation
-![Analysis Panel](screenshots/panel-analisis.jpg)
+![Analysis Panel](screenshots/panel-analisis.png)
 *Visual representation of equivalent circuits with automated calculation reports.*
 
 ### E-Learning Lab
-![Practice Lab](screenshots/estudiante-ejercicios.jpg)
+![Practice Lab](screenshots/estudiante-ejercicios.png)
 *Gamified learning environment for students to solve specific circuit challenges.*
 
 ### Theory Management (Professor CMS)
-![CMS Panel](screenshots/manual-gestion-teoria-prof.jpg)
+![CMS Panel](screenshots/manual-gestion-teoria-prof.png)
 *Integrated HTML editor for professors to create and manage academic content.*
 
 ## 🚀 Installation & Running
