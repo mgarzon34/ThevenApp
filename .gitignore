@@ -16,3 +16,13 @@ out/
 .vscode/
 *.log
 /.metadata/
+
+# macOS system files
+.DS_Store
+
+# SonarLint
+.sonarLint/
+
+# Eclipse metadata
+.metadata/
+
