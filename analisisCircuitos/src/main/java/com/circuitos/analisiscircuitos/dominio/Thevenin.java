@@ -91,7 +91,7 @@ public class Thevenin {
 		double[] voltajes=MatrixUtil.resolverCircuitoNodal(circuitoAbierto);
 		int indiceA=nodosInternos.get(nodoA);
 		int indiceB=nodosInternos.get(nodoB);
-		return voltajes[indiceA] - voltajes[indiceB];
+		return voltajes[indiceB] - voltajes[indiceA];
 	}
 	
 	/**

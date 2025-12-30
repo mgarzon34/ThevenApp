@@ -28,7 +28,7 @@ class TheveninTest {
         circuito.addComponente(new Tierra(0));
         
         Analizador analizador=new Analizador();
-        ResultadoThevenin resultado=analizador.calculaThevenin(circuito, 1, 0);
+        ResultadoThevenin resultado=analizador.calculaThevenin(circuito, 0, 1);
         assertEquals(5.0, resultado.getVth(), DELTA, "La tensión de Thevenin debe ser 5V");
         assertEquals(500.0, resultado.getRth(), DELTA, "La resistencia de Thevenin debe ser 500Ω");
     }
@@ -37,7 +37,7 @@ class TheveninTest {
     @DisplayName("Test 1: Circuito Mixto Simple")
     void testLanzador1() {
         Circuito circuito=new Circuito();
-        // Vth=4V, Rth=4333.333Ω
+        // Vth=-4V, Rth=4333.333Ω
         circuito.addComponente(new FuenteTensionInd(12, 0, 1));
         circuito.addComponente(new FuenteCorrienteInd("4m", 1, 2));
         circuito.addComponente(new Resistencia("3k", 0, 2));
@@ -48,7 +48,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 2, 3);
-        assertEquals(4.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 1");
+        assertEquals(-4.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 1");
         assertEquals(4333.33, resTh.getRth(), 1.0, "Rth incorrecto para Test 1"); // Delta mayor por decimales
     }
 
@@ -56,7 +56,7 @@ class TheveninTest {
     @DisplayName("Test 2: Fuentes Mixtas")
     void testLanzador2() {
         Circuito circuito=new Circuito();
-        // Vth=1.2V, Rth=7200Ω
+        // Vth=-1.2V, Rth=7200Ω
         circuito.addComponente(new Resistencia(12000, 0, 1));
         circuito.addComponente(new FuenteCorrienteInd(0.002, 1, 2));
         circuito.addComponente(new Resistencia(12000, 0, 2));
@@ -67,7 +67,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 3);
-        assertEquals(1.2, resTh.getVth(), DELTA, "Vth incorrecto para Test 2");
+        assertEquals(-1.2, resTh.getVth(), DELTA, "Vth incorrecto para Test 2");
         assertEquals(7200.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 2");
     }
 
@@ -75,7 +75,7 @@ class TheveninTest {
     @DisplayName("Test 3: Fuentes Mixtas")
     void testLanzador3() {
         Circuito circuito=new Circuito();
-        // Vth=-10V, Rth=2000Ω
+        // Vth=10V, Rth=2000Ω
         circuito.addComponente(new Resistencia(4000, 0, 1));
         circuito.addComponente(new FuenteTensionInd(12, 1, 2));
         circuito.addComponente(new Resistencia(6000, 0, 2, true)); // Carga
@@ -86,7 +86,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 2);
-        assertEquals(-10.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 3");
+        assertEquals(10.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 3");
         assertEquals(2000.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 3");
     }
 
@@ -94,7 +94,7 @@ class TheveninTest {
     @DisplayName("Test 4: Múltiples Fuentes de Corriente")
     void testLanzador4() {
         Circuito circuito=new Circuito();
-        // Vth=10V, Rth=3000Ω
+        // Vth=-10V, Rth=3000Ω
         circuito.addComponente(new Resistencia(2000, 0, 1));
         circuito.addComponente(new FuenteCorrienteInd(0.002, 2, 1));
         circuito.addComponente(new Resistencia(1000, 1, 3, true)); // Carga
@@ -107,7 +107,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 1, 3);
-        assertEquals(10.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 4");
+        assertEquals(-10.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 4");
         assertEquals(3000.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 4");
     }
 
@@ -174,7 +174,7 @@ class TheveninTest {
     @DisplayName("Test 8: Fuente Dependiente CCVS")
     void testLanzador8() {
         Circuito circuito=new Circuito();
-        // Vth=-24V, Rth=6000Ω
+        // Vth=24V, Rth=6000Ω
         circuito.addComponente(new FuenteTensionDependiente(4000, 1, 0, ControlType.CORRIENTE, 2, 1));
         circuito.addComponente(new Resistencia("10k", 0, 1));
         circuito.addComponente(new Resistencia("10k", 1, 2));
@@ -184,7 +184,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 2);
-        assertEquals(-24.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 8");
+        assertEquals(24.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 8");
         assertEquals(6000.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 8");
     }
 
@@ -192,7 +192,7 @@ class TheveninTest {
     @DisplayName("Test 9: Fuente Dependiente VCCS")
     void testLanzador9() {
         Circuito circuito=new Circuito();
-        // Vth=-24V, Rth=14000Ω
+        // Vth=24V, Rth=14000Ω
         circuito.addComponente(new FuenteCorrienteInd("2m", 0, 1));
         circuito.addComponente(new FuenteCorrienteDependiente(1.0/2000, 1, 2, ControlType.TENSION, 0, 3));
         circuito.addComponente(new Resistencia("4k", 1, 3));
@@ -203,7 +203,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 2);
-        assertEquals(-24.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 9");
+        assertEquals(24.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 9");
         assertEquals(14000.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 9");
     }
 
@@ -211,7 +211,7 @@ class TheveninTest {
     @DisplayName("Test 10: Fuente Dependiente VCVS")
     void testLanzador10() {
         Circuito circuito=new Circuito();
-        // Vth=-20V, Rth=6Ω
+        // Vth=20V, Rth=6Ω
         circuito.addComponente(new FuenteCorrienteInd(5, 0, 1));
         circuito.addComponente(new Resistencia(4, 0, 1));
         circuito.addComponente(new Resistencia(2, 1, 2));
@@ -222,7 +222,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 3);
-        assertEquals(-20.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 10");
+        assertEquals(20.0, resTh.getVth(), DELTA, "Vth incorrecto para Test 10");
         assertEquals(6.0, resTh.getRth(), DELTA, "Rth incorrecto para Test 10");
     }
 
@@ -230,7 +230,7 @@ class TheveninTest {
     @DisplayName("Test 11: Circuito Complejo Thevenin")
     void testLanzador11() {
         Circuito circuito=new Circuito();
-        // Vth=-40.64V, Rth=83.93Ω
+        // Vth=40.64V, Rth=83.93Ω
         circuito.addComponente(new Resistencia("2.2k", 0, 1));
         circuito.addComponente(new Resistencia(750, 1, 2));
         circuito.addComponente(new FuenteTensionInd(5, 0, 2));
@@ -246,7 +246,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 7);
-        assertEquals(-40.64, resTh.getVth(), 0.1, "Vth incorrecto para Test 11");
+        assertEquals(40.64, resTh.getVth(), 0.1, "Vth incorrecto para Test 11");
         assertEquals(83.93, resTh.getRth(), 0.1, "Rth incorrecto para Test 11");
     }
 
@@ -254,7 +254,7 @@ class TheveninTest {
     @DisplayName("Test 12: Fuente Dependiente CCCS")
     void testLanzador12() {
         Circuito circuito=new Circuito();
-        // Vth=-5.053, Rth=9.211Ω
+        // Vth=5.053, Rth=9.211Ω
         circuito.addComponente(new FuenteCorrienteDependiente(4.5, 0, 1, ControlType.CORRIENTE, 2, 0));
         circuito.addComponente(new Resistencia(10, 0, 1));
         circuito.addComponente(new FuenteTensionInd(12, 1, 2));
@@ -264,7 +264,7 @@ class TheveninTest {
 
         Analizador analizador=new Analizador();
         ResultadoThevenin resTh=analizador.calculaThevenin(circuito, 0, 3);
-        assertEquals(-5.053, resTh.getVth(), DELTA, "Vth incorrecto para Test 12");
+        assertEquals(5.053, resTh.getVth(), DELTA, "Vth incorrecto para Test 12");
         assertEquals(9.211, resTh.getRth(), DELTA, "Rth incorrecto para Test 12");
     }
 }

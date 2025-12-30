@@ -349,10 +349,6 @@ public class ComponenteVisualFactory {
             puntoNegativo.setManaged(false);
             puntoNegativo.setMouseTransparent(false);
         	}
-        	case FCI, FCD -> {
-        		puntoPositivo.setTranslateY(43);
-        		puntoNegativo.setTranslateY(-45);
-        	}
         	default -> {
         		puntoPositivo.setTranslateY(-45);
         		puntoNegativo.setTranslateY(43);
