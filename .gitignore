@@ -13,5 +13,6 @@ out/
 .settings/
 .idea/
 *.iml
+.vscode/
 *.log
 /.metadata/
