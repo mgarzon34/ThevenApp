@@ -16,7 +16,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <javafx.version>23.0.1</javafx.version>
-    <javafx.platform>mac</javafx.platform>
+    <javafx.platform>mac-aarch64</javafx.platform>
     <controlsfx.version>11.2.2</controlsfx.version>
   </properties>
 
@@ -55,127 +55,53 @@
     	<version>3.6.1</version>
     </dependency>
     
+    <!--
+      Antes había 4 copias de cada módulo JavaFX (sin classifier, win, linux, mac).
+      Maven las ponía todas en el module-path, pero un módulo con el mismo nombre
+      no puede repetirse: se quedaba con la primera (la que no tiene classifier,
+      que no trae librerías nativas), y las demás se descartaban con el aviso
+      "already on the module path". Resultado: JavaFX no encontraba ningún
+      pipeline gráfico nativo (ni siquiera el de software) y fallaba al arrancar.
+      Además, "mac" son binarios Intel (x86_64); en Apple Silicon (arm64) hace
+      falta el classifier "mac-aarch64". Al dejar solo una entrada por módulo,
+      ya no hay ambigüedad.
+    -->
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-controls</artifactId>
     	<version>${javafx.version}</version>
+    	<classifier>mac-aarch64</classifier>
     </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-controls</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>win</classifier>
-    </dependency>
-   	<dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-controls</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>linux</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-controls</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>mac</classifier>
-    </dependency>
-    
+
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-fxml</artifactId>
     	<version>${javafx.version}</version>
+    	<classifier>mac-aarch64</classifier>
     </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-fxml</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>win</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-fxml</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>linux</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-fxml</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>mac</classifier>
-    </dependency>
-    
+
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-base</artifactId>
     	<version>${javafx.version}</version>
+    	<classifier>mac-aarch64</classifier>
     </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-base</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>win</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-base</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>linux</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-base</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>mac</classifier>
-    </dependency>
-   
+
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-web</artifactId>
     	<version>${javafx.version}</version>
+    	<classifier>mac-aarch64</classifier>
     </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-web</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>win</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-web</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>linux</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-web</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>mac</classifier>
-    </dependency>
-    
+
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-graphics</artifactId>
     	<version>${javafx.version}</version>
+    	<classifier>mac-aarch64</classifier>
     </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-graphics</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>win</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-graphics</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>linux</classifier>
-    </dependency>
-    <dependency>
-    	<groupId>org.openjfx</groupId>
-    	<artifactId>javafx-graphics</artifactId>
-    	<version>${javafx.version}</version>
-    	<classifier>mac</classifier>
-    </dependency>
-    
-    
+
+
     <dependency>
     	<groupId>com.fasterxml.jackson.core</groupId>
     	<artifactId>jackson-databind</artifactId>
