@@ -12,6 +12,7 @@ module com.circuitos.AnalisisCircuitos {
 	requires java.sql;
 	requires javafx.web;
 	requires com.fasterxml.jackson.core;
+	requires jbcrypt;
 	
 	opens com.circuitos.analisiscircuitos.gui to javafx.graphics, javafx.fxml;
 	opens com.circuitos.analisiscircuitos.gui.controller to javafx.fxml;

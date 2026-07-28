@@ -1,17 +1,16 @@
 package com.circuitos.analisiscircuitos.gui.learning.database;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.mindrot.jbcrypt.BCrypt;
 
 import com.circuitos.analisiscircuitos.gui.learning.model.User;
 
@@ -35,6 +34,8 @@ public class UserData {
 		String sql="SELECT id, username, password_hash, role, nombre, apellido1, apellido2,"
 				+ "pregunta_seguridad, respuesta_seguridad, calificacion_general, comentarios_profesor "
 				+ "FROM users WHERE username = ?";
+		User user=null;
+		boolean necesitaRehash=false;
 		try(Connection conn=db.getConnection();
 				PreparedStatement pstmt=conn.prepareStatement(sql)) {
 			pstmt.setString(1, username);
@@ -42,13 +43,21 @@ public class UserData {
 			if(rs.next()) {
 				String storedHash=rs.getString("password_hash");
 				if(verificarPassword(password, storedHash)) {
-					return mapearUsuario(rs);
+					user=mapearUsuario(rs);
+					necesitaRehash=!esFormatoBCrypt(storedHash);
 				}
 			}
 		} catch(SQLException e) {
 			logger.log(Level.WARNING, "Error autenticando usuario", e);
+			return null;
 		}
-		return null;
+		// Importante: la conexión/consulta de lectura ya está cerrada aquí (fin del try-with-resources).
+		// SQLite solo admite un escritor a la vez y bloquea si hay una conexión de lectura todavía
+		// abierta; por eso la migración a BCrypt se hace fuera del bloque anterior.
+		if(user!=null && necesitaRehash) {
+			cambiarPassword(username, password); //regenera el hash ya en BCrypt
+		}
+		return user;
 	}
 	
 	/**
@@ -173,28 +182,46 @@ public class UserData {
 	}
 	
 	/**
-	 * Uso del algoritmo SHA-256 (firma de 256 bits) para hash de contraseña.
+	 * Hash de contraseña con BCrypt (incluye sal aleatoria y factor de coste)
 	 * 
 	 * @param password			Contraseña que hashea
 	 */
 	private String hashPassword(String password) {
-		try {
-			MessageDigest digest=MessageDigest.getInstance("SHA-256");
-			byte[] hash=digest.digest(password.getBytes(StandardCharsets.UTF_8));
-			return Base64.getEncoder().encodeToString(hash);
-		} catch(Exception e) {
-			throw new RuntimeException("Error de hash en la contraseña", e);
-		}
+		return BCrypt.hashpw(password, BCrypt.gensalt(12));
+	}
+
+	/**
+	 * Comprueba si un hash tiene formato BCrypt ($2a$, $2b$, $2y$).
+	 */
+	private boolean esFormatoBCrypt(String hash) {
+		return hash != null && (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$"));
 	}
 	
 	/**
-	 * Verifica contraseña.
+	 * Verifica contraseña. Soporta el nuevo BCrypt y el antiguo SHA-256 (por compatibilidad).
 	 * 
 	 * @param password			Contraseña
 	 * @param hash				Hash de la contraseña
 	 * @return {@code true} si se ha verificado, {@code false} si no
 	 */
 	private boolean verificarPassword(String password, String hash) {
-		return hashPassword(password).equals(hash);
+		if(esFormatoBCrypt(hash)) {
+			return BCrypt.checkpw(password, hash);
+		}
+		return verificarPasswordSha256(password, hash);
+	}
+
+	/**
+	 * Verificación de contraseña con el algoritmo antiguo SHA-256.
+	 */
+	private boolean verificarPasswordSha256(String password, String hash) {
+		try {
+			java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+			byte[] calculado=digest.digest(password.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+			String calculadoBase64=java.util.Base64.getEncoder().encodeToString(calculado);
+			return calculadoBase64.equals(hash);
+		} catch(Exception e) {
+			throw new RuntimeException("Error verificando contraseña heredada", e);
+		}
 	}
 }

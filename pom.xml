@@ -55,17 +55,6 @@
     	<version>3.6.1</version>
     </dependency>
     
-    <!--
-      Antes había 4 copias de cada módulo JavaFX (sin classifier, win, linux, mac).
-      Maven las ponía todas en el module-path, pero un módulo con el mismo nombre
-      no puede repetirse: se quedaba con la primera (la que no tiene classifier,
-      que no trae librerías nativas), y las demás se descartaban con el aviso
-      "already on the module path". Resultado: JavaFX no encontraba ningún
-      pipeline gráfico nativo (ni siquiera el de software) y fallaba al arrancar.
-      Además, "mac" son binarios Intel (x86_64); en Apple Silicon (arm64) hace
-      falta el classifier "mac-aarch64". Al dejar solo una entrada por módulo,
-      ya no hay ambigüedad.
-    -->
     <dependency>
     	<groupId>org.openjfx</groupId>
     	<artifactId>javafx-controls</artifactId>
@@ -116,6 +105,11 @@
     	<groupId>org.xerial</groupId>
     	<artifactId>sqlite-jdbc</artifactId>
     	<version>3.46.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.mindrot</groupId>
+      <artifactId>jbcrypt</artifactId>
+      <version>0.4</version>
     </dependency>
   </dependencies>
 
