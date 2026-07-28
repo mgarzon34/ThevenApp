@@ -1,0 +1,56 @@
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelPropiedadesAnalisisController"
+      prefWidth="350.0" styleClass="propiedades-fondo-panel">
+    <children>
+        <VBox spacing="10.0" AnchorPane.topAnchor="0" 
+                             AnchorPane.leftAnchor="0"
+                             AnchorPane.rightAnchor="0"
+                             AnchorPane.bottomAnchor="0">
+            <padding>
+                <Insets top="12" right="12" bottom="12" left="12" />
+            </padding>
+
+            <!-- TÍTULO DEL PANEL -->
+            <Label fx:id="titulo" text="Resumen de análisis" wrapText="true" styleClass="propiedades-titulo" />
+
+			<Separator />
+            <!-- BLOQUE RESUMEN NUMÉRICO -->
+            <GridPane hgap="10" vgap="6">
+            	<!-- Fuente equivalente -->
+            	<Label text="" styleClass="propiedades-texto"
+            		GridPane.rowIndex="0" GridPane.columnIndex="0" />
+            	<Label fx:id="labelFuenteEquivalente" text="-" wrapText="true"
+            		styleClass="propiedades-texto" GridPane.rowIndex="0" GridPane.columnIndex="1" />
+            		
+            	<!-- Resistencia equivalente-->
+            	<Label text="" styleClass="propiedades-texto"
+            		GridPane.rowIndex="1" GridPane.columnIndex="0" />
+            	<Label fx:id="labelResistenciaEquivalente" text="-" wrapText="true"
+            		styleClass="propiedades-texto" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+			</GridPane>
+			
+		 	<!-- BLOQUE CARGAS -->
+		 	<Label text="Componentes de carga:" 
+		 		styleClass="propiedades-label-bold" />
+		 	<TextArea fx:id="areaCargas" editable="false" wrapText="true"
+		 		prefRowCount="4" styleClass="propiedades-texto" />
+		 		
+			<Separator />
+
+            <!-- BLOQUE EXPLICACIÓN -->
+            <Label text="Resumen:" styleClass="propiedades-label-bold" />
+            <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS"
+            			style="-fx-background: white; -fx-border-color: #C8C8C8; -fx-border-radius: 4;
+            					-fx-background-radius: 4;">
+            	<content>
+            		<Label fx:id="areaExplicacion" wrapText="true" style="-fx-text-alignment: justify;
+            						-fx-background-color: white; -fx-padding: 10;" styleClass="propiedades-texto" />
+            	</content>
+            </ScrollPane>
+        </VBox>
+    </children>
+</AnchorPane>

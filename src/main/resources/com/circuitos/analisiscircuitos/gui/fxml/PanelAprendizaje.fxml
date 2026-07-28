@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del Panel de Aprendizaje - Sistema educativo completo
+	Incluye registro, autenticación, modo estudiante y modo profesor.
+	
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelAprendizajeController
+ -->
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.web.WebView?>
+<?import javafx.scene.web.HTMLEditor?>
+
+			<!-- CABECERA Y SECCIÓN DE AUTENTICACIÓN -->
+
+<AnchorPane fx:id="aprendizajePane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelAprendizajeController">
+    <children>
+        <VBox fx:id="loginPanel" alignment="CENTER" spacing="20.0" styleClass="login-panel"
+              AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+              AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+              <children>
+                <VBox alignment="CENTER" spacing="15.0" styleClass="login-form">
+                    <children>
+                        <Label text="E-Learning - ThevenApp" styleClass="login-title">
+                            <font>
+                                <Font name="System Bold" size="24.0" />
+                            </font>
+                        </Label>
+                        <Separator />
+                        <HBox alignment="CENTER" spacing="10.0">
+                            <children>
+                                <fx:define>
+                                    <ToggleGroup fx:id="modeToggleGroup" />
+                                </fx:define>
+                                <ToggleButton fx:id="loginModeButton" text="Iniciar Sesión"
+                                              toggleGroup="$modeToggleGroup" selected="true"
+                                              styleClass="mode-toggle-button" />
+                                <ToggleButton fx:id="registerModeButton" text="Registrarse"
+                                              toggleGroup="$modeToggleGroup" styleClass="mode-toggle-button" />
+                            </children>
+                        </HBox>
+                        <VBox spacing="10.0" alignment="CENTER_LEFT">
+                            <children>
+                                <Label text="Nombre de usuario:" />
+                                <TextField fx:id="usernameField" promptText="Ingresa tu nombre de usuario" />
+                                <Label text="Contraseña:" />
+                                <PasswordField fx:id="passwordField" promptText="Ingresa tu contraseña" />
+                                <VBox fx:id="registerFields" spacing="10.0" visible="false" managed="false">
+                                    <children>
+                                    	<Label text="Confirmar Contraseña:" />
+                                    	<PasswordField fx:id="confirmPasswordField" promptText="Repite tu contraseña" />
+                                    	<Separator />
+                                        <Label text="Datos Personales:" style="-fx-font-weight: bold;"/>
+                                        <TextField fx:id="nombreField" promptText="Nombre" />
+                                        <HBox spacing="10.0">
+                                            <TextField fx:id="apellido1Field" promptText="Primer Apellido" HBox.hgrow="ALWAYS"/>
+                                            <TextField fx:id="apellido2Field" promptText="Segundo Apellido" HBox.hgrow="ALWAYS"/>
+                                        </HBox>
+                                        <Separator />
+                                        <Label text="Recuperación de cuenta:" />
+                                        <ComboBox fx:id="securityQuestionCombo" promptText="Selecciona una pregunta de seguridad" maxWidth="Infinity" />
+                                        <TextField fx:id="securityAnswerField" promptText="Tu respuesta secreta" />
+                                        <Label text="Tipo de usuario:" />
+                                        <ComboBox fx:id="roleComboBox" promptText="Selecciona tu rol" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="authButton" text="Iniciar Sesión" onAction="#onAuthAction"
+                                        styleClass="auth-button" />
+                                <Hyperlink fx:id="forgotPasswordLink" text="¿Olvidaste tu contraseña?" onAction="#onOlvidarPassword" styleClass="forgot-link"/>
+                                <Label fx:id="authStatusLabel" text="" styleClass="auth-status" />
+                            </children>
+                        </VBox>
+                    </children>
+                    <padding>
+                        <Insets bottom="30.0" left="30.0" right="30.0" top="30.0" />
+                    </padding>
+                </VBox>
+            </children>
+        </VBox>
+
+			<!-- PANEL PRINICIPAL Y CABECERA -->
+			
+        <VBox fx:id="learningMainPanel" visible="false" managed="false" spacing="10.0" styleClass="content-panel"
+              AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+              AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+            
+            <VBox styleClass="learning-header">
+                <children>
+                    <HBox alignment="CENTER_LEFT" spacing="10.0">
+                        <children>
+                            <Label fx:id="welcomeLabel" text="Bienvenido" styleClass="welcome-label" />
+                            <Pane HBox.hgrow="ALWAYS" />
+                            <Button fx:id="logoutButton" text="Cerrar Sesión"
+                                    onAction="#onLogout" styleClass="logout-button" />
+                        </children>
+                        <padding>
+                            <Insets bottom="10.0" left="15.0" right="15.0" top="10.0" />
+                        </padding>
+                    </HBox>
+                     <HBox fx:id="statsPanel" spacing="20.0" alignment="CENTER_LEFT"
+                          styleClass="stats-panel" visible="false" managed="false">
+                           <children>
+                                <VBox alignment="CENTER" spacing="5.0">
+                                    <children>
+                                        <Label text="Progreso General" styleClass="stats-label" />
+                                        <ProgressBar fx:id="generalProgressBar" prefWidth="100.0" />
+                                        <Label fx:id="progressLabel" text="0%" styleClass="stats-value" />
+                                    </children>
+                                </VBox>
+                                <VBox alignment="CENTER" spacing="5.0">
+                                    <children>
+                                        <Label text="Ejercicios Completados" styleClass="stats-label" />
+                                        <Label fx:id="ejerciciosCompletadosLabel" text="0/0" styleClass="stats-value" />
+                                    </children>
+                                </VBox>
+                                <VBox alignment="CENTER" spacing="5.0">
+                                    <children>
+                                        <Label text="Calificación" styleClass="stats-label" />
+                                        <Label fx:id="puntuacionPromedioLabel" text="0%" styleClass="stats-value" />
+                                    </children>
+                                </VBox>
+                           </children>
+                           <padding>
+                                <Insets bottom="10.0" left="15.0" right="15.0" top="5.0" />
+                           </padding>
+                    </HBox>
+                </children>
+            </VBox>
+	
+			<!-- VISTAS DE CONTENIDO -->
+            <VBox fx:id="contentPanel" spacing="10.0" VBox.vgrow="ALWAYS">
+                <padding>
+                    <Insets top="10.0" left="20.0" right="20.0" bottom="20.0"/>
+                </padding>
+                
+				<!-- Panel de bienvenida -->
+                 <VBox fx:id="welcomePanel" spacing="15.0" alignment="CENTER" VBox.vgrow="ALWAYS">
+                    <children>
+                        <Label text="¡Bienvenido al Sistema de Aprendizaje!" styleClass="welcome-title">
+                            <font>
+                                <Font name="System Bold" size="18.0" />
+                            </font>
+                        </Label>
+                        <Label text="Selecciona una opción del menú de la izquierda para comenzar."
+                               styleClass="welcome-subtitle" />
+                    </children>
+                </VBox>
+
+				<!-- Panel de teoría -->
+				<VBox fx:id="teoriaPanel" spacing="10.0" visible="false" managed="false" styleClass="learning-section" VBox.vgrow="ALWAYS">
+    				<children>
+       	 				<Label text="📚 Biblioteca de Conocimiento" styleClass="section-title" />
+                		<SplitPane dividerPositions="0.20" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
+            				<items>
+                				<VBox spacing="10.0" maxWidth="250" minWidth="150">
+                    				<children>
+                        				<Label text="Índice de Contenidos" style="-fx-font-weight: bold; -fx-text-fill: #666;" />
+                        				<ListView fx:id="listaTeoriaAlumnos" styleClass="lista-teoria-moderna" VBox.vgrow="ALWAYS"/>
+                    				</children>
+                    				<padding>
+                        				<Insets top="0" right="10" bottom="0" left="0"/>
+                    				</padding>
+                				</VBox>
+                				<WebView fx:id="teoriaWebView" prefHeight="500.0" minWidth="400.0" />
+            				</items>
+        				</SplitPane>
+    				</children>
+				</VBox>
+				
+				<!-- Panel de ejercicios -->
+                <VBox fx:id="ejerciciosPanel" spacing="15.0" visible="false" managed="false" styleClass="learning-section" VBox.vgrow="ALWAYS">
+                    <children>
+                        <Label text="🧮 Laboratorio de Práctica" styleClass="section-title" />
+                        <StackPane VBox.vgrow="ALWAYS">
+                        	<children>
+                       	 		<ScrollPane fx:id="scrollEjercicios" fitToWidth="true" style="-fx-background-color: transparent;">
+                            		<content>
+                                		<FlowPane fx:id="ejerciciosContainer" hgap="20.0" vgap="20.0" style="-fx-padding: 10;" prefWrapLength="800.0" />
+                            		</content>
+                        		</ScrollPane>
+                        		<VBox fx:id="detalleEjercicioPanel" spacing="20.0" visible="true" managed="false" alignment="TOP_CENTER" style="-fx-padding: 30;">
+                        			<children>
+                        				<Label fx:id="lblDetalleTitulo" text="Título Ejercicio" styleClass="ejercicio-detalle-titulo"/>
+                        				<VBox spacing="10" styleClass="ejercicio-detalle" maxWidth="600">
+                        					<Label text="Enunciado:" styleClass="ejercicio-detalle-enunciado"/>
+                        					<Label fx:id="lblDetalleDescripcion" text="Descripción detallada..." wrapText="true" styleClass="ejercicio-detalle-descripcion"/>
+                        					<HBox spacing="15">
+                        						<Label fx:id="lblDetalleDificultad" text="Dificultad: ⭐⭐⭐" styleClass="ejercicio-tipo-diff"/>
+                        						<Label fx:id="lblDetalleTipo" text="Tipo: Thevenin" styleClass="ejercicio-tipo-diff"/>
+                        					</HBox>
+                        				</VBox>
+                        				<HBox spacing="20" alignment="CENTER">
+                        					<Button text="⬅ Volver a la lista" onAction="#onVolverListaEjercicios" styleClass="secondary-button"/>
+                        					<Button text="🚀 COMENZAR RESOLUCIÓN" onAction="#onComenzarResolucion" styleClass="ejercicio-button"/>
+                        				</HBox>
+                        			</children>
+                        		</VBox>
+                        	</children>
+                        </StackPane>
+                    </children>
+                </VBox>
+	
+				<!-- Panel de PDFs-->
+                <VBox fx:id="pdfPanel" spacing="10.0" visible="false" managed="false" VBox.vgrow="ALWAYS">
+                    <children>
+                        <Label text="📄 Documentos PDF" styleClass="content-style📄">
+                            <font>
+                                <Font name="System Bold" size="16.0" />
+                            </font>
+                        </Label>
+                        <SplitPane dividerPositions="0.3" orientation="HORIZONTAL" VBox.vgrow="ALWAYS">
+                            <items>
+                                <ListView fx:id="pdfListView" />
+                                <VBox spacing="10.0">
+                                    <children>
+                                        <Label fx:id="tituloPdfLabel" text="Selecciona un documento" styleClass="content-subtitle" />
+                                        <ScrollPane fitToWidth="true" fitToHeight="true" VBox.vgrow="ALWAYS">
+                                            <content>
+                                                <TextArea fx:id="infoPdfArea" editable="false" wrapText="true"
+                                                          prefRowCount="15" text="Selecciona un documento PDF de la lista para ver su contenido." />
+                                            </content>
+                                        </ScrollPane>
+                                        <Button fx:id="abrirPdfButton" text="🔗 Abrir PDF" onAction="#abrirPdfVisorExterno"
+                                                styleClass="primary-button" disable="true" maxWidth="Infinity" />
+                                    </children>
+                                </VBox>
+                            </items>
+                        </SplitPane>
+                    </children>
+                </VBox>
+                
+			<!-- VISTAS DE GESTIÓN -->
+			
+				<!-- Panel de gestión de PDFs -->
+                <VBox fx:id="pdfGestionPanel" spacing="10.0" visible="false" managed="false" VBox.vgrow="ALWAYS">
+                     <children>
+                        <Label text="📁 Gestión de Documentos PDF" styleClass="content-title">
+                            <font>
+                                <Font name="System Bold" size="16.0" />
+                            </font>
+                        </Label>
+                        <SplitPane dividerPositions="0.4" orientation="HORIZONTAL" VBox.vgrow="ALWAYS">
+                            <items>
+                                <VBox spacing="10.0">
+                                    <children>
+                                        <Label text="Documentos Existentes" styleClass="content-subtitle" />
+                                        <ListView fx:id="gestionPdfListView" VBox.vgrow="ALWAYS"/>
+                                        <Button fx:id="eliminarPdfButton" text="🗑 Eliminar Seleccionado"
+                                                onAction="#onEliminarPdf" styleClass="danger-button" disable="true" />
+                                    </children>
+                                </VBox>
+                                <VBox spacing="15.0">
+                                    <children>
+                                        <Label text="Subir nuevo documento" styleClass="content-subtitle" />
+                                        <VBox spacing="10.0">
+                                            <children>
+                                                <Label text="Título del documento:" />
+                                                <TextField fx:id="tituloPdfField" promptText="Ej: Circuitos Eléctricos" />
+                                                <Label text="Descripción (opcional):" />
+                                                <TextArea fx:id="descripcionPdfField"
+                                                          promptText="Descripción del contenido del documento..."
+                                                          prefRowCount="3" wrapText="true" />
+                                                <Button fx:id="uploadPdfButton" text="📤 Seleccionar y subir PDF"
+                                                        onAction="#onSubirPdf" styleClass="primary-button" maxWidth="Infinity" />
+                                                <Label fx:id="uploadStatusLabel" text="" styleClass="upload-status" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                    <padding>
+                                        <Insets bottom="10.0" left="15.0" right="10.0" top="10.0" />
+                                    </padding>
+                                </VBox>
+                            </items>
+                        </SplitPane>
+                    </children>
+                </VBox>
+
+				<!-- Panel de gestión de teoría -->
+				<VBox fx:id="gestionTeoriaPanel" spacing="10.0" visible="false" managed="false" VBox.vgrow="ALWAYS">
+   					 <children>
+       					 <Label text="📖 Gestión de Contenidos de Teoría" styleClass="content-title">
+           					 <font><Font name="System Bold" size="16.0" /></font>
+        				 </Label>
+        
+       					 <SplitPane dividerPositions="0.25" VBox.vgrow="ALWAYS">
+            				<items>
+                				<VBox spacing="10.0" maxWidth="250" minWidth="150">
+                    				<padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                    				<Label text="Temas:" style="-fx-font-weight:bold;"/>
+                    				<ListView fx:id="listaGestionTeoria" VBox.vgrow="ALWAYS" />
+                    				<HBox spacing="10.0" alignment="CENTER">
+                        				<Button text="➕" onAction="#onNuevoTema" styleClass="primary-button"/>
+                        				<Button text="🗑 " onAction="#onEliminarTema" styleClass="danger-button"/>
+                   					</HBox>
+                				</VBox>
+
+                				<VBox spacing="10.0">
+                    				<padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                   					<Label text="Edición:" style="-fx-font-weight:bold;"/>
+                    
+                    				<HBox spacing="10.0" alignment="CENTER_LEFT">
+                       					<Label text="Título:" />
+                        				<TextField fx:id="txtTituloTeoria" HBox.hgrow="ALWAYS" promptText="Título del tema"/>
+                        				<Label text="Orden:" />
+                        				<TextField fx:id="txtOrdenTeoria" prefWidth="50" text="1"/>
+                    				</HBox>
+                    
+                    				<Label text="Contenido:" />
+                    				<HTMLEditor fx:id="editorTeoria" prefHeight="400.0" VBox.vgrow="ALWAYS" />
+                    
+                    				<Button text="💾 Guardar Cambios" onAction="#onGuardarTeoria" 
+                            				styleClass="primary-button" maxWidth="Infinity"/>
+                				</VBox>
+           					</items>
+        				</SplitPane>
+    				</children>
+				</VBox>
+				
+				<!-- Panel de gestión de ejercicios -->
+				
+				<VBox fx:id="gestionEjerciciosPanel" spacing="10.0" visible="false" managed="false" VBox.vgrow="ALWAYS">
+    				<children>
+       					<Label text="⚙️ Gestión de Ejercicios" styleClass="content-title">
+            				<font><Font name="System Bold" size="16.0" /></font>
+        				</Label>
+        				<SplitPane dividerPositions="0.25" VBox.vgrow="ALWAYS">
+            				<items>
+                				<VBox spacing="10.0" maxWidth="250" minWidth="150">
+                    				<padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                    				<Label text="Ejercicios:" style="-fx-font-weight:bold;"/>
+                    				<ListView fx:id="listaGestionEjercicios" VBox.vgrow="ALWAYS" />
+                    				<HBox spacing="10.0" alignment="CENTER">
+                        				<Button text="➕" onAction="#onNuevoEjercicio" styleClass="primary-button"/>
+                        				<Button text="🗑 " onAction="#onEliminarEjercicio" styleClass="danger-button"/>
+                    				</HBox>
+                				</VBox>
+                				<ScrollPane fitToWidth="true">
+                    				<content>
+                        				<VBox spacing="15.0">
+                            				<padding><Insets top="10" right="20" bottom="10" left="10"/></padding>
+                            				<Label text="Configuración del Ejercicio:" style="-fx-font-weight:bold;"/>
+                            				<Label text="Título:" />
+                            				<TextField fx:id="txtTituloEjercicio" promptText="Ej: Análisis de Malla Simple"/>
+                            				<Label text="Descripción:" />
+                            				<TextArea fx:id="txtDescEjercicio" prefRowCount="3" wrapText="true" 
+                                      				promptText="Describe qué debe calcular el alumno..."/>
+                            				<HBox spacing="20.0" alignment="CENTER_LEFT">
+                                				<VBox spacing="5.0">
+                                    				<Label text="Dificultad (1-5):" />
+                                    				<ComboBox fx:id="comboDificultad" prefWidth="100"/>
+                                				</VBox>
+                                				<VBox spacing="5.0">
+                                    				<Label text="Tipo:" />
+                                    				<ComboBox fx:id="comboTipoAnalisis" prefWidth="150"/>
+                                				</VBox>
+                            				</HBox>
+                            				<Separator />
+                            				<Label text="Circuito y Solución:" style="-fx-font-weight:bold; -fx-text-fill: #0078d7;"/>
+                            				<HBox spacing="10.0" alignment="CENTER_LEFT">
+                                				<Label text="Estado del Circuito:" />
+                                				<Label fx:id="lblEstadoCircuito" text="No hay circuito cargado" 
+                                       				style="-fx-font-style:italic; -fx-text-fill: gray;"/>
+                                				<Button text="📥 Importar Circuito Actual del Panel Diseño" 
+                                        			onAction="#onImportarCircuito" styleClass="primary-button"/>
+                            				</HBox>
+                            				<Label text="Soluciones Correctas (Para corrección automática):" />
+                            				<HBox spacing="15.0">
+                            					<VBox spacing="5.0">
+                            						<Label text="Vth" />
+                            						<HBox spacing="5.0" alignment="CENTER_LEFT">
+                            							<TextField fx:id="txtSolVth" prefWidth="80" promptText="0.0" />
+                            							<ComboBox fx:id="comboUnitVth" prefWidth="70" />
+                            						</HBox>
+                            					</VBox>
+                            					<VBox spacing="5.0">
+                            						<Label text="Rth" />
+                            						<HBox spacing="5.0" alignment="CENTER_LEFT">
+                            							<TextField fx:id="txtSolRth" prefWidth="80" promptText="0.0" />
+                            							<ComboBox fx:id="comboUnitRth" prefWidth="70" />
+                            						</HBox>
+                            					</VBox>
+                            					<VBox spacing="5.0">
+                            						<Label text="In" />
+                            						<HBox spacing="5.0" alignment="CENTER_LEFT">
+                            							<TextField fx:id="txtSolIn" prefWidth="80" promptText="0.0" />
+                            							<ComboBox fx:id="comboUnitIn" prefWidth="70" />
+                            						</HBox>
+                            					</VBox>
+                            					<VBox spacing="5.0">
+                            						<Label text="Rn" />
+                            						<HBox spacing="5.0" alignment="CENTER_LEFT">
+                            							<TextField fx:id="txtSolRn" prefWidth="80" promptText="0.0" />
+                            							<ComboBox fx:id="comboUnitRn" prefWidth="70" />
+                            						</HBox>
+                            					</VBox>
+                            				</HBox>
+                            				<Separator />
+                            				<Button text="💾 Guardar Ejercicio" onAction="#onGuardarEjercicio" 
+                                    				styleClass="primary-button" maxWidth="Infinity"/>
+                        				</VBox>
+                    				</content>
+                				</ScrollPane>
+            				</items>
+        				</SplitPane>
+    				</children>
+				</VBox>
+				
+				<!-- Panel de progreso -->
+				<VBox fx:id="progresoPanel" spacing="10.0" visible="false" managed="false" VBox.vgrow="ALWAYS">
+   				 	<children>
+        				<Label text="📈 Panel de Seguimiento" styleClass="content-title">
+            				<font><Font name="System Bold" size="16.0" /></font>
+        				</Label>
+       			 		<SplitPane fx:id="progresoProfesorSplit" dividerPositions="0.3" VBox.vgrow="ALWAYS" visible="false" managed="false">
+            				<items>
+                				<VBox spacing="10">
+                    				<padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                    				<Label text="Listado de Alumnos:" style="-fx-font-weight:bold;"/>
+                    				<ListView fx:id="listaAlumnosProfesor" VBox.vgrow="ALWAYS"/>
+                				</VBox>
+                				<VBox spacing="15">
+                    				<padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+                    				<Label fx:id="lblAlumnoSeleccionado" text="Selecciona un alumno" styleClass="profesor-alumno-nombre"/>
+                    				<GridPane hgap="10" vgap="10">
+                        				<Label text="Ejercicios Completados:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        				<Label fx:id="lblProfesorInfoEjercicios" text="-" GridPane.rowIndex="0" GridPane.columnIndex="1" styleClass="profesor-stat-valor"/>
+                        				<Label text="Temas Leídos:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        				<Label fx:id="lblProfesorInfoTeoria" text="-" GridPane.rowIndex="1" GridPane.columnIndex="1" styleClass="profesor-stat-valor"/>
+                    				</GridPane>
+                    				<Separator />
+                    				<VBox spacing="5">
+                    					<HBox spacing="10" alignment="CENTER_LEFT">
+                        					<Label text="Calificación (0-10):" />
+                        					<TextField fx:id="txtNotaProfesor" prefWidth="60" promptText="0.0"/>
+                        					<Button text="💾 Guardar Calificación" onAction="#onGuardarNota" styleClass="primary-button"/>
+                    					</HBox>
+                    				</VBox>
+                    				<VBox spacing="5">
+                    					<Label text="Mensaje para el alumno:" />
+                    					<TextArea fx:id="txtMensajeProfesor" prefRowCount="4" wrapText="true" promptText="Escribe un comentario..."/>
+                    					<Button text="💬 Enviar Comentario" onAction="#onGuardarComentario" styleClass="secondary-button" maxWidth="Infinity"/>
+                    				</VBox>
+                    				<Separator />
+                    				<Button text="🔥 Reiniciar progreso del alumno" onAction="#onResetearProgreso" styleClass="danger-button" maxWidth="Infinity" />
+                				</VBox>
+            				</items>
+        				</SplitPane>
+        				<VBox fx:id="progresoAlumnoContainer" spacing="20" visible="false" managed="false" styleClass="progreso-alumno-container">
+            				<children>
+                				<HBox spacing="30" alignment="CENTER">
+                    				<VBox styleClass="progreso-tarjeta, progreso-tarjeta-nota">
+                        				<Label text="Calificación General" styleClass="progreso-label-titulo"/>
+                        				<Label fx:id="lblAlumnoNota" text="-" styleClass="progreso-valor-grande"/>
+                        				<Label text="Asignada por el profesor" styleClass="progreso-label-subtitulo"/>
+                    				</VBox>
+                    				<VBox styleClass="progreso-tarjeta, progreso-tarjeta-curso">
+                        				<Label text="Progreso del Curso" styleClass="progreso-label-titulo"/>
+                        				<ProgressBar fx:id="barProgresoDetalle" prefWidth="150" progress="0"/>
+                        				<Label fx:id="lblProgresoDetalle" text="0%" styleClass="progreso-valor-medio"/>
+                    				</VBox>
+                				</HBox>
+                
+                				<Separator />
+                
+                				<Label text="Mensajes del Profesor:" styleClass="progreso-seccion-titulo"/>
+                				<TextArea fx:id="txtAlumnoMensajes" editable="false" wrapText="true" prefRowCount="5" 
+                          				styleClass="progreso-area-mensajes"/>
+            				</children>
+        				</VBox>
+    				</children>
+				</VBox>
+            </VBox>
+        </VBox>
+    </children>
+</AnchorPane>

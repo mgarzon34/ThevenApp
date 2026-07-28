@@ -1,0 +1,35 @@
+{
+	"folders": {},
+	"connections": {
+		"sqlite_jdbc-19ae3fa9d86-2e8b58da9031835f": {
+			"provider": "sqlite",
+			"driver": "sqlite_jdbc",
+			"name": "thevenapp_database.db",
+			"save-password": true,
+			"configuration": {
+				"database": "/Users/marcoagp/ThevenApp/thevenapp_database.db",
+				"url": "jdbc:sqlite:/Users/marcoagp/ThevenApp/thevenapp_database.db",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": true
+			}
+		}
+	},
+	"virtual-models": {"sqlite_jdbc-19ae3fa9d86-2e8b58da9031835f":{"@properties":{"erd.diagram.state":{"serialized":"\u003cdiagram version\u003d\"1\" name\u003d\"empty\" time\u003d\"202512031706\"\u003e\u003centities\u003e\u003cdata-source id\u003d\"sqlite_jdbc-19ae3fa9d86-2e8b58da9031835f\"\u003e\u003centity id\u003d\"1\" name\u003d\"documentos_pdf\" fq-name\u003d\"documentos_pdf\" order\u003d\"0\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"193\" y\u003d\"397\"/\u003e\u003centity id\u003d\"2\" name\u003d\"ejercicios\" fq-name\u003d\"ejercicios\" order\u003d\"1\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"556\" y\u003d\"27\"/\u003e\u003centity id\u003d\"3\" name\u003d\"progreso_estudiante\" fq-name\u003d\"progreso_estudiante\" order\u003d\"2\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"185\" y\u003d\"205\"/\u003e\u003centity id\u003d\"4\" name\u003d\"progreso_teoria\" fq-name\u003d\"progreso_teoria\" order\u003d\"3\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"187\" y\u003d\"623\"/\u003e\u003centity id\u003d\"5\" name\u003d\"teoria\" fq-name\u003d\"teoria\" order\u003d\"4\" border-width\u003d\"3\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"397\" y\u003d\"730\"/\u003e\u003centity id\u003d\"6\" name\u003d\"users\" fq-name\u003d\"users\" order\u003d\"5\" font\u003d\".AppleSystemUIFont:13:0\" x\u003d\"852\" y\u003d\"321\"/\u003e\u003c/data-source\u003e\u003c/entities\u003e\u003crelations\u003e\u003crelation name\u003d\"FK_progreso_estudiante_ejercicios\" fq-name\u003d\"progreso_estudiante.FK_progreso_estudiante_ejercicios\" type\u003d\"fk\" pk-ref\u003d\"2\" fk-ref\u003d\"3\"/\u003e\u003crelation name\u003d\"FK_progreso_teoria_teoria\" fq-name\u003d\"progreso_teoria.FK_progreso_teoria_teoria\" type\u003d\"fk\" pk-ref\u003d\"5\" fk-ref\u003d\"4\"/\u003e\u003crelation name\u003d\"FK_documentos_pdf_users\" fq-name\u003d\"documentos_pdf.FK_documentos_pdf_users\" type\u003d\"fk\" pk-ref\u003d\"6\" fk-ref\u003d\"1\"/\u003e\u003crelation name\u003d\"FK_ejercicios_users\" fq-name\u003d\"ejercicios.FK_ejercicios_users\" type\u003d\"fk\" pk-ref\u003d\"6\" fk-ref\u003d\"2\"/\u003e\u003crelation name\u003d\"FK_progreso_estudiante_users_2\" fq-name\u003d\"progreso_estudiante.FK_progreso_estudiante_users_2\" type\u003d\"fk\" pk-ref\u003d\"6\" fk-ref\u003d\"3\"/\u003e\u003crelation name\u003d\"FK_progreso_teoria_users_2\" fq-name\u003d\"progreso_teoria.FK_progreso_teoria_users_2\" type\u003d\"fk\" pk-ref\u003d\"6\" fk-ref\u003d\"4\"/\u003e\u003crelation name\u003d\"FK_teoria_users\" fq-name\u003d\"teoria.FK_teoria_users\" type\u003d\"fk\" pk-ref\u003d\"6\" fk-ref\u003d\"5\"/\u003e\u003c/relations\u003e\u003c/diagram\u003e"}}}},
+	"connection-types": {
+		"dev": {
+			"name": "Development",
+			"color": "255,255,255",
+			"description": "Regular development database",
+			"auto-commit": true,
+			"confirm-execute": false,
+			"confirm-data-change": false,
+			"smart-commit": false,
+			"smart-commit-recover": true,
+			"auto-close-transactions": true,
+			"close-transactions-period": 1800,
+			"auto-close-connections": true,
+			"close-connections-period": 14400
+		}
+	}
+}

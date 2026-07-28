@@ -1,0 +1,13 @@
+/* ========================================================
+ * Estilos para el logo de la pantalla principal
+ * Archivo: logoControl.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+ 
+.logo-image {
+	-fx-cursor: hand;		/* cursor de mano */
+	-fx-effect: dropshadow(gaussian, transparent, 0, 0, 0, 0);
+	-fx-scale-x: 1.0;
+	-fx-scale-y: 1.0;
+}

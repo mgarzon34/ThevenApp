@@ -1,0 +1,76 @@
+/* ========================================================
+ * Estilos para el panel de propiedades, fondo, etiquetas
+ * y advertencia.
+ * Archivo: PanelPropiedades.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+
+/* Fondo del panel de propiedades */
+.propiedades-fondo-panel {
+	-fx-background-color: #f0f0f0;			/* Color gris */
+	-fx-border-color: #e0e0e0;
+	-fx-border-width: 1px;
+	-fx-border-radius: 5px;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 8, 0, 0, 2);
+}	
+
+/* Estilo del título de componente */
+.propiedades-titulo {
+	-fx-font-family: "Lato";
+	-fx-font-size: 14px;
+	-fx-font-weight: bold;
+	-fx-text-fill: black;
+	-fx-padding: 0 0 10px 0;
+}
+
+/* Estilo negrita para etiquetas */
+.propiedades-label-bold {
+	-fx-font-family: "Open Sans";
+	-fx-font-size: 14px;
+	-fx-text-fill: black;
+	-fx-font-weight: bold;
+	-fx-padding: 5px 10px 5px 0;
+}
+
+/* Estilo negrita y color rojo para advertencia */
+.propiedades-label-advertencia {
+	-fx-text-fill: red;
+	-fx-font-weight: bold;
+}
+
+/* Estilo del texto normal en el panel de propiedades */
+.propiedades-texto {
+	-fx-font-family: "Open Sans";
+	-fx-font-size: 13px;
+	-fx-text-fill: black;
+}
+
+/* Estilo para los enlaces modificables del panel */
+.propiedades-enlace {
+	-fx-font-family: "Open Sans";
+	-fx-text-fill: #008080;
+	-fx-underline: true;
+	-fx-font-weight: bold;
+	-fx-font-size: 13px;
+	-fx-cursor: hand;
+}
+
+/* Estilo para los enlaces solo lectura del panel */
+.propiedades-enlace-solo-lectura {
+	-fx-font-family: "Open Sans";
+	-fx-text-fill: #008080;
+	-fx-underline: false;
+	-fx-font-weight: bold;
+	-fx-font-size: 13px;
+	-fx-cursor: default;
+}
+
+.propiedades-enlace:hover {
+	-fx-underline: false;
+	-fx-text-fill: #0056b3;
+}
+
+.propiedades-enlace:pressed {
+	-fx-text-fill: red;
+}

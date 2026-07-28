@@ -1,0 +1,68 @@
+/* =======================================================================
+ * Estilos del visor de logs.
+ * Archivo: logViewer.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ====================================================================== */
+ 
+/* Fuente base */
+.list-view .list-cell.log-cell {
+    -fx-font-family: "Consolas", "Menlo", "Monaco", monospace;
+    -fx-font-size: 12px;
+}
+
+/* INFO */
+.list-view .list-cell.info-entry {
+    -fx-background-color: rgba(0, 123, 255, 0.20);
+}
+.list-view .list-cell.info-entry .text {
+    -fx-fill: #004085;
+}
+
+/* FINE */
+.list-view .list-cell.fine-entry {
+    -fx-background-color: rgba(0, 200, 83, 0.20);
+}
+.list-view .list-cell.fine-entry .text {
+    -fx-fill: #064d28;
+}
+
+/* FINER */
+.list-view .list-cell.finer-entry {
+    -fx-background-color: rgba(0, 188, 212, 0.20);
+}
+.list-view .list-cell.finer-entry .text {
+    -fx-fill: #004d52;
+}
+
+/* WARNING (negrita) */
+.list-view .list-cell.warning-entry {
+    -fx-background-color: rgba(255, 193, 7, 0.30);
+}
+.list-view .list-cell.warning-entry .text {
+    -fx-fill: #7a4f00;
+    -fx-font-weight: bold;
+}
+
+/* SEVERE (negrita) */
+.list-view .list-cell.severe-entry {
+    -fx-background-color: rgba(220, 53, 69, 0.35);
+}
+.list-view .list-cell.severe-entry .text {
+    -fx-fill: #750000;
+    -fx-font-weight: bold;
+}
+
+/* Resaltado de término (no se puede poner fondo sólido en Text, usamos color + subrayado) */
+.list-view .list-cell .log-hl {
+    -fx-fill: #000000;
+    -fx-font-weight: bold;
+    -fx-underline: true;
+}
+
+/* Selección: mantener contraste */
+.list-view:focused .list-cell:filled:selected,
+.list-view .list-cell:filled:selected {
+    -fx-background-color: -fx-focus-color, -fx-cell-focus-inner-border, rgba(0,0,0,0.12);
+    -fx-background-insets: 0, 1, 2;
+}

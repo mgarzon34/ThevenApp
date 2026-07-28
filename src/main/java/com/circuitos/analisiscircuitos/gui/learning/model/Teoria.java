@@ -1,0 +1,87 @@
+package com.circuitos.analisiscircuitos.gui.learning.model;
+
+/**
+ * Clase que define el contenido teórico de la aplicación dado por su
+ * id, titulo, contenido e índice.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class Teoria {
+	private int id;
+	private String titulo;
+	private String contenido;
+	private int orderIndex;
+	
+	/**
+	 * Devuelve el ID de la teoría.
+	 * 
+	 * @return	ID de la teoría
+	 */
+	public int getId() { 
+		return id; 
+	}
+	
+	/**
+	 * Modifica el ID de la teoría.
+	 * 
+	 * @param id nuevo
+	 */
+	public void setId(int id) { 
+		this.id=id; 
+	}
+	
+	/**
+	 * Devuelve el título de la teoría.
+	 * 
+	 * @return título de la teoría
+	 */
+	public String getTitulo() { 
+		return titulo; 
+	}
+	
+	/**
+	 * Modifica el título de la teoría.
+	 * 
+	 * @param titulo nuevo
+	 */
+	public void setTitulo(String titulo) { 
+		this.titulo=titulo; 
+	}
+	
+	/**
+	 * Devuelve el contenido de la teoría.
+	 * 
+	 * @return contenido teórico
+	 */
+	public String getContenido() { 
+		return contenido; 
+	}
+	
+	/**
+	 * Modifica el contenido de la teoría.
+	 * 
+	 * @param contenido nuevo
+	 */
+	public void setContenido(String contenido) { 
+		this.contenido=contenido; 
+	}
+	
+	/**
+	 * Devuelve el índice de la teoría.
+	 * 
+	 * @return índice de la teoría
+	 */
+	public int getOrderIndex() { 
+		return orderIndex; 
+	}
+	
+	/**
+	 * Modifica el índice de la teoría.
+	 * 
+	 * @param orderIndex índice nuevo
+	 */
+	public void setOrderIndex(int orderIndex) { 
+		this.orderIndex=orderIndex; 
+	}
+}

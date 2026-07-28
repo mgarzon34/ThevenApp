@@ -1,0 +1,51 @@
+package com.circuitos.analisiscircuitos.analisis;
+
+/**
+ * Contiene los resultados Vth y Rth del análisis de los circuitos.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ResultadoThevenin {
+	private final double vth;
+	private final double rth;
+	
+	/**
+	 * Constructor para cálculo de Thevenin.
+	 * 
+	 * @param vth			Tensión de Thevenin
+	 * @param rth			Resistencia de Thevenin
+	 */
+	public ResultadoThevenin(double vth, double rth) {
+		this.vth=vth;
+		this.rth=rth;
+	}
+	
+	/**
+	 * Obtiene la tensión o voltaje de Thevenin.
+	 * 
+	 * @return vth		Tensión de Thevenin
+	 */
+	public double getVth() {
+		return vth;
+	}
+	
+	/**
+	 * Obtiene la resistencia de Thevenin.
+	 * 
+	 * @return rth		Resistencia de Thevenin
+	 */
+	public double getRth() {
+		return rth;
+	}
+	
+	/**
+	 * Devuelve un String con la información de tensión y resistencia de Thevenin.
+	 * 
+	 * @return String		Info de tensión y resistencia Thevenin.
+	 */
+	@Override
+	public String toString() {
+		return "ResultadoThevenin{vth="+vth+", rth="+rth+"}";
+	}
+}

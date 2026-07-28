@@ -1,0 +1,67 @@
+/* ========================================================
+ * Estilos para el panel de bienvenida.
+ * Archivo: PanelBienvenida.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+
+/* Fondo color gris para el cuadro que contiene los enlaces */
+.bienvenida-caja {
+	-fx-background-color: #f0f0f0;
+}
+
+/* Estilo de texto para el mensaje de bienvenida  */
+.bienvenida-label-text {
+	-fx-font-size: 16px;
+	-fx-font-weight: bold;
+}
+
+/* Estilo para el menú de archivos recientes */
+.bienvenida-recientes {
+	-fx-font-weight: bold;
+	-fx-font-size: 14px;
+}
+
+/* Estilo para lista vacía de archivos recientes */
+.bienvenida-vacio {
+	-fx-font-style: italic;
+	-fx-text-fill: gray;
+}
+
+/* Estilo para enlace de borrar historial */
+.bienvenida-borrar-historial {
+	-fx-font-size: 10px;
+	-fx-text-fill: darkred;
+}
+
+.bienvenida-error {
+	-fx-font-size: 14px;
+	-fx-text-fill: red;
+}
+
+/* Estilo para botón de E-Learning */
+.bienvenida-button-elearning {
+	-fx-background-color: #00aaff;
+	-fx-text-fill: white;
+	-fx-background-radius: 30;
+	-fx-padding: 12 30;
+	-fx-font-family: "Verdana";
+	-fx-font-size: 14px;
+	-fx-font-weight: bold;
+	-fx-cursor: hand;
+	-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 10, 0, 0, 4);
+}
+
+.bienvenida-button-elearning:hover {
+	-fx-background-color: #33bfff;
+	-fx-scale-x: 1.05;
+	-fx-scale-y: 1.05;
+	-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 15, 0, 0, 6);
+}
+
+.bienvenida-button-elearning:pressed {
+	-fx-background-color: #002C55;
+	-fx-scale-x: 0.98;
+	-fx-scale-y: 0.98;
+	-fx-effect: dropshadow(two-pass-box, rgba(0,0,0,0.2), 5, 0, 0, 0);
+}

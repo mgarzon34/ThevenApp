@@ -1,0 +1,54 @@
+package com.circuitos.analisiscircuitos.dominio.util;
+
+import java.util.Objects;
+
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Componente;
+
+/**
+ * Clase para imprimir la descripción de un circuito en consola.
+ * Muestra un resumen de nodos y componentes y luego detalla cada elemento indicando
+ * su tipo, nodos conectados y valor formateado.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitPrinter {
+	private CircuitPrinter() { /* NO INSTANCIABLE */ }
+	
+	/**
+	 * Imprime por pantalla la información del circuito.
+	 * 
+	 * @param c							circuito a imprimir
+	 * @throws NullPointerException		si circuito c es null
+	 */
+	public static void printCircuit(Circuito c) {
+		Objects.requireNonNull(c, "El circuito no puede ser null");
+		System.out.println("=== RESUMEN DEL CIRCUITO ===");
+		System.out.println("Nodos: " +c.getNodos().size());
+		System.out.println("Componentes totales: "+c.getComponentes().size()+"\n");
+		System.out.println();
+		
+		System.out.println("Componentes: ");
+		for(Componente comp : c.getComponentes()) {
+			String descripcion=comp.describir();
+			System.out.println(formatDescripcion(descripcion));
+		}
+	}
+	
+	/**
+	 * Da formato a la descripción para impresión en consola.
+	 * 
+	 * @param desc		Descripción del componente
+	 * @return descripción formateada
+	 */
+	private static String formatDescripcion(String desc) {
+		String[] lineas=desc.split("\\n");
+		StringBuilder sb=new StringBuilder();
+		sb.append("- ").append(lineas[0]);
+		for(int i=1; i<lineas.length; i++) {
+			sb.append(System.lineSeparator()).append("   ").append(lineas[i]);
+		}
+		return sb.toString();
+	}
+}

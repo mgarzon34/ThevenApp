@@ -1,0 +1,71 @@
+package com.circuitos.analisiscircuitos.gui.util;
+
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Clase de utilidades para análisis geométrico de cables representados mediante {@link Polyline}
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CableUtil {
+	private static final Logger logger=Logger.getLogger(CableUtil.class.getName());
+	
+	/**
+	 * Constructor no instanciable.
+	 */
+	private CableUtil() { /* No instanciable */ }
+	
+	/**
+	 * Devuelve el índice (posición inicial de la lista de puntos) del segmento más cercano
+	 * al punto (x, y).
+	 * 
+	 * @param puntos		Lista de coordenadas del cable
+	 * @param x				Coordenada X del punto a evaluar
+	 * @param y				Coordenada Y del punto a evaluar
+	 * @return índice del primer valor X del segmento más cercano o -1 si hay menos de 2 segmentos
+	 */
+	public static int indiceSegmentoCercano(List<Double> puntos, double x, double y) {
+		if(puntos.size()<4) {
+			logger.warning("Menos de 2 puntos, no hay segmento que evaluar");
+			return -1;
+		}
+		double minDistancia=Double.MAX_VALUE;
+		int bestIdx=0;
+		for(int i=0; i<puntos.size()-2; i+=2) {
+			double x1=puntos.get(i), y1=puntos.get(i+1);
+			double x2=puntos.get(i+2), y2=puntos.get(i+3);
+			double d=distanciaPuntoSegmento(x, y, x1, y1, x2, y2);
+			if(d<minDistancia) {
+				minDistancia=d;
+				bestIdx=i;
+			}
+		}
+		logger.log(Level.FINE, "Segmento más cercano en índice {0} con distancia {1}", new Object[] {bestIdx, minDistancia});
+		return bestIdx;
+	}
+	
+	/**
+	 * Calcula la distancia mínima entre un punto (px, py) y un segmento definido por (x1, y1) - (x2, y2).
+	 * 
+	 * @param px			Coordenada X del punto
+	 * @param py			Coordenada Y del punto
+	 * @param x1			Coordenada X del extremo inicial del segmento
+	 * @param y1			Coordenada Y del extremo inicial del segmento
+	 * @param x2			Coordenada X del extremo final del segmento
+	 * @param y2			Coordenada Y del extremo final del segmento
+	 * @return Distancia mínima entre el punto y el segmento
+	 */
+	private static double distanciaPuntoSegmento(double px, double py,
+												 double x1, double y1,
+												 double x2, double y2) {
+		double dx=x2 - x1, dy=y2 - y1;
+		if(dx==0 && dy==0) return Math.hypot(px-x1, py-y1);
+		double t=((px-x1)*dx + (py-y1)*dy)/(dx*dx + dy*dy);
+		t=Math.max(0,  Math.min(1, t));
+		double projX=x1+t*dx, projY=y1+t*dy;
+		return Math.hypot(px-projX, py-projY);
+	}
+}

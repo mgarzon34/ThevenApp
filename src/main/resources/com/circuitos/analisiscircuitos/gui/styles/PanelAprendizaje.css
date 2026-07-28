@@ -1,0 +1,521 @@
+/* ======================================
+ * Estilos para el panel de aprendizaje.
+ * Archivo: PanelAprendizaje.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ===================================== */
+
+/* ============================
+   SECCIÓN 1: LOGIN Y REGISTRO
+   ============================ */
+
+.login-panel {
+    -fx-background-color: linear-gradient(to bottom right, #ecf0f1, #bdc3c7);
+}
+
+.login-form {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 5);
+    -fx-padding: 40;
+    -fx-min-width: 350;
+    -fx-max-width: 400;
+}
+
+.login-title {
+    -fx-text-fill: #2c3e50;
+}
+
+.mode-toggle-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #bdc3c7;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+}
+
+.mode-toggle-button:selected {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-border-color: #3498db;
+}
+
+.auth-button {
+    -fx-background-color: #2c3e50;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+    -fx-padding: 10 20;
+    -fx-pref-width: 200;
+}
+
+.auth-button:hover {
+    -fx-background-color: #34495e;
+}
+
+.auth-status {
+    -fx-font-size: 12px;
+}
+
+/* ===============================
+   SECCIÓN 2: ESTRUCTURA PRINCIPAL
+   =============================== */
+
+/* Header Superior */
+.learning-header {
+    -fx-background-color: white;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+    -fx-padding: 5;
+}
+
+.welcome-label {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+}
+
+.logout-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e74c3c;
+    -fx-border-color: #e74c3c;
+    -fx-border-radius: 5;
+    -fx-cursor: hand;
+}
+
+.logout-button:hover {
+    -fx-background-color: #e74c3c;
+    -fx-text-fill: white;
+}
+
+/* Panel de Estadísticas (Header) */
+.stats-panel {
+    -fx-background-color: #f8f9fa;
+    -fx-background-radius: 5;
+    -fx-border-color: #ecf0f1;
+    -fx-border-radius: 5;
+}
+
+.stats-label {
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 11px;
+}
+
+.stats-value {
+    -fx-text-fill: #3498db;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+/* SplitPane Principal */
+.main-split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 10;
+}
+.main-split-pane > .split-pane-divider {
+    -fx-background-color: transparent;
+}
+
+/* =====================
+   SECCIÓN 3: NAVEGACIÓN
+   ===================== */
+
+.navigation-panel {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 5, 0, 0, 2);
+}
+
+.navigation-title {
+    -fx-text-fill: #2c3e50;
+    -fx-padding: 0 0 10 0;
+}
+
+/* ====================
+   SECCIÓN 4: CONTENIDO
+   ==================== */
+
+.content-panel {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 5, 0, 0, 2);
+}
+
+/* Estilos de Texto Generales */
+.welcome-title {
+    -fx-text-fill: #3498db;
+    -fx-font-size: 22px;
+}
+.welcome-subtitle {
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 14px;
+}
+.content-title { /* Alias de section-title para compatibilidad */
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+}
+.content-subtitle { /* Alias de section-subtitle */
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+/* Botones de Acción Generales */
+.primary-button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-background-radius: 5;
+    -fx-padding: 8 15;
+}
+.primary-button:hover {
+    -fx-background-color: #2980b9;
+}
+.primary-button:disabled {
+    -fx-background-color: #bdc3c7;
+    -fx-text-fill: #ecf0f1;
+}
+
+.danger-button {
+    -fx-background-color: white;
+    -fx-text-fill: #e74c3c;
+    -fx-border-color: #e74c3c;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+}
+.danger-button:hover {
+    -fx-background-color: #e74c3c;
+    -fx-text-fill: white;
+}
+.danger-button:disabled {
+    -fx-border-color: #bdc3c7;
+    -fx-text-fill: #bdc3c7;
+    -fx-background-color: transparent;
+}
+
+.upload-status {
+    -fx-font-size: 11px;
+}
+
+/* =============================
+   SECCIÓN 5: ESTILOS DINÁMICOS
+   =============================*/
+
+.learning-section {
+    -fx-padding: 10;
+    -fx-background-color: transparent;
+}
+
+.section-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+}
+
+.section-subtitle {
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 14px;
+}
+
+/* Menú de Teoría */
+.theory-menu-container {
+    -fx-padding: 5;
+    -fx-spacing: 10;
+}
+.theory-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #bdc3c7;
+    -fx-border-radius: 20;
+    -fx-background-radius: 20;
+    -fx-padding: 8 15;
+    -fx-cursor: hand;
+    -fx-text-fill: #34495e;
+}
+.theory-button:hover {
+    -fx-background-color: #ecf0f1;
+}
+.theory-button-selected {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-border-color: #3498db;
+    -fx-border-radius: 20;
+    -fx-background-radius: 20;
+    -fx-padding: 8 15;
+}
+
+/* Tarjetas de Ejercicios */
+.exercise-card {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-border-radius: 15;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 5);
+    -fx-padding: 20;
+    -fx-cursor: hand;
+    -fx-alignment: top-center;
+    -fx-spacing: 10;
+}
+.exercise-card:hover {
+    -fx-background-color: #f8f9fa;
+    -fx-effect: dropshadow(three-pass-box, rgba(52, 152, 219, 0.4), 15, 0, 0, 5);
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+}
+.card-icon {
+    -fx-font-size: 40px;
+}
+.card-title {
+    -fx-font-family: 'Segoe UI';
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+    -fx-text-fill: #34495e;
+    -fx-text-alignment: center;
+}
+.card-desc {
+    -fx-text-fill: #7f8c8d;
+    -fx-font-size: 12px;
+}
+
+/* Botón de acción dentro de las tarjetas */
+.action-button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-padding: 8 20;
+    -fx-background-radius: 5;
+}
+.action-button:hover {
+    -fx-background-color: #2980b9;
+}
+
+/* Píldoras de Dificultad */
+.difficulty-pill {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 5 15;
+    -fx-background-radius: 20;
+    -fx-font-size: 10px;
+}
+.diff-1 { -fx-background-color: #2ecc71; }
+.diff-2 { -fx-background-color: #27ae60; }
+.diff-3 { -fx-background-color: #f39c12; }
+.diff-4 { -fx-background-color: #e67e22; }
+.diff-5 { -fx-background-color: #c0392b; }
+
+/* ======================================
+   SECCIÓN 6: PANEL DE NAVEGACIÓN LATERAL
+   ======================================*/
+.nav-panel-background {
+	-fx-background-color: #0085C5;
+}
+
+.nav-panel-header {
+	-fx-background-color: #002C55;
+	-fx-padding: 10;
+}
+
+.nav-panel-title {
+	-fx-text-fill: white;
+	-fx-font-family: "Arial";
+	-fx-font-size: 18px;
+	-fx-font-weight: bold;
+}
+
+.nav-button {
+	-fx-background-color: transparent;
+	-fx-text-fill: white;
+	-fx-alignment: CENTER_LEFT;
+	-fx-font-family: "Arial";
+	-fx-font-size: 13px;
+	-fx-padding: 10 15 10 15;
+	-fx-cursor: hand;
+	-fx-border-color: transparent;
+}
+
+.nav-button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.2);
+	-fx-border-color: rgba(255, 255, 255, 0.2);
+	-fx-border-width: 0 0 0 3;
+}
+
+.nav-button:pressed, .nav-button-selected {
+	-fx-background-color: #002C55;
+}
+
+.separator *.line {
+	-fx-border-style: solid;
+	-fx-border-width: 1px;
+	-fx-border-color: rgba(255,255,255,0.3);
+	-fx-background-color: transparent;
+}
+
+/* ==============================================
+   SECCIÓN 7: VENTANA DE RESOLUCIÓN DE EJERCICIOS
+   ==============================================*/
+.ventana-resolucion {
+	-fx-background-color: white;
+	-fx-border-color: #0078d7;
+	-fx-border-width: 2;
+	-fx-font-weight: bold;
+	-fx-font-size: 14px;
+}
+
+.ventana-resolucion-boton {
+	-fx-background-color: #28a745;
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-cursor: hand;
+}
+
+.ventana-resolucion-correcto {
+	-fx-text-fill: green;
+	-fx-font-weight: bold;
+}
+
+.ventana-resolucion-incorrecto {
+	-fx-text-fill: red;
+}
+
+.ventana-resolucion-boton-volver {
+	-fx-background-color: #0078d7;
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-cursor: hand;
+}
+
+/* ==================================
+   SECCIÓN 8: ENUNCIADO DE EJERCICIOS
+   ==================================*/
+.ejercicio-detalle-titulo {
+	-fx-font-size: 22px;
+	-fx-font-weight: bold;
+	-fx-text-fill: #0078d7;
+}
+
+.ejercicio-detalle {
+	-fx-background-color: #f9f9f9;
+	-fx-padding: 20;
+	-fx-border-color: #ddd;
+	-fx-border-radius: 5;
+	-fx-background-radius: 5;
+}
+
+.ejercicio-detalle-enunciado {
+	-fx-font-weight: bold;
+}
+
+.ejercicio-detalle-descripcion {
+	-fx-font-size: 14px;
+}
+
+.ejercicio-tipo-diff {
+	-fx-text-fill: #666;
+}
+
+.ejercicio-button {
+	-fx-background-color: #0078d7;
+	-fx-text-fill: white;
+	-fx-font-size: 14px;
+	-fx-font-weight: bold;
+	-fx-padding: 10 20;
+	-fx-cursor: hand;
+}
+
+.ejercicio-card-completado {
+	-fx-background-color: #e8f8f5 !important;
+	-fx-border-color: #2ecc71;
+	-fx-border-width: 2px;
+	-fx-effect: dropshadow(three-pass-box, rgba(46, 204, 113, 0.4), 10, 0, 0, 0);
+}
+
+/* =======================================
+   SECCIÓN 9: PANEL DE PROGRESO (PROFESOR)
+   =======================================*/
+.profesor-alumno-nombre {
+	-fx-font-size: 18px;
+	-fx-font-weight: bold;
+	-fx-text-fill: #0078d7;
+}
+
+.profesor-stat-valor {
+	-fx-font-weight: bold;
+	-fx-text-fill: #333;
+}
+
+.profesor-seccion-titulo {
+	-fx-font-weight: bold;
+	-fx-font-size: 14px;
+	-fx-text-fill: #2c3e50;
+}
+
+.secondary-button {
+	-fx-background-color: #27ae60;
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-cursor: hand;
+	-fx-background-radius: 5;
+	-fx-padding: 8 15;
+}
+
+.secondary-button:hover {
+	-fx-background-color: #219150;
+}
+
+/* ==========================================
+   SECCIÓN 10: PANEL DE PROGRESO (ESTUDIANTE)
+   ==========================================*/
+.progreso-alumno-container {
+	-fx-padding: 30;
+}
+
+.progreso-tarjeta {
+	-fx-padding: 20;
+	-fx-background-radius: 10;
+	-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 0);
+	-fx-alignment: center;
+	-fx-pref-width: 200;
+}
+
+.progreso-tarjeta-nota {
+	-fx-background-color: #e3f2fd;
+}
+
+.progreso-tarjeta-curso {
+	-fx-background-color: #e8f5e9;
+}
+
+.progreso-label-titulo {
+	-fx-font-size: 14px;
+	-fx-text-fill: #555;
+}
+
+.progreso-valor-grande {
+	-fx-font-size: 48px;
+	-fx-font-weight: bold;
+	-fx-text-fill: #0078d7;
+}
+
+.progreso-label-subtitulo {
+	-fx-font-size: 10px;
+	-fx-text-fill: #888;
+}
+
+.progreso-valor-medio {
+	-fx-font-size: 24px;
+	-fx-font-weight: bold;
+	-fx-text-fill: #2e7d32;
+}
+
+.progreso-seccion-titulo {
+	-fx-font-size: 16px;
+	-fx-font-weight: bold;
+}
+
+.progreso-area-mensajes {
+	-fx-control-inner-background: #fff9c4;
+	-fx-font-family: 'Segoe UI';
+}

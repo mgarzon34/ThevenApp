@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de Opciones Visuales. 
+	Muestra tanto en el panel de diseño como en análisis una caja con opciones
+	para mostrar los puntos de control o las etiquetas de los componentes.
+		
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelOpcionesVisualesController
+	Utiliza estilo: PanelDiseno.css
+ -->
+ 
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.layout.HBox?>
+
+<HBox xmlns="http://javafx.com/javafx/23.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelOpcionesVisualesController"
+      spacing="20.0"
+      alignment="CENTER_RIGHT"
+      styleClass="panel-opciones">
+    <CheckBox fx:id="mostrarNodos" text="Mostrar nodos" selected="false" />
+    <CheckBox fx:id="mostrarPuntosControl" text="Mostrar puntos de control" selected="true" />
+    <CheckBox fx:id="mostrarEtiquetas" text="Mostrar etiquetas" selected="false" />
+
+</HBox>

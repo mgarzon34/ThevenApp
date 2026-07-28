@@ -1,0 +1,69 @@
+package com.circuitos.analisiscircuitos.gui.builder;
+
+import java.util.function.BiConsumer;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.model.Cable;
+
+import javafx.geometry.Point2D;
+import javafx.scene.Cursor;
+import javafx.scene.shape.Circle;
+
+/**
+ * Utilidad para fabricar puntos de control para cables. 
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CablePuntoControlFactory {
+	private static final Logger logger=Logger.getLogger(CablePuntoControlFactory.class.getName());
+	
+	public static final double RADIO_PUNTO=5.0;
+	private static final String ESTILO_PUNTO_CONTROL="cable-punto-control";
+
+	private CablePuntoControlFactory() { /* NO INSTANCIABLE */ }
+	
+	/**
+	 * Crea un punto de control interactivo en una posición específica.
+	 * 
+	 * @param p					Coordenadas del punto 
+	 * @param dragYDrop			Acción para el arrastre
+	 * @return Punto de control interactivo
+	 */
+	public static Circle crearPuntoControl(Point2D p, BiConsumer<Double, Double> dragYDrop, Cable cable) {
+		Circle circle=new Circle(p.getX(), p.getY(), RADIO_PUNTO);
+		circle.getStyleClass().add(ESTILO_PUNTO_CONTROL);
+		circle.setCursor(Cursor.HAND);
+		
+		//Al empezar el arrastre: notificar al cable
+		circle.setOnMousePressed(e -> {
+			if(cable!=null) {
+				cable.activarArrastreCodo();
+			}
+			e.consume();
+		});
+		//Durante el arrastre: mover el codo y redibujar sin perder anclaje
+		circle.setOnMouseDragged(e -> {
+			double nuevoX=e.getX();
+			double nuevoY=e.getY();
+			circle.setCenterX(nuevoX);
+			circle.setCenterY(nuevoY);
+			if(cable!=null) {
+				cable.arrastrarCodo();
+			}
+			if(dragYDrop!=null) {
+				dragYDrop.accept(nuevoX, nuevoY);
+			}
+			logger.fine(()->String.format("Punto control se movió a [%.2f, %.2f]", nuevoX, nuevoY));
+			e.consume();
+		});
+		//Al soltar el codo: quitar flag y recalcular
+		circle.setOnMouseReleased(e -> {
+			if(cable!=null) {
+				cable.desactivarArrastreCodoCodo();
+			}
+			e.consume();
+		});
+		return circle;
+	}
+}

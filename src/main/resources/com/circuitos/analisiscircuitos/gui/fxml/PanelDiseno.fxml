@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML del panel de diseño de ThevenApp.
+	Panel principal de diseño de circuitos. Contiene un SplitPane con:
+		- Área de dibujo a la izquierda (zona de Dibujo dentro).
+		- Panel lateral de propiedades oculto por defecto (panelPropiedades)
+		
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: PanelDisenoController
+	Utiliza estilo: PanelDiseno.css
+ -->
+ 
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.control.SplitPane?>
+
+
+<SplitPane xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
+		   fx:controller="com.circuitos.analisiscircuitos.gui.controller.PanelDisenoController"
+		   dividerPositions="0.75" fx:id="splitPane">
+	<items>
+		<AnchorPane fx:id="rootDiseno" >
+			<children>
+				<Pane fx:id="zonaDibujo" prefHeight="750" prefWidth="1000" 
+					  styleClass="design-panel-con-fondo" AnchorPane.bottomAnchor="0.0"
+					  AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" 
+					  AnchorPane.topAnchor="0.0" />
+			</children>		
+		</AnchorPane>
+   		<AnchorPane fx:id="panelPropiedadesContainer" prefWidth="260.0" visible="false" managed="false">
+   			<fx:include fx:id="panelPropiedades" source="PanelPropiedades.fxml"
+   					AnchorPane.topAnchor="0.0" AnchorPane.leftAnchor="0.0" />
+   		</AnchorPane>
+   	</items>
+</SplitPane>
+   	

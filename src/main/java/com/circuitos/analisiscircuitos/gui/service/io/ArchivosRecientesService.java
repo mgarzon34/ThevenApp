@@ -1,0 +1,124 @@
+package com.circuitos.analisiscircuitos.gui.service.io;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+/**
+ * Servicio para gestionar la lista de archivos recientes abiertos en la aplicación.
+ * Guarda la lista en un archivo local y permite acceder a los más recientes.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class ArchivosRecientesService {
+	
+	private static final Logger logger=Logger.getLogger(ArchivosRecientesService.class.getName());
+	private static final String APP_NAME="ThevenApp";
+	private static final String FILE_NAME="thevenapp-recientes.txt";
+	private static final int MAX_RECIENTES=5;
+	private static final ReentrantLock lock=new ReentrantLock();
+	
+	/**
+	 * Obtiene la ruta del archivo donde se almacenan los archivos recientes,
+	 * según el sistema operativo (Windows, MacOS o Linux).
+	 * 
+	 * @return Path hacia archivo de configuración de archivos recientes
+	 * @throws IOException si falla la creación de directorio
+	 */
+	public static Path getConfigFilePath() throws IOException {
+		String os=System.getProperty("os.name").toLowerCase();
+		Path baseDir;
+		if(os.contains("win")) {
+			baseDir=Paths.get(System.getenv("APPDATA"));
+		} else if(os.contains("mac")) {
+			baseDir=Paths.get(System.getProperty("user.home"), "Library", "Application Support");
+		} else {
+			baseDir=Paths.get(System.getProperty("user.home"), ".config");
+		}
+		Path directorio=baseDir.resolve(APP_NAME);
+		Files.createDirectories(directorio);
+		return directorio.resolve(FILE_NAME);
+	}
+	
+	/**
+	 * Agrega un archivo a la lista de recientes.
+	 * 
+	 * @param ruta Ruta del archivo abierto
+	 */
+	public static void agregarArchivoReciente(String ruta) throws IOException {
+		lock.lock();
+		try {
+			List<String> recientes=obtenerArchivosRecientes();
+			List<String> actuales=recientes.stream()
+					.filter(p -> !p.equals(ruta) && Files.exists(Paths.get(p)))
+					.collect(Collectors.toList());
+			actuales.add(0, ruta);
+			List<String> limite=actuales.stream()
+					.distinct()
+					.limit(MAX_RECIENTES)
+					.collect(Collectors.toList());
+			Path file=getConfigFilePath();
+			Files.write(file, limite, StandardCharsets.UTF_8);
+			logger.fine("Archivo reciente agregado: "+ruta);
+		} catch (IOException e) {
+			logger.log(Level.WARNING, "Error actualizando archivos recientes", e);
+			throw e;
+		} finally {
+			lock.unlock();
+		}
+	}
+	
+	/**
+	 * Devuelve la lista de archivos recientes almacenados localmente.
+	 * Filtra rutas que ya no existen en el disco.
+	 * 
+	 * @return Lista de archivos (rutas)
+	 * @throws IOException si ocurre un error de entrada/salida
+	 */
+	public static List<String> obtenerArchivosRecientes() throws IOException {
+		lock.lock();
+		try {
+			Path file=getConfigFilePath();
+			if(Files.notExists(file)) {
+				return Collections.emptyList();
+			}
+			List<String> all=Files.readAllLines(file, StandardCharsets.UTF_8);
+			List<String> validos=all.stream()
+					.distinct()
+					.filter(path -> Files.exists(Paths.get(path)))
+					.collect(Collectors.toList());
+			return Collections.unmodifiableList(validos);
+		} catch (IOException e) {
+			logger.log(Level.WARNING, "Error leyendo archivos recientes", e);
+			throw e;
+		} finally {
+			lock.unlock();
+		}
+	}
+	
+	/**
+	 * Limpia la lista de archivos recientes eliminando el contenido del archivo.
+	 */
+	public static void limpiarLista() throws IOException {
+		lock.lock();
+		try {
+			Path file=getConfigFilePath();
+			Files.write(file, Collections.emptyList(), StandardCharsets.UTF_8);
+			logger.fine("Lista de archivos recientes limpiada");
+		} catch (IOException e) {
+			logger.log(Level.WARNING, "Error limpiando archivos recientes", e);
+			throw e;
+		} finally {
+			lock.unlock();
+		}
+	}
+}

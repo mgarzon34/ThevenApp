@@ -1,0 +1,161 @@
+package com.circuitos.analisiscircuitos.gui.dialog;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.gui.controller.DialogEditarValorController;
+import com.circuitos.analisiscircuitos.gui.model.NodeField;
+import com.circuitos.analisiscircuitos.gui.util.UnidadConverter;
+
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+
+/**
+ * Clase de utilidades para editar el valor de un componente del circuito.
+ * Permite mostrar un diálogo dinámico según el tipo de componente elegido, así 
+ * formatear el valor introducido para adecuarlo al modelo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public final class PropiedadesActions {
+	private static final Logger logger=Logger.getLogger(PropiedadesActions.class.getName());
+	private static final String DIALOGO_FXML="/com/circuitos/analisiscircuitos/gui/fxml/DialogEditarValor.fxml";
+	
+	private PropiedadesActions() { /* No instanciable */ }
+	
+	/**
+	 * Muestra la ventana para editar el valor de un componente y seleccionar su unidad.
+	 * 
+	 * @param componente				Componente a editar
+	 * @param textoActual				Valor actual del componente (antes de editar)
+	 * @return true si el valor ha cambiado, false si no se ha cambiado
+	 */
+	public static boolean editarValorUnidad(Componente componente, String textoActual) {
+		List<String> unidades=UnidadConverter.obtenerUnidades(componente.getClass());
+		Map<String, Double> factores=UnidadConverter.obtenerFactores(componente.getClass());
+		double valorBase=UnidadConverter.calcularValorBase(textoActual, unidades, factores, componente.getValor());
+		String sufijoInicial=UnidadConverter.extraerSufijo(textoActual, unidades);
+		
+		try {
+			FXMLLoader loader=new FXMLLoader(
+					PropiedadesActions.class.getResource(DIALOGO_FXML));					
+			Parent root=loader.load();
+			DialogEditarValorController ctrl=loader.getController();
+			ctrl.setUnidadesDisponibles(unidades, factores);
+			ctrl.setValorInicial(valorBase, sufijoInicial);
+			ctrl.setLabel(modificarLabelValor(componente));
+			
+			Stage stage=new Stage();
+			stage.initModality(Modality.APPLICATION_MODAL);
+			stage.setTitle("Editar valor");
+			stage.setScene(new Scene(root));
+			stage.showAndWait();
+			
+			if(!ctrl.isConfirmado()) {
+				logger.fine("Edición de valor cancelada para "+componente.getId());
+				return false;
+			}
+			Optional<Double> opt=ctrl.getValorBase();
+			if(opt.isPresent()) {
+				double nuevoValor=opt.get();
+				if(Math.abs(nuevoValor-componente.getValor())>1e-12) {
+					componente.setValor(nuevoValor);
+					logger.log(Level.INFO, "Valor de {0} cambiado a {1}", new Object[] {componente.getId(), nuevoValor});
+					return true;
+				}
+			}
+			logger.fine("Sin cambios en el valor de "+componente.getId());
+			return false;
+		} catch (IOException ex) {
+			logger.severe("Error cargando diálogo de edición: "+ex.getMessage());
+			return false;
+		}
+	}
+	
+	/**
+	 * Muestra una ventana para editar uno de los nodos de conexión de un componente. 
+	 * Llama a la clase {@link DialogosNodo} para realizar la operación.
+	 * 
+	 * @param componente				Componente sobre el que se modifica el nodo
+	 * @param tipoNodo					Tipo de nodo: positivo, negativo, control negativo o control positivo
+	 * @param textoActual				Valor actual del nodo
+	 * @return true si se ha modificado correctamente, false si no
+	 */
+	public static boolean editarNodo(Componente componente, NodeField field, String textoActual) {
+		boolean changed=DialogoNodo.editarNodo(componente, field, textoActual);
+		if(changed) {
+			logger.log(Level.INFO, "Nodo {0} modificado en {1}", new Object[] {field, componente.getId()});
+		}
+		return changed;
+	}
+	
+	/**
+	 * Muestra un diálogo para confirmación de marcar o desmarcar un componente como carga.
+	 * Llama a la clase {@link DialogoCarga} para realizar la operación.
+	 * 
+	 * @param componente				Componente que se va a modificar
+	 * @return true si el estado de carga ha cambiado, false si no
+	 */
+	public static boolean gestionarCarga(Componente componente) {
+		boolean changed=DialogoCarga.gestionar(componente);
+		if(changed && !(componente instanceof Resistencia) && componente.isCarga()) {
+			logger.log(Level.INFO, 
+					"Componente no válido para marcar como carga: {0}", componente.getClass().getSimpleName());
+			componente.setCarga(false);
+			changed=false;
+		}
+		if(changed) {
+			logger.log(Level.INFO, "Estado de carga cambiado para {0}", componente.getId());
+		}
+		return changed;
+	}
+	
+	/**
+	 * Permite cambiar el tipo de magnitud de la que depende una fuente dependiente.
+	 * Llama a la clase {@link alternarDependencia} para realizar la operación.
+	 * 
+	 * @param componente				Componente (o fuente dependiente) que se va a modificar
+	 * @return true si el tipo de dependencia ha cambiado, false si no
+	 */
+	public static boolean alternarDependencia(Componente componente) {
+		boolean changed=DialogoDependencia.alternar(componente);
+		if(changed) {
+			logger.log(Level.INFO, "Dependencia cambniada para ", componente.getId());
+		}
+		return changed;
+	}
+	
+	/**
+	 * Modifica la etiqueta del campo de valor según el componente con su magnitud eléctrica
+	 * o ganancia (caso de fuentes dependientes).
+	 * 
+	 * @param comp				Componente
+	 * @return etiqueta según componente
+	 */
+	private static String modificarLabelValor(Componente comp) {
+		if(comp instanceof Resistencia) {
+			return "Resistencia:";
+		} else if(comp instanceof FuenteTensionInd) {
+			return "Voltaje:";
+		} else if(comp instanceof FuenteCorrienteInd) {
+			return "Corriente:";
+		} else if(comp instanceof FuenteTensionDependiente || comp instanceof FuenteCorrienteDependiente) {
+			return "Ganancia:";
+		}
+		return "Valor:";
+	}
+}

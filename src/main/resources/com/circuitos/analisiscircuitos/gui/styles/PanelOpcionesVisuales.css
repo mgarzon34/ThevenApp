@@ -1,0 +1,24 @@
+/* ========================================================
+ * Estilos para el panel de opciones visuales.
+ * Archivo: PanelOpcionesVisuales.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ======================================================== */
+ 
+ .panel-opciones {
+     -fx-background-color: linear-gradient(to right, #f8f9fa, #e9ecef);
+     -fx-padding: 8 16 8 16;
+     -fx-border-color: #c0c0c0;
+     -fx-border-radius: 6;
+     -fx-background-radius: 6;
+     -fx-spacing: 20;
+ }
+
+ .panel-opciones .check-box {
+     -fx-font-size: 13px;
+     -fx-text-fill: #333;
+ }
+
+ .panel-opciones .check-box:selected .text {
+     -fx-font-weight: bold;
+ }

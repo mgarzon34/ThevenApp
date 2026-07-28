@@ -1,0 +1,223 @@
+package com.circuitos.analisiscircuitos.gui.controller;
+
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.gui.service.state.VisualOptionsService;
+
+import javafx.beans.property.BooleanProperty;
+import javafx.fxml.FXML;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Tooltip;
+
+/**
+ * Controlador del panel superior derecho de opciones visuales. 
+ * Permite activar o desactivar la visualización de:
+ * - Nodos eléctricos.
+ * - Puntos de control de componentes y cables.
+ * - Etiquetas de los componentes.
+ * Las opciones están enlazadas con {@link VisualOptionsService} para que los cambios
+ * se actualicen en tiempo real.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class PanelOpcionesVisualesController {
+	private static final Logger logger=Logger.getLogger(PanelOpcionesVisualesController.class.getName());
+	
+	@FXML private CheckBox mostrarNodos;
+	@FXML private CheckBox mostrarPuntosControl;
+	@FXML private CheckBox mostrarEtiquetas;
+
+	/**
+	 * Inicializa el controlador y enlaza los checkbox con las propiedades visuales.
+	 */
+	public void initialize() {
+		configurarCheckboxNodos();
+		configurarCheckboxPuntosControl();
+		configurarCheckboxEtiquetas();
+		logger.info("Panel de opciones visuales inicializado correctamente.");
+	}
+	
+	/**
+	 * Configura el checkbox de nodos eléctricos.
+	 * Controla las etiquetas de nodos (n0, n1, n2, etc.)
+	 */
+	private void configurarCheckboxNodos() {
+		bind(VisualOptionsService.showNodesProperty(), mostrarNodos, "Nodos",
+				"Controla la visibilidad de las etiquetas de nodos eléctricos (n0, n1, n2, etc.)");
+	}
+	
+	/**
+	 * Configura el checkbox de puntos de control de cables.
+	 * Controla únicamente el punto de control principal de cada cable.
+	 */
+	private void configurarCheckboxPuntosControl() {
+		bind(VisualOptionsService.showAllControlElementsProperty(), mostrarPuntosControl, "PuntosControl",
+				"Controla la visibilidad del punto de control principal de cada cable");
+	}
+	
+	/**
+	 * Configura el checkbox de etiquetas de componentes.
+	 */
+	private void configurarCheckboxEtiquetas() {
+		bind(VisualOptionsService.showLabelsProperty(), mostrarEtiquetas, "Etiquetas",
+				"Controla la visibilidad de las etiquetas de valor de los componentes");
+	}
+	
+	/**
+	 * Activa o desactiva los checkboxes superiores para mostrar una propiedad.
+	 * Añade mensaje de log y un tooltip.
+	 * 
+	 * @param prop			BooleanProperty del checkbox
+	 * @param box			Checkbox que se activa o desactiva
+	 * @param nombre		Nombre del checkbox
+	 * @param descripcion	Descripción detallada para el tooltip
+	 */
+	private void bind(BooleanProperty prop, CheckBox box, String nombre, String descripcion) {
+		prop.bindBidirectional(box.selectedProperty());
+		prop.addListener((obs, oldVal, newVal) -> {
+			logger.info(String.format("%s: %s -> %s", nombre,
+					oldVal ? "VISIBLE" : "OCULTO",
+					newVal ? "VISIBLE" : "OCULTO"));
+		});
+		box.setTooltip(new Tooltip(descripcion));
+		logger.fine(String.format("%s inicializado: %s", nombre, 
+				prop.get() ? "VISIBLE" : "OCULTO"));	
+	}
+	
+	/**
+	 * Obtiene el estado actual de visibilidad de nodos.
+	 * 
+	 * @return {@code true} si los nodos están visibles
+	 */
+	public boolean isNodosVisible() {
+		return mostrarNodos.isSelected();
+	}
+	
+	/**
+	 * Obtiene el estado actual de visibilidad de los puntos de control.
+	 * 
+	 * @return {@code true} si los puntos de control están visibles
+	 */
+	public boolean isPuntosControlVisible() {
+		return mostrarPuntosControl.isSelected();
+	}
+	
+	/**
+	 * Obtiene el estado actual de visibildad de etiquetas.
+	 * 
+	 * @return {@code true} si las etiquetas están visibles
+	 */
+	public boolean isEtiquetasVisible() {
+		return mostrarEtiquetas.isSelected();
+	}
+	
+	/**
+	 * Establece la visibilidad de nodos.
+	 * 
+	 * @param visible 	{@code true} para mostrar, {@code false} para ocultar
+	 */
+	public void setNodosVisible(boolean visible) {
+		mostrarNodos.setSelected(visible);
+		logger.fine("Nodos configurados: "+(visible ? "VISIBLE" : "OCULTO"));
+	}
+	
+	/**
+	 * Establece la visibilidad de puntos de control.
+	 * 
+	 * @param visible 	{@code true} para mostrar, {@code false} para ocultar
+	 */
+	public void setPuntosControlVisible(boolean visible) {
+		mostrarPuntosControl.setSelected(visible);
+		logger.fine("Puntos de control configurados: "+(visible ? "VISIBLE" : "OCULTO"));
+	}
+	
+	/**
+	 * Establece la visibilidad de etiquetas.
+	 * 
+	 * @param visible 	{@code true} para mostrar, {@code false} para ocultar
+	 */
+	public void setEtiquetasVisible(boolean visible) {
+		mostrarEtiquetas.setSelected(visible);
+		logger.fine("Etiquetas configuradas: "+(visible ? "VISIBLE" : "OCULTO"));
+	}
+	
+	/**
+	 * Reinicia todas las opciones visuales a los valores por defecto.
+	 */
+	public void reset() {
+		VisualOptionsService.reset();
+		logger.info("Opciones visuales reiniciadas a valores por defecto");
+	}
+	
+	/**
+	 * Activa el modo de depuración que muestra todos los elementos visuales.
+	 * Útil para desarrolladores y usuarios avanzados.
+	 */
+	public void activarDebugMode() {
+		VisualOptionsService.activarDebugMode();
+		logger.info("Modo de depuración activado - todos los elementos visuales visibles");
+	}
+	
+	/**
+	 * Activa el modo limpio que oculta elementos de distracción.
+	 * Ideal para presentaciones o capturas de pantalla.
+	 */
+	public void activarCleanMode() {
+		VisualOptionsService.activarCleanMode();
+		logger.info("Modo limpio activado - elementos de distracción ocultos");
+	}
+	
+	/**
+	 * Obtiene un resumen del estado actual de todas las opciones visuales.
+	 * 
+	 * @return String con el estado actual de todas las opciones
+	 */
+	public String getEstadoActual() {
+		return String.format("Opciones Visuales: Nodos=%s, Puntos Control=%s, Etiquetas=%s",
+				isNodosVisible() ? "ON" : "OFF",
+				isPuntosControlVisible() ? "ON" : "OFF",
+				isEtiquetasVisible() ? "ON" : "OFF");
+	}
+	
+	/**
+	 * Configura las opciones visuales para el modo Análisis, es decir,
+	 * muestra de forma fija los puntos de control y etiquetas y oculta los nodos y
+	 * desactiva los checkboxes para que no se pueda interactuar.
+	 */
+	public void configurarModoAnalisis() {
+		setNodosVisible(false);
+		setPuntosControlVisible(true);
+		setEtiquetasVisible(true);
+		mostrarNodos.setDisable(true);
+		mostrarPuntosControl.setDisable(true);
+		mostrarEtiquetas.setDisable(true);
+		logger.info("PanelOpcionesVisuales configurado en modo ANÁLISIS: "+getEstadoActual());
+	}
+	
+	/**
+	 * Configura las opciones visuales para el modo Diseño, es decir,
+	 * activa los checkboxes para que el usuario pueda interactuar.
+	 */
+	public void configurarModoDiseno() {
+		mostrarNodos.setDisable(false);
+		mostrarPuntosControl.setDisable(false);
+		mostrarEtiquetas.setDisable(false);
+		logger.info("PanelOpcionesVisuales configurado en modo DISEÑO: "+getEstadoActual());
+	}
+	
+	/**
+	 * Configura las opciones visuales para el modo E-Learning, es decir,
+	 * desactiva los checkboxes de nodos, puntos de control y etiquetas porque en este panel
+	 * no son necesarios.
+	 */
+	public void configurarModoAprendizaje() {
+		setNodosVisible(false);
+		setPuntosControlVisible(false);
+		setEtiquetasVisible(false);
+		mostrarNodos.setDisable(true);
+		mostrarPuntosControl.setDisable(true);
+		mostrarEtiquetas.setDisable(true);
+		logger.info("PanelOpcionesVisuales configurado en modo E-LEARNING: "+getEstadoActual());
+	}
+}

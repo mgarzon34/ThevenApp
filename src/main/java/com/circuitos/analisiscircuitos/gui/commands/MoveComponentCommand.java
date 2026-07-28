@@ -1,0 +1,118 @@
+package com.circuitos.analisiscircuitos.gui.commands;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.gui.service.undo.DescripcionesAccion;
+
+import javafx.scene.layout.StackPane;
+
+/**
+ * Comando para mover un componente en el diseño del circuito.
+ * Este comando soporta fusión para agrupar movimientos consecutivos
+ * en una sola operación de undo/redo.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class MoveComponentCommand implements Command {
+    private final Componente componente;
+    private final StackPane vista;
+    private final double originalX;
+    private final double originalY;
+    private double finalX;
+    private double finalY;
+    private final String descripcion;
+    private final Runnable onUpdateListener;
+    
+    /**
+     * Constructor del comando de mover componente.
+     * 
+     * @param componente 		Componente a mover
+     * @param originalX 		Posición X original
+     * @param originalY 		Posición Y original
+     * @param finalX 			Posición X final
+     * @param finalY 			Posición Y final
+     */
+    public MoveComponentCommand(Componente componente, StackPane vista,
+                               double originalX, double originalY, 
+                               double finalX, double finalY, Runnable onUpdateListener) {
+        this.componente = componente;
+        this.vista=vista;
+        this.originalX = originalX;
+        this.originalY = originalY;
+        this.finalX = finalX;
+        this.finalY = finalY;
+        this.onUpdateListener=onUpdateListener;
+        if(componente!=null) {
+        	this.descripcion=DescripcionesAccion.mover(componente);
+        } else {
+        	this.descripcion="Mover componente";
+        }
+    }
+    
+    /**
+     * Obtiene el componente que está siendo movido.
+     * 
+     * @return El componente
+     */
+    public Componente getComponente() {
+        return componente;
+    }
+    
+    /**
+     * Obtiene la posición X final después del movimiento.
+     * 
+     * @return Posición X final
+     */
+    public double getFinalX() {
+        return finalX;
+    }
+    
+    /**
+     * Obtiene la posición Y final después del movimiento.
+     * 
+     * @return Posición Y final
+     */
+    public double getFinalY() {
+        return finalY;
+    }
+    
+    /* Implementación métodos de la interfaz */
+    
+    @Override
+    public void ejecutar() {
+        if(!esValido()) return;
+        vista.relocate(finalX, finalY);
+        if(onUpdateListener!=null) onUpdateListener.run();
+    }
+    
+    @Override
+    public void deshacer() {
+    	if(!esValido()) return;
+    	vista.relocate(originalX, originalY);
+    	if(onUpdateListener!=null) onUpdateListener.run();
+    }
+    
+    @Override
+    public String getDescripcion() {
+    	return descripcion;
+    }
+    
+    @Override
+    public boolean puedeFusionarCon(Command otroComando) {
+        if(!(otroComando instanceof MoveComponentCommand otro)) return false;
+        return this.vista==otro.vista;
+    }
+    
+    @Override
+    public void fusionarCon(Command otroComando) {
+    	if(!(otroComando instanceof MoveComponentCommand otro)) return;
+        this.finalX=otro.finalX;
+        this.finalY=otro.finalY;
+        if(onUpdateListener!=null) onUpdateListener.run();
+    }
+    
+    @Override
+    public boolean esValido() {
+    	return vista!=null;
+    }
+}

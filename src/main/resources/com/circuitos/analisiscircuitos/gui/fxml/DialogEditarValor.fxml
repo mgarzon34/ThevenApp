@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!-- 
+	FXML del diálogo de edición de valor de un componente.
+
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+
+	Controlador asociado: DialogEditarValorController
+-->
+<VBox xmlns="http://javafx.com/javafx/23.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.circuitos.analisiscircuitos.gui.controller.DialogEditarValorController"
+      spacing="20" alignment="TOP_LEFT"
+      prefWidth="400">
+
+    <padding>
+        <Insets top="15" right="15" bottom="15" left="15"/>
+    </padding>
+
+    <!-- Fila con columnas: Valor y Unidad -->
+    <HBox spacing="20">
+        <!-- Columna de valor -->
+        <VBox spacing="5" HBox.hgrow="ALWAYS">
+            <Label fx:id="labelValor" text="Valor:" />
+            <TextField fx:id="valorField"
+                       promptText="Ingrese valor numérico"
+                       maxWidth="Infinity"
+                       VBox.vgrow="NEVER"/>
+        </VBox>
+
+        <!-- Columna de unidad -->
+        <VBox spacing="5">
+            <Label fx:id="labelUnidad" text="Unidad:" />
+            <ComboBox fx:id="unidadCombo"
+                      promptText="Seleccione unidad"
+                      prefWidth="120" />
+        </VBox>
+    </HBox>
+
+    <!-- Separación visual -->
+    <Region prefHeight="10"/>
+
+    <!-- Botones -->
+    <HBox spacing="10" alignment="CENTER_RIGHT">
+        <Button text="Cancelar" onAction="#onCancelar" cancelButton="true" />
+        <Button text="Aceptar" onAction="#onAceptar" defaultButton="true" />
+    </HBox>
+</VBox>

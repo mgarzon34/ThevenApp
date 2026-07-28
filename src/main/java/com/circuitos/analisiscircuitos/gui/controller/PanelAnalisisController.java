@@ -1,0 +1,627 @@
+package com.circuitos.analisiscircuitos.gui.controller;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import com.circuitos.analisiscircuitos.analisis.Analizador;
+import com.circuitos.analisiscircuitos.analisis.ResultadoNorton;
+import com.circuitos.analisiscircuitos.analisis.ResultadoThevenin;
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.dominio.util.GraphUtil;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades;
+import com.circuitos.analisiscircuitos.dominio.util.Unidades.Type;
+import com.circuitos.analisiscircuitos.gui.model.ConectorPuntos;
+import com.circuitos.analisiscircuitos.gui.renderer.CircuitoEquivalenteRenderer;
+import com.circuitos.analisiscircuitos.gui.renderer.NortonRenderer;
+import com.circuitos.analisiscircuitos.gui.renderer.TheveninRenderer;
+import com.circuitos.analisiscircuitos.gui.service.analisis.ResumenAnalisisService;
+import com.circuitos.analisiscircuitos.gui.service.cable.CableManager;
+import com.circuitos.analisiscircuitos.gui.service.nodes.NodoManager;
+import com.circuitos.analisiscircuitos.gui.util.InteraccionComponenteUtil;
+import com.circuitos.analisiscircuitos.gui.util.UIHelper;
+
+import javafx.application.Platform;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+
+/**
+ * Controlador del área de diseño del circuito.
+ * Permite arrastrar componentes, conectarlos, mostrarlos gráficamente, 
+ * eliminar componentes, seleccionar para edición y mostrar sus propiedades.
+ * 
+ * @author Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class PanelAnalisisController {
+	private static final Logger logger=Logger.getLogger(PanelAnalisisController.class.getName());
+	
+	@FXML private SplitPane splitPane;
+	@FXML private AnchorPane rootAnalisis, panelPropiedadesAnalisisContainer;
+	@FXML private PanelPropiedadesAnalisisController panelPropiedadesAnalisisController;
+	@FXML private Pane zonaDibujoAnalisis;
+	@FXML private ImageView imagenMiniatura;
+	@FXML private StackPane contenedorMiniatura;
+	@FXML private Region redimensionarManual;
+	@FXML private Label botonCerrarMiniatura;
+	@FXML private Button btnTogglePropiedades;
+
+	private CableManager cableManager;
+	private ConectorPuntos conector;
+	private final NodoManager nodoManager=new NodoManager(); //Gestor de nodos eléctricos
+	private PanelAnalisisOpcionesController opcionesController;
+	private PanelDisenoController panelDisenoController;
+	private boolean propiedadesVisibles=false;
+	private final Analizador analizador=new Analizador();
+	
+	/**
+	 * Inicializa el área de diseño. Recibe arrastre, selección y eliminación.
+	 */
+	@FXML
+	public void initialize() {
+		logger.info("Inicializando PanelAnalisisController");
+		inicializarServicios();
+		configurarEventosMiniatura();
+		propiedadesVisibles=false;
+		aplicarVisibilidadPanelPropiedades();
+		InteraccionComponenteUtil.setContextoActual(InteraccionComponenteUtil.Contexto.ANALISIS);
+		logger.info("PanelAnalisisController inicializado correctamente");
+	}
+	
+	/**
+	 * Inicia los servicios que se van a utilizar en el controlador.
+	 */
+	private void inicializarServicios() {
+		conector=new ConectorPuntos(zonaDibujoAnalisis, nodoManager);
+		cableManager=new CableManager(zonaDibujoAnalisis, conector, nodoManager);
+	}
+	
+	/**
+	 * Calcula y renderiza el circuito equivalente de Thévenin 
+	 * a partir del circuito en el panel de diseño y los nodos indicados.
+	 * 
+	 * @param nodoNeg			Nodo negativo de referencia
+	 * @param nodoPos			Nodo positivo de referencia
+	 */
+	public void onCalcularThevenin(int nodoNeg, int nodoPos) {
+		logger.info("Calculando circuito equivalente de Thevenin para nodos "+nodoNeg+"-"+nodoPos);
+		try {
+			Circuito original=prepararZonaAnalisis("Thévenin");
+			if(original==null) return;
+			
+			Circuito circuitoAnalisis=prepararCircuitoAnalisisCarga(original);
+			if(circuitoAnalisis==null) return;
+			
+			ResultadoThevenin resultado=analizador.calculaThevenin(circuitoAnalisis, nodoNeg, nodoPos);
+			double vth=resultado.getVth();
+			double rth=resultado.getRth();
+			if(rth==0.0) {
+				actualizarPanelPropiedadesThevenin(original, resultado, nodoNeg, nodoPos);
+				mostrarAlertaRthCero();
+				return;
+			}
+			logger.info("Resultado Thévenin: Vth="+vth+" V, Rth="+rth+" Ω");
+			
+			CircuitoEquivalenteRenderer rendererBase=crearRendererEquivalente();
+			TheveninRenderer thevRenderer=new TheveninRenderer(rendererBase);
+			thevRenderer.renderizarTh(original, nodoNeg, nodoPos, resultado);
+			Platform.runLater(this::desactivarInteraccionZonaAnalisis);
+			actualizarPanelPropiedadesThevenin(original, resultado, nodoNeg, nodoPos);
+			asegurarMiniaturaVisible();
+			logger.info("Análisis Thevenin completado con éxito");
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error en análisis Thevenin", e);
+			UIHelper.mostrarError("Error al calcular Thevenin: "+e.getMessage());
+		}
+	}
+	
+	/**
+	 * Calcula y renderiza el circuito equivalente de Norton
+	 * a partir del circuito en el panel de diseño y los nodos indicados.
+	 * 
+	 * @param nodoNeg			Nodo negativo de referencia
+	 * @param nodoPos			Nodo positivo de referencia
+	 */
+	public void onCalcularNorton(int nodoNeg, int nodoPos) {
+		logger.info("Calculando circuito equivalente de Norton para nodos "+nodoNeg+"-"+nodoPos);
+		try {
+			Circuito original=prepararZonaAnalisis("Norton");
+			if(original==null) return;
+			
+			Circuito circuitoAnalisis=prepararCircuitoAnalisisCarga(original);
+			if(circuitoAnalisis==null) return;
+			
+			ResultadoNorton resultado=analizador.calculaNorton(circuitoAnalisis, nodoNeg, nodoPos);
+			double iN=resultado.getIn();
+			double rN=resultado.getRn();
+			if(rN==0.0) {
+				actualizarPanelPropiedadesNorton(original, resultado, nodoNeg, nodoPos);
+				mostrarAlertaRthCero();
+				return;
+			}
+			logger.info("Resultado Norton: In="+iN+" A, Rn="+rN+" Ω");
+			
+			CircuitoEquivalenteRenderer rendererBase=crearRendererEquivalente();
+			NortonRenderer nortonRenderer=new NortonRenderer(rendererBase);
+			nortonRenderer.renderizarNo(original, nodoNeg, nodoPos, resultado);
+			Platform.runLater(this::desactivarInteraccionZonaAnalisis);
+			actualizarPanelPropiedadesNorton(original, resultado, nodoNeg, nodoPos);
+			asegurarMiniaturaVisible();
+			logger.info("Análisis Norton completado con éxito");
+		} catch(Exception e) {
+			logger.log(Level.SEVERE, "Error en análisis Norton", e);
+			UIHelper.mostrarError("Error al calcular Norton: "+e.getMessage());
+		}
+	}
+	
+	/**
+	 * Prepara la zona de dibujo del panel de análisis antes de realizar los cálculos.
+	 * 
+	 * @param nombreAnalisis			Nombre para mensajes de error/log
+	 * @return Circuito original a analizar o {@code null} si no está disponible
+	 */
+	private Circuito prepararZonaAnalisis(String nombreAnalisis) {
+		if(panelDisenoController==null) {
+			UIHelper.mostrarError("No se puede acceder al circuito del área de diseño.");
+			return null;
+		}
+		
+		Circuito original=panelDisenoController.getCircuitoActual();
+		if(original==null || original.getComponentes().isEmpty()) {
+			UIHelper.mostrarError("El circuito está vacío. No se puede realizar el análisis de "+nombreAnalisis);
+			return null;
+		}
+		if(zonaDibujoAnalisis!=null) {
+			if(contenedorMiniatura!=null && contenedorMiniatura.getParent()==zonaDibujoAnalisis) {
+				zonaDibujoAnalisis.getChildren().removeIf(n -> n!=contenedorMiniatura);
+			} else {
+				zonaDibujoAnalisis.getChildren().clear();
+			}
+		}
+		conector.reset();
+		mostrarPanelPropiedades(true);
+		return original;
+	}
+	
+	/**
+	 * Resetea el panel de análisis.
+	 */
+	public void resetAnalisis() {
+		if(zonaDibujoAnalisis!=null) {
+			if(contenedorMiniatura!=null && zonaDibujoAnalisis.getChildren().contains(contenedorMiniatura)) {
+				zonaDibujoAnalisis.getChildren().retainAll(contenedorMiniatura);
+			} else {
+				zonaDibujoAnalisis.getChildren().clear();
+			}
+		}
+		asegurarMiniaturaVisible();
+		mostrarPanelPropiedades(false);
+		if(panelPropiedadesAnalisisController!=null) {
+			panelPropiedadesAnalisisController.limpiarPanel();
+		}
+		logger.info("Panel de análisis reseteado correctamente.");
+	}
+	
+	/**
+	 * Crea el renderer base para los circuitos equivalentes. La selección no hace nada.
+	 * 
+	 * @return CircuitoEquivalenteRenderer base para circuitos equivalentes
+	 */
+	private CircuitoEquivalenteRenderer crearRendererEquivalente() {
+		Consumer<Componente> seleccionSinOp=k -> { /*Modo informativo: se ignora la selección*/ };
+		return new CircuitoEquivalenteRenderer(zonaDibujoAnalisis, conector, seleccionSinOp);
+	}
+	
+	/**
+	 * Actualiza el panel de propiedades cuando se realiza un análisis de Thévenin.
+	 * 
+	 * @param original				Circuito original
+	 * @param resultado				Resultado del análisis realizado
+	 * @param nodoNeg				Nodo negativo sobre el que se hace el análisis
+	 * @param nodoPos				Nodo positivo sobre el que se hace el análisis
+	 */
+	private void actualizarPanelPropiedadesThevenin(Circuito original,
+			ResultadoThevenin resultado, int nodoNeg, int nodoPos) {
+		if(panelPropiedadesAnalisisController==null) {
+			return;
+		}
+		String titulo="Análisis de Thévenin realizado";
+		String vthFormat=Unidades.format(resultado.getVth(), Type.TENSION);
+		String rthFormat=Unidades.format(resultado.getRth(), Type.RESISTENCIA);
+		
+		String txFuente="Tensión Thévenin:\nVth = "+vthFormat;
+		String txRes;
+		if(resultado.getRth()==0.0) {
+			txRes="Resistencia Thévenin:\nRth=0Ω (cortocircuito).\n"+
+					"No se ha dibujado el circuito equivalente para evitar\n"+
+					"inconsistencias.";
+		} else {
+			txRes="Resistencia Thévenin:\nRth = "+rthFormat;
+		}
+		List<String> cargas=construirListaCargas(original);
+		String resumen=ResumenAnalisisService.resumirTh(original, resultado.getRth());
+		panelPropiedadesAnalisisController.mostrarResultadoAnalisis(titulo, txFuente, txRes, cargas, resumen);
+	}
+	
+	/**
+	 * Actualiza el panel de propiedades cuando se realiza un análisis de Norton.
+	 * 
+	 * @param original				Circuito original
+	 * @param resultado				Resultado del análisis realizado
+	 * @param nodoNeg				Nodo negativo sobre el que se hace el análisis
+	 * @param nodoPos				Nodo positivo sobre el que se hace el análisis
+	 */
+	private void actualizarPanelPropiedadesNorton(Circuito original, 
+			ResultadoNorton resultado, int nodoNeg, int nodoPos) {
+		if(panelPropiedadesAnalisisController==null) {
+			return;
+		}
+		String titulo="Análisis de Norton realizado";
+		String inFormat=Double.isInfinite(resultado.getIn()) ? "∞ A (Rn = 0Ω" :
+			Unidades.format(resultado.getIn(), Type.CORRIENTE);
+		String rnFormat=Unidades.format(resultado.getRn(), Type.RESISTENCIA);
+
+		String txFuente;
+		String txRes;
+		if(resultado.getRn()==0.0) {
+			txFuente="Corriente de Norton:\nIn no definida (Rth=0Ω -> In infinita).\n"
+					+"No se ha dibujado el circuito equivalente para evitar\n"
+					+"inconsistencias.";
+			txRes="Resistencia Norton:\nRn=0Ω (no existe equivalente de Norton para estos nodos).";
+		} else {
+			txFuente="Corriente de Norton:\nIn = "+inFormat;
+			txRes="Resistencia Norton:\nRn = "+rnFormat;
+		}
+		List<String> cargas=construirListaCargas(original);
+		String resumen=ResumenAnalisisService.resumirNo(original, resultado.getRn());
+		panelPropiedadesAnalisisController.mostrarResultadoAnalisis(titulo, txFuente, txRes, cargas, resumen);
+	}
+	
+	/**
+	 * Construye la lista de componentes de carga, es decir, componentes que no entraron en 
+	 * el análisis con una descripción con formato específico.
+	 * 
+	 * @param original			Circuito original
+	 * @return Lista de componentes de carga
+	 */
+	private List<String> construirListaCargas(Circuito original) {
+		try {
+			if(original==null || original.getComponentes()==null) return List.of();
+			return original.getComponentes().stream()
+					.filter(Componente::isCarga)
+					.map(this::formatearDescripcionCarga)
+					.toList();
+		} catch(Exception e) {
+			logger.log(Level.WARNING, "No se pudo construir la lista de cargas", e);
+			return List.of();
+		}
+	}
+	
+	/**
+	 * Formatea una descripción corta de un componente de carga.
+	 * 
+	 * @param comp			Componente de carga
+	 * @return String con la descripción
+	 */
+	private String formatearDescripcionCarga(Componente comp) {
+		String tipo=comp.getClass().getSimpleName();
+		String id;
+		try {
+			id=String.valueOf(comp.getId());
+		} catch(Exception e) {
+			id="?";
+		}
+		String valorFormat=obtenerValorFormateado(comp);
+		return tipo+" "+id+(valorFormat!=null ? ": "+valorFormat : "");
+	}
+	
+	/**
+	 * Devuelve el valor de un componente de carga formateado según el tipo de componente.
+	 * 
+	 * @param comp				Componente del que se extrae su valor
+	 * @return Valor formateado del componente
+	 */
+	private String obtenerValorFormateado(Componente comp) {
+		if(comp instanceof Resistencia r) return Unidades.format(r.getValor(), Type.RESISTENCIA);
+		if(comp instanceof FuenteTensionInd fti) return Unidades.format(fti.getValor(), Type.TENSION);
+		if(comp instanceof FuenteCorrienteInd fci) return Unidades.format(fci.getValor(), Type.CORRIENTE);
+		return null;
+	}
+	
+	/**
+	 * Desactiva la interacción con los circuitos equivalentes de forma que sean
+	 * meramente informativos.
+	 */
+	private void desactivarInteraccionZonaAnalisis() {
+		if(zonaDibujoAnalisis==null) return;
+		zonaDibujoAnalisis.setMouseTransparent(false);
+		zonaDibujoAnalisis.setPickOnBounds(false);
+		for(Node n : zonaDibujoAnalisis.getChildren()) {
+			if(n==contenedorMiniatura) n.setMouseTransparent(false);
+			else n.setMouseTransparent(true);
+		}
+	}
+	
+	/**
+	 * Prepara el circuito eliminando la carga automáticamente antes de enviarlo
+	 * a realizar el análisis. Crea una copia sin carga para enviarla.
+	 * 
+	 * @param original			Circuito original
+	 * @return copia del circuito sin carga para enviar al analizador
+	 */
+	private Circuito prepararCircuitoAnalisisCarga(Circuito original) {
+		List<Componente> compCarga=obtenerComponentesCarga(original);
+		if(compCarga==null || compCarga.isEmpty()) {
+			return original;
+		}
+		@SuppressWarnings("unused")
+		int[] bornes;
+		try {
+			bornes=GraphUtil.detectarBornesCarga(compCarga, original.getComponentes());
+		} catch(IllegalArgumentException ex) {
+			UIHelper.mostrarAlerta(Alert.AlertType.WARNING, "Selección de carga no válida", ex.getMessage());
+			return null;
+		}
+		Circuito circuitoAnalisis=new Circuito();
+		for(Componente c : original.getComponentes()) {
+			if(!compCarga.contains(c)) {
+				circuitoAnalisis.addComponente(c);
+			}
+		}
+		return circuitoAnalisis;
+	}
+	
+	/**
+	 * Extrae todos los componentes marcados como carga del circuito original.
+	 * 
+	 * @param original			Circuito original
+	 * @return Lista de componentes de carga
+	 */
+	private List<Componente> obtenerComponentesCarga(Circuito original) {
+		if(original==null || original.getComponentes()==null) {
+			return new ArrayList<>();
+		}
+		return original.getComponentes().stream()
+				.filter(Componente::isCarga)
+				.collect(Collectors.toList());
+	}
+	
+	/**
+	 * Configura el comportamiento y cómo se interactúa con la miniatura del circuito original.
+	 */
+	private void configurarEventosMiniatura() {
+		if(botonCerrarMiniatura!=null) botonCerrarMiniatura.setOnMouseClicked(this::onCerrarMiniatura);
+		if(imagenMiniatura!=null) imagenMiniatura.setOnMouseClicked(this::onMiniaturaClick);
+		if(redimensionarManual!=null) {
+			redimensionarManual.setOnMousePressed(this::onRedimensionarManualPressed);
+			redimensionarManual.setOnMouseDragged(this::onRedimensionarManualDragged);
+		}
+		if(contenedorMiniatura!=null) contenedorMiniatura.setCursor(javafx.scene.Cursor.HAND);
+	}
+	
+	/**
+	 * Inicia el arrastre de la miniatura del circuito original.
+	 * Guarda el desplazamiento para calcular la nueva posición.
+	 * 
+	 * @param event		Evento de ratón presionado
+	 */
+	@FXML
+	private void onMiniaturaMousePressed(MouseEvent event) {
+		double offsetX=event.getSceneX()-contenedorMiniatura.getLayoutX();
+		double offsetY=event.getSceneY()-contenedorMiniatura.getLayoutY();
+		contenedorMiniatura.setUserData(new double[] {offsetX, offsetY});
+	}
+	
+	/**
+	 * Arrastra la miniatura del circuito original.
+	 * 
+	 * @param event			Evento de arrastre del ratón
+	 */
+	@FXML
+	private void onMiniaturaMouseDragged(MouseEvent event) {
+		double[] offsets=(double[]) contenedorMiniatura.getUserData();
+		if(offsets!=null) {
+			double newX=event.getSceneX()-offsets[0];
+			double newY=event.getSceneY()-offsets[1];
+			newX=Math.max(0, Math.min(newX, zonaDibujoAnalisis.getWidth()-contenedorMiniatura.getWidth()));
+			newY=Math.max(0,  Math.min(newY, zonaDibujoAnalisis.getHeight()-contenedorMiniatura.getHeight()));
+			contenedorMiniatura.setLayoutX(newX);
+			contenedorMiniatura.setLayoutY(newY);
+		}
+	}
+	
+	/**
+	 * Al hacer click muestra el circuito original ampliado.
+	 * 
+	 * @param event			Evento de click
+	 */
+	@FXML
+	private void onMiniaturaClick(MouseEvent event) {
+		if(event.isStillSincePress()) mostrarCircuitoOriginalZoom();
+	}
+
+	/**
+	 * Asegura que la miniatura del circuito original esté visible
+	 * y actualiza el estado del checkbox.
+	 */
+	private void asegurarMiniaturaVisible() {
+		if(contenedorMiniatura==null) return;
+		if(opcionesController!=null && !opcionesController.isMiniaturaActiva()) {
+			logger.info("Miniatura no forzada porque el checkbox está desactivado.");
+			contenedorMiniatura.setVisible(false);
+			contenedorMiniatura.setManaged(false);
+			return;
+		}
+		if(contenedorMiniatura.getParent()==null && zonaDibujoAnalisis!=null) {
+			zonaDibujoAnalisis.getChildren().add(contenedorMiniatura);
+			logger.info("Miniatura reinsertada en zonaDibujoAnalisis tras limpieza.");
+		}
+		contenedorMiniatura.setVisible(true);
+		contenedorMiniatura.setManaged(true);
+		logger.info("Miniatura configurada como visible");
+	}
+	
+	/**
+	 * Establece la imagen que se mostrará como miniatura del circuito original.
+	 * 
+	 * @param img			Imagen a mostrar en la miniatura
+	 */
+	public void setMiniaturaCircuito(Image img) {
+		if(imagenMiniatura!=null && img!=null) {
+			imagenMiniatura.setImage(img);
+			Platform.runLater(this::asegurarMiniaturaVisible);
+		}
+	}
+
+	/**
+	 * Cierra u oculta la miniatura del circuito original y actualiza el checkbox.
+	 */
+	@FXML
+	private void onCerrarMiniatura(MouseEvent e) {
+		contenedorMiniatura.setVisible(false);
+		contenedorMiniatura.getProperties().remove("mantener_visible");
+		if(opcionesController!=null) opcionesController.actualizarCheckMiniatura(false);
+	}
+	
+	/**
+	 * Guarda estado inicial para comenzar a redimensionar manualmente la miniatura del circuito.
+	 * 
+	 * @param event		Evento de ratón presionado sobre el área de redimensionado
+	 */
+	@FXML
+	private void onRedimensionarManualPressed(MouseEvent event) {
+		contenedorMiniatura.setUserData(new double[] {
+				event.getScreenX(), event.getScreenY(),
+				imagenMiniatura.getFitWidth(), imagenMiniatura.getFitHeight()
+		});
+	}
+	
+	/**
+	 * Redimensiona manualmente la miniatura del circuito arrastrando el área de redimensionado.
+	 * 
+	 * @param event			Evento de arrastre de ratón
+	 */
+	@FXML
+	private void onRedimensionarManualDragged(MouseEvent event) {
+		double[] data=(double []) contenedorMiniatura.getUserData();
+		if(data!=null) {
+			double deltaX=event.getScreenX()-data[0];
+			double deltaY=event.getScreenY()-data[1];
+			double newWidth=Math.max(100, data[2]+deltaX);
+			double newHeight=Math.max(75, data[3]+deltaY);
+			imagenMiniatura.setFitWidth(newWidth);
+			imagenMiniatura.setFitHeight(newHeight);
+		}
+	}
+	
+	/**
+	 * Muestra el circuito original en una ventana de diálogo 
+	 * con zoom para inspección más detallada.
+	 */
+	private void mostrarCircuitoOriginalZoom() {
+		if(imagenMiniatura.getImage()==null) return;
+		ImageView zoom=new ImageView(imagenMiniatura.getImage());
+		zoom.setPreserveRatio(true);
+		zoom.setFitWidth(800);
+		ScrollPane scrollpane=new ScrollPane(zoom);
+		scrollpane.setPrefSize(850, 600);
+		scrollpane.setPannable(true);
+		Dialog<Void> dialog=new Dialog<>();
+		dialog.setTitle("Vista ampliada del circuito original");
+		dialog.getDialogPane().setContent(scrollpane);
+		dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+		dialog.showAndWait();
+	}
+	
+	/**
+	 * Muestra u oculta el panel de propiedades de la pestaña de Análisis.
+	 * 
+	 * @param mostrar 		Flag booleano para mostrar/ocultar
+	 */
+	public void mostrarPanelPropiedades(boolean mostrar) {
+		propiedadesVisibles=mostrar;
+		aplicarVisibilidadPanelPropiedades();
+	}
+	
+	/**
+	 * Aplica la visibilidad del panel de propiedades según el flag propiedadesVisibles.
+	 */
+	private void aplicarVisibilidadPanelPropiedades() {
+		if(panelPropiedadesAnalisisContainer!=null) {
+			panelPropiedadesAnalisisContainer.setVisible(propiedadesVisibles);
+			panelPropiedadesAnalisisContainer.setManaged(propiedadesVisibles);
+		}
+		if(splitPane!=null) {
+			splitPane.setDividerPositions(propiedadesVisibles ? 0.75 : 1.0);
+		}
+		actualizarEstadoBotonPropiedades();
+	}
+	
+	/**
+	 * Controla el panel de propiedades según el evento del botón para mostrar/ocultar.
+	 */
+	@FXML
+	private void onTogglePropiedades(ActionEvent event) {
+		propiedadesVisibles=!propiedadesVisibles;
+		aplicarVisibilidadPanelPropiedades();
+	}
+	
+	/**
+	 * Actualiza el estado del botón que permite abrir o cerrar el panel de propiedades.
+	 */
+	private void actualizarEstadoBotonPropiedades() {
+		if(btnTogglePropiedades==null) return;
+		btnTogglePropiedades.setText(propiedadesVisibles ? "❯" : "❮");
+	}
+	
+	/**
+	 * Muestra una alerta cuando, al realizar el cálculo, la resistencia equivalente
+	 * de Norton o Thevenin es cero.
+	 */
+	private void mostrarAlertaRthCero() {
+		Alert alert=new Alert(AlertType.ERROR);
+		alert.setHeaderText("Análisis no válido");
+		alert.setContentText(
+				"La resistencia equivalente vista desde los nodos seleccionados es R=0 Ω.\n\n"+
+				"Eso implica un cortocircuito:\n"+
+				"• En Thevenin, Vth existe pero no tiene sentido mostrar Rth=0.\n"+
+				"• En Norton, la corriente In sería infinita.\n\n"+
+				"Revisa el circuito o elige otros nodos de análisis.");
+		alert.showAndWait();
+	}
+	
+	/** Getters para otros controladores */
+	public void setOpcionesController(PanelAnalisisOpcionesController opcionesController) {
+		this.opcionesController=opcionesController;
+	}
+	public void setPanelDisenoController(PanelDisenoController panelDisenoController) {
+		this.panelDisenoController=panelDisenoController;
+	}
+	public Pane getZonaDibujoAnalisis() { return zonaDibujoAnalisis; }
+	public ConectorPuntos getConector() { return conector; }
+	public AnchorPane getRootAnalisis() { return rootAnalisis; }
+	public CableManager getCableManager() { return cableManager; }
+	public StackPane getContenedorMiniatura() { return contenedorMiniatura; }
+}

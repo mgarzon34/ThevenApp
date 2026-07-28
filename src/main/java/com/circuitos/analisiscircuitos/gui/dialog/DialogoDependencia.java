@@ -1,0 +1,77 @@
+package com.circuitos.analisiscircuitos.gui.dialog;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+
+import javafx.scene.control.ChoiceDialog;
+
+/**
+ * Clase utilitaria para alternar el tipo de dependencia (tensión o corriente) de las 
+ * fuentes dependientes.
+ * Es utilizada por {@link PropiedadesActions} para realizar sus operaciones.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class DialogoDependencia {
+	private static final Logger logger=Logger.getLogger(DialogoDependencia.class.getName());
+	private static final String TITLE="Seleccionar dependencia";
+	private static final String HEADER="Indica de qué magnitud depende la fuente:";
+	private static final String CONTENT="Dependencia:";
+	
+	private DialogoDependencia() { /* No instanciable */ }
+	
+	/**
+	 * Alterna el tipo de magnitud (tensión o corriente) de la que depende la fuente.
+	 * 
+	 * @param componente			Componente a modificar, debe ser una fuente dependiente
+	 * @return {@code true} si el tipo de dependencia ha cambiado, {@code false} si no
+	 */
+	public static boolean alternar(Componente componente) {
+		boolean esFTD = componente instanceof FuenteTensionDependiente;
+		boolean esFCD = componente instanceof FuenteCorrienteDependiente;
+
+		if (!esFTD && !esFCD) return false;
+
+		boolean actualCorriente = esFTD
+				? ((FuenteTensionDependiente) componente).getControlType().equals(FuenteTensionDependiente.ControlType.CORRIENTE)
+				: ((FuenteCorrienteDependiente) componente).getControlType().equals(FuenteCorrienteDependiente.ControlType.CORRIENTE);
+
+		String inicial = actualCorriente ? "Corriente" : "Tensión";
+		List<String> opciones = Arrays.asList("Tensión", "Corriente");
+
+		ChoiceDialog<String> dialog = new ChoiceDialog<>(inicial, opciones);
+		dialog.setTitle(TITLE);
+		dialog.setHeaderText(HEADER);
+		dialog.setContentText(CONTENT);
+
+		Optional<String> result = dialog.showAndWait();
+		if (result.isEmpty()) {
+			logger.fine("Usuario canceló el diálogo de dependencia para "+componente.getId());
+			return false;
+		}
+
+		String elegido = result.get();
+		boolean esCorriente = elegido.equals("Corriente");
+
+		if (esCorriente == actualCorriente) return false;
+
+		if (esFTD) {
+			((FuenteTensionDependiente) componente).setControlType(
+				esCorriente ? FuenteTensionDependiente.ControlType.CORRIENTE
+							: FuenteTensionDependiente.ControlType.TENSION);
+		} else {
+			((FuenteCorrienteDependiente) componente).setControlType(
+				esCorriente ? FuenteCorrienteDependiente.ControlType.CORRIENTE
+							: FuenteCorrienteDependiente.ControlType.TENSION);
+		}
+		logger.info(() -> String.format("Dependencia de %s cambiada.", componente.getId()));
+		return true;
+	}
+}

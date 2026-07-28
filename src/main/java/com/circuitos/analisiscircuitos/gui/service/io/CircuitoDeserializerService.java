@@ -1,0 +1,83 @@
+package com.circuitos.analisiscircuitos.gui.service.io;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteInd;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+import com.circuitos.analisiscircuitos.dominio.Tierra;
+import com.circuitos.analisiscircuitos.dto.CableDto;
+import com.circuitos.analisiscircuitos.dto.CircuitoFileDto;
+import com.circuitos.analisiscircuitos.gui.service.cable.CableNodeRepairUtil;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.NamedType;
+
+/**
+ * Servicio para deserializar un circuito desde archivo JSON.
+ * 
+ * @author Marco Antonio Garzón Palos
+ * @version 1.0
+ */
+public class CircuitoDeserializerService {
+	
+	private static final Logger logger=Logger.getLogger(CircuitoDeserializerService.class.getName());
+	private final ObjectMapper mapper;
+	
+	/**
+	 * Constructor. Configura ObjectMapper para reconocer subtipos.
+	 */
+	public CircuitoDeserializerService() {
+		mapper = new ObjectMapper()
+				.enable(SerializationFeature.INDENT_OUTPUT)
+				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+				.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+				.disable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES);
+				
+		mapper.registerSubtypes(new NamedType(Resistencia.class, "Resistencia"),
+				new NamedType(FuenteTensionInd.class, "FuenteTensionIndependiente"),
+				new NamedType(FuenteCorrienteInd.class, "FuenteCorrienteIndependiente"),
+				new NamedType(FuenteTensionDependiente.class, "FuenteTensionDependiente"),
+				new NamedType(FuenteCorrienteDependiente.class, "FuenteCorrienteDependiente"),
+				new NamedType(Tierra.class, "Tierra"));
+	}
+	
+	/**
+	 * Carga un archivo JSON y devuelve objeto {@link CircuitoFileDto}
+	 * 
+	 * @param archivo			Archivo JSON con el circuito serializado
+	 * @return DTO con el circuito, posiciones, cables
+	 * @throws IOException si el archivo no existe o está mal formado
+	 */
+	public CircuitoFileDto cargarCircuitoArchivo(File archivo) throws IOException {
+		Objects.requireNonNull(archivo, "El archivo a cargar no puede ser null");
+		logger.fine("Cargando circuito desde "+archivo);
+		CircuitoFileDto dto=mapper.readValue(archivo, CircuitoFileDto.class);
+		List<CableDto> reparados=CableNodeRepairUtil.repairCables(dto.cables());
+		CircuitoFileDto corregido=new CircuitoFileDto(dto.metadata(), dto.circuito(), dto.posiciones(), reparados);
+		logger.info(()->String.format("Circuito cargado y reparado: %d cables", reparados.size()));
+		return corregido;
+	}
+	
+	/**
+	 * Carga un circuito desde una cadena de texto JSON (para resolver ejercicios).
+	 * 
+	 * @param json					Cadena de texto JSON
+	 * @return DTO con el circuito
+	 * @throws IOException si el JSON está mal formado
+	 */
+	public CircuitoFileDto cargarCircuitoTexto(String json) throws IOException {
+		Objects.requireNonNull(json, "El contenido JSON no puede ser null");
+		logger.fine("Deserializando circuito desde String");
+		CircuitoFileDto dto=mapper.readValue(json, CircuitoFileDto.class);
+		List<CableDto> reparados=CableNodeRepairUtil.repairCables(dto.cables());
+		return new CircuitoFileDto(dto.metadata(), dto.circuito(), dto.posiciones(), reparados);
+	}
+}

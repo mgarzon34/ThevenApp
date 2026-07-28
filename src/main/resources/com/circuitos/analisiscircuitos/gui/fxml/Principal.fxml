@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	FXML de la ventana principal de ThevenApp.
+	Contiene una barra de menú, el logo lateral, la paleta de componentes y un
+	área de pestañas para Diseño, Análisis y Aprendizaje.
+	
+	Autor: Marco Antonio Garzón Palos
+	Versión: 1.0
+	
+	Controlador asociado: ThevenAppController
+	Utiliza estilo: logoControl.css (para el logo)
+ -->
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.StackPane?>
+
+<BorderPane prefHeight="800.0" prefWidth="1200" 
+		    xmlns="http://javafx.com/javafx/23.0.1" 
+		    xmlns:fx="http://javafx.com/fxml/1" 
+		    fx:id="rootBorderpane"
+		    fx:controller="com.circuitos.analisiscircuitos.gui.controller.ThevenAppController">
+		 
+		 <!-- MENÚ SUPERIOR -->
+         <top>
+            <MenuBar BorderPane.alignment="CENTER">
+              <menus>
+              
+              	<!-- Menú Archivo -->
+                <Menu mnemonicParsing="false" text="Archivo">
+                  <items>
+                        <MenuItem fx:id="menuItemNuevo" mnemonicParsing="false" onAction="#onCrearNuevoCircuito" text="Nuevo" />
+                        <Menu fx:id="menuRecientes" text="Abrir recientes" />
+                        <MenuItem fx:id="menuItemCargar" mnemonicParsing="false" onAction="#onAbrir" text="Cargar" />
+                        <MenuItem fx:id="menuItemGuardar" mnemonicParsing="false" onAction="#onGuardar" text="Guardar" />  
+                        <MenuItem fx:id="menuItemGuardarComo" mnemonicParsing="false" onAction="#onGuardarComo" text="Guardar como" />
+                    	<MenuItem fx:id="menuItemSalir" mnemonicParsing="false" onAction="#onSalir" text="Salir" />
+                  </items>
+                </Menu>
+                
+                <!-- Menú Edición -->
+                <Menu mnemonicParsing="false" text="Edicion">
+                  <items>
+                    <MenuItem fx:id="menuItemUndo" mnemonicParsing="false" onAction="#onDeshacer" text="Deshacer" />
+                    <MenuItem fx:id="menuItemRedo" mnemonicParsing="false" onAction="#onRehacer" text="Rehacer" />
+                    <MenuItem fx:id="seleccionarTodo" mnemonicParsing="false" onAction="#onSeleccionarTodo" text="Seleccionar todo" />
+                    <MenuItem fx:id="deseleccionarTodo" mnemonicParsing="false" onAction="#onDeseleccionarTodo" text="Deseleccionar todo" />
+                    <MenuItem fx:id="limpiarArea" mnemonicParsing="false" onAction="#onLimpiarArea" text="Limpiar área de dibujo" />
+                  </items>
+                </Menu>
+                
+                <!-- Menú Ayuda -->
+                <Menu mnemonicParsing="false" text="Ayuda">
+                  <items>
+                  	<MenuItem mnemonicParsing="false" onAction="#onVerLogs" text="Ver Logs" />
+                  	<MenuItem mnemonicParsing="false" onAction="#onAbrirManual" text="Manual de Usuario (PDF)" />
+                    <MenuItem mnemonicParsing="false" onAction="#onAcercaDe" text="Acerca de" />
+                  </items>
+                </Menu>
+              </menus>
+            </MenuBar>
+         </top>
+         
+         <!-- PANEL LATERAL IZQUIERDO -->
+         <left>
+           <VBox alignment="TOP_CENTER" prefWidth="228.0" spacing="10.0" styleClass="logo-image" BorderPane.alignment="CENTER">
+   			 <children>
+   			 
+        		<!-- Logo principal de la aplicación -->
+       			 <ImageView fx:id="imagenLogo" fitHeight="140.0" fitWidth="224.0" pickOnBounds="true">
+           			 <image>
+                		<Image url="@../images/logoThevenApp.png" />
+           			 </image>
+       			 </ImageView>
+        
+       			 <!-- Paleta de componentes -->
+       			 <StackPane fx:id="contenedorPanelesLaterales" prefWidth="228.0" VBox.vgrow="ALWAYS">
+       			 	<fx:include fx:id="panelComp" source="PanelComponentes.fxml" />
+       			 	<fx:include fx:id="panelAnalisisOpciones" source="PanelAnalisisOpciones.fxml" />
+       			 	<fx:include fx:id="panelNavegacionAprendizaje" source="PanelNavegacionAprendizaje.fxml" visible="false" managed="false" />
+       			 </StackPane>
+     		 </children>
+   		 </VBox>
+   </left>
+   
+   <!-- ÁREA CENTRAL: PESTAÑAS -->
+<center>
+   <AnchorPane>
+       <children>
+           <TabPane fx:id="tabPanePrincipal"
+                    prefHeight="200.0"
+                    prefWidth="200.0"
+                    tabClosingPolicy="UNAVAILABLE"
+                    AnchorPane.topAnchor="0.0"
+                    AnchorPane.bottomAnchor="0.0"
+                    AnchorPane.leftAnchor="0.0"
+                    AnchorPane.rightAnchor="0.0">
+               <tabs>
+                   <Tab fx:id="tabDiseno" text="Diseño">
+                       <fx:include source="PanelDiseno.fxml"/>
+                   </Tab>
+                   <Tab fx:id="tabAnalisis" text="Analisis">
+                       <fx:include source="PanelAnalisis.fxml"/>
+                   </Tab>
+                   <Tab fx:id="tabAprendizaje" text="E-Learning">
+                       <fx:include source="PanelAprendizaje.fxml"/>
+                   </Tab>
+               </tabs>
+           </TabPane>
+
+           <fx:include fx:id="panelOpcionesVisuales"
+                       source="PanelOpcionesVisuales.fxml"
+                       AnchorPane.topAnchor="10.0"
+                       AnchorPane.rightAnchor="10.0"/>
+       </children>
+   </AnchorPane>
+</center>
+
+</BorderPane>

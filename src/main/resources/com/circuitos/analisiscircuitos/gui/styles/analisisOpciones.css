@@ -1,0 +1,78 @@
+/* =======================================================================
+ * Estilos del panel de opciones de Análisis y de los botones incluidos
+ * Archivo: analisisOpciones.css
+ * Autor: Marco Antonio Garzón Palos
+ * Versión: 1.0
+ * ====================================================================== */
+
+ .panel-analisis-opciones {
+ 	-fx-padding: 40;
+ 	-fx-background-color:  #0085C5;			/* Color azul */
+ 	-fx-border-color: #aabbd0;
+ 	-fx-border-width: 1;
+ 	-fx-border-radius: 8;
+ 	-fx-background-radius: 8;
+ 	-fx-cursor:hand;
+ } 
+ 
+ .panel-analisis-opciones .button {
+ 	-fx-font-size: 15px;
+ 	-fx-font-weight: bold;
+ 	-fx-padding: 12 24;
+ 	-fx-background-color: #FFB300;
+ 	-fx-text-fill: #002C55;
+ 	-fx-background-radius: 6;
+ 	-fx-effect: dropshadow(one-pass-box, rgba(0,0,0,0.2), 5, 0, 2, 2);
+ }
+ 
+ .panel-analisis-opciones .button:hover {
+ 	-fx-background-color: #FFA000;
+ }
+ 
+ .panel-analisis-background {
+ 	-fx-background-color:  #002C55;			/* Color azul oscuro */
+ }
+ 
+ .panel-analisis-title {
+ 	-fx-text-fill: white;				/* Color de letra blanco */
+	-fx-font-family: "Arial";			/* Tipo de letra */
+	-fx-font-size: 16px;				/* Tamaño de letra */
+	-fx-font-weight: bold;				/* Estilo "negrita" */
+ }
+ 
+ .panel-analisis-checkbox {
+ 	-fx-text-fill: white;
+ 	-fx-font-size: 13px;
+ 	-fx-font-weight: bold;
+ 	-fx-padding: 10 0 0 0;
+ 	-fx-wrap-text: true;
+ 	 	-fx-cursor:hand;
+ }
+ 
+ .panel-analisis-checkbox .box {
+ 	-fx-background-color: white;
+ 	-fx-border-color: #FFB300;
+ 	-fx-border-width: 2;
+ 	-fx-border-radius: 3;
+ 	-fx-background-radius: 3;
+ }
+ 
+ .panel-analisis-checkbox:selected .box {
+ 	-fx-background-color: #FFB300;
+ 	-fx-border-color: #FFA000;
+ }
+ 
+ .panel-analisis-checkbox:hover {
+ 	-fx-cursor: hand;
+ }
+ 
+ .panel-analisis-label {
+ 	-fx-text-fill: white;
+ 	-fx-font-weight: bold;
+ 	-fx-font-size: 13px;
+ }
+ 
+ .panel-analisis-opciones .combo-box {
+ 	-fx-background-color: white;
+ 	-fx-border-color: #FFB300;
+ }

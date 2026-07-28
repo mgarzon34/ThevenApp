@@ -1,0 +1,292 @@
+package com.circuitos.analisiscircuitos.dominio.util;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
+
+import com.circuitos.analisiscircuitos.dominio.Circuito;
+import com.circuitos.analisiscircuitos.dominio.Componente;
+import com.circuitos.analisiscircuitos.dominio.FuenteCorrienteDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionDependiente;
+import com.circuitos.analisiscircuitos.dominio.FuenteTensionInd;
+import com.circuitos.analisiscircuitos.dominio.Resistencia;
+
+/**
+ * Clase que tiene herramientas para "estampar" (stamp) componentes en matrices y vectores 
+ * del método de análisis nodal unificado(MNA).
+ * Criterio de signos: Nodo 1 - Negativo / Entrada de corriente, Nodo 2 - Positivo / Salida de corriente
+ * Flujo de nodo 1 a nodo2.
+ * 
+ * @author 	Marco Antonio Garzon Palos
+ * @version 1.0
+ */
+public class StampUtil {
+	private static final Logger logger=Logger.getLogger(StampUtil.class.getName());
+	
+	private StampUtil() { /* No instanciable */ }
+	
+	/**
+	 * Convierte un índice de nodo en bruto en su índice comprimido sin referencia.
+	 * @param nodo 	índice original del nodo
+	 * @param ref 	índice del nodo de referencia
+	 * @return 		índice comprimido, o -1 si nodo==ref
+	 */
+	public static int comprimir(int nodo, int ref) {
+		if (nodo==ref) return -1;
+		return nodo>ref ? nodo-1 : nodo;
+	}
+	
+	/**
+	 * Añade conductancia al sistema G en la posición dada, respetando la referencia.
+	 * @param G 	matriz de conductancias
+	 * @param fila 	índice del nodo asociado a la fila en la que estampamos
+	 * @param col 	índice del nodo asociado a la columna
+	 * @param valor conductancia que añadimos (g o -g)
+	 * @param ref 	índice de referencia para comprimir filas y columnas
+	 * @throws NullPointerException		si matriz G es null
+	 */
+	public static void stampG(RealMatrix G, int fila, int col, double valor, int ref) {
+		Objects.requireNonNull(G, "G no puede ser null");
+		int i=comprimir(fila, ref);
+		int j=comprimir(col, ref);
+		if(i>=0 && j>=0) {
+			G.addToEntry(i, j, valor);
+			logger.log(Level.FINER, "stampG: G[{0},{1}]+={2}", new Object[] {i, j, valor});
+		}
+	}
+	
+	/**
+	 * Añade una corriente al vector I para la ecuación nodal.
+	 * @param I 	vector de corrientes del sistema MNA
+	 * @param nodo 	índice del nodo donde inyectamos corriente
+	 * @param valor corriente que añadimos (positiva o negativa)
+	 * @param ref 	índice de referencia para comprimir la posición en el vector
+	 * @throws NullPointerException		si vector I es null
+	 */
+	public static void stampI(RealVector I, int nodo, double valor, int ref) {
+		Objects.requireNonNull(I, "I no puede ser null");
+		int i=comprimir(nodo, ref);
+		if(i>=0) {
+			I.addToEntry(i, valor);
+			logger.log(Level.FINER, "stampI: I[{0}]+={1}", new Object[] {i, valor});
+		}
+	}
+	
+	/**
+	 * Estampa en B el coeficiente de una fuente de tensión independiente o dependiente.
+	 * @param B 	bloque B de la MNA (nodos -> variables de fuente)
+	 * @param i		índice en bruto del nodo (fila en B)
+	 * @param j		índice de la fuente de tensión (columna en B)
+	 * @param valor	coeficiente a añadir (+1 o -1)
+	 * @param ref	índice de referencia para comprimir fila
+	 * @throws NullPointerException		si matriz B es null
+	 */
+	public static void stampB(RealMatrix B, int i, int j, double valor, int ref) {
+		Objects.requireNonNull(B, "B no puede ser null");
+		int fila=comprimir(i, ref);
+		if(fila>=0) {
+			B.addToEntry(fila, j, valor);
+			logger.log(Level.FINER, "stampB: B[{0},{1}]+={2}", new Object[] {fila, j, valor});
+		}
+	}
+	
+	/**
+	 * Estampa en C el coeficiente de una fuente de tensión (variables -> nodos).
+	 * @param C 	bloque C de la MNA que vincula variables de fuentes de tensión a nodos
+	 * @param i 	índice de la fuente (fila de C)
+	 * @param j 	índice del nodo (columna de C)
+	 * @param valor coeficiente a añadir (+1 o -1)
+	 * @param ref 	índice de referencia para comprimir la columna
+	 * @throws NullPointerException		si matriz C es null
+	 */
+	public static void stampC(RealMatrix C, int i, int j, double valor, int ref) {
+		Objects.requireNonNull(C, "C no puede ser null");
+		int col=comprimir(j, ref);
+		if(col>=0) {
+			C.addToEntry(i, col, valor);
+			logger.log(Level.FINER, "stampC: C[{0},{1}]+={2}", new Object[] {i, col, valor});
+		}
+	}
+	
+	/**
+	 * Estampa en la submatriz D de supernodos un valor.
+	 * @param D					matriz D del sistema ampliado
+	 * @param fila				índice de supernodo (fila en D)
+	 * @param col				índice de fuente de tensión de control (columna en D)
+	 * @param valor				valor a sumar en la posición (fila, col)
+	 * @throws IllegalArgumentException		si fila o col están fuera de rango
+	 */
+	public static void stampD(RealMatrix D, int fila, int col, double valor) {
+		Objects.requireNonNull(D, "D no puede ser null");
+		int filas=D.getRowDimension();
+		int cols=D.getColumnDimension();
+		if(fila<0 || fila>=filas || col<0 || col>=cols) {
+			throw new IllegalArgumentException(String.format("índices fuera de rango en D: fila=%d (0..%d), col=%d (0..%d)", 
+					fila, filas-1, col, cols-1));
+		}
+		D.addToEntry(fila, col, valor);
+		logger.log(Level.FINER, "stampD: D[{0},{1}]+={2}", new Object[] {fila, col, valor});
+	}
+	
+	/**
+	 * Fuente de corriente controlada por tensión (VCCS):
+	 * Iout=gm*(Vctrl+ - Vctrl-).
+	 * @param G		matriz de conductancias
+	 * @param pout	índice del nodo de salida positivo
+	 * @param nout	índice del nodo de salida negativo
+	 * @param cpos	índice del nodo de control positivo
+	 * @param cneg	índice del nodo de control negativo
+	 * @param gm	transconductancia (beta)
+	 * @param ref	índice de referencia para comprimir
+	 */
+	public static void stampVCCS(RealMatrix G, int pout, int nout, int cpos, int cneg,
+			double gm, int ref) {
+		stampG(G, nout, cpos, +gm, ref);
+		stampG(G, nout, cneg, -gm, ref);
+		stampG(G, pout, cpos, -gm, ref);
+		stampG(G, pout, cneg, +gm, ref);
+	}
+	
+	/**
+	 * Fuente de corriente controlada por corriente (CCCS): 
+	 * Iout=beta*Ictrl.
+	 * 
+	 * @param I		vector de corriente
+	 * @param pout	índice del nodo de salida positivo
+	 * @param nout	índice del nodo de salida negativo
+	 * @param beta	ganancia de la fuente (alfa)
+	 * @param ictrl	corriente de control extraída de la fuente de corriente
+	 * @param ref	índice de referencia para comprimir
+	 */
+	public static void stampCCCS(RealVector I, int pout, int nout, double beta,
+			double ictrl, int ref) {
+		stampI(I, pout, +beta*ictrl, ref);
+		stampI(I, nout, -beta*ictrl, ref);
+	}
+	
+	/**
+	 * Fuente de tensión controlada por tensión (VCVS):
+	 * V(pout)-V(nout)=mu*[Vctrl+ - Vctrl-] (Estamapa en el bloque C de supernodos).
+	 * 
+	 * @param C		bloque C de la MNA
+	 * @param fila	índice de supernodo (fila en C)
+	 * @param ctrlP	índice del nodo de control positivo
+	 * @param ctrlN índice del nodo de control negativo
+	 * @param mu	ganancia de tensión
+	 * @param ref	índice de referencia para comprimir
+	 */
+	public static void stampVCVS(RealMatrix C, int fila, int ctrlP, int ctrlN,
+			double mu, int ref) {
+		stampC(C, fila, ctrlP, -mu, ref);
+		stampC(C, fila, ctrlN, +mu, ref);
+	}
+	
+	/**
+	 * Fuente de tensión controlada por corriente (CCVS):
+	 * V(pout)-V(nout)=alpha*Ictrl (estampa en la submatriz D de supernodos)
+	 * 
+	 * @param D			bloque D de la MNA
+	 * @param fila		índice de supernodo (fila en D)
+	 * @param srcIdx	índice de la fuente de control en la lista de fuentes de tensión
+	 * @param alpha		ganancia de la fuente dependiente
+	 */
+	public static void stampCCVS(RealMatrix D, int fila, int srcIdx, double alpha) {
+		stampD(D, fila, srcIdx, -alpha);
+	}
+	
+	/**
+	 * Estampa una fuente de tensión dependiente en las matrices C y D según su tipo.
+	 * 
+	 * @param C			bloque C de la MNA
+	 * @param D			bloque D de la MNA
+	 * @param fila		índice de supernodo o fila en C/D
+	 * @param src		fuente de tensión dependiente
+	 * @param nodos		mapa de índice de nodos actuales
+	 * @param ref		índice de referencia para comprimir
+	 * @param fV		lista de todas las fuentes de tensión (independientes y dependientes)
+	 * @param c			circuito actual
+	 * @throws IllegalStateException (si no se encuentra rama de control para CCVS)
+	 */
+	public static void stampSelectFuenteTension(RealMatrix C, RealMatrix D, int fila, FuenteTensionDependiente src,
+			Map<Integer, Integer> nodos, int ref, java.util.List<Componente> fV, Circuito c) {
+		Objects.requireNonNull(src, "Fuente no puede ser null");
+		if(src.getControlType()==FuenteTensionDependiente.ControlType.TENSION) {
+			int ctrlP=nodos.get(src.getCtrlPos());
+			int ctrlN=nodos.get(src.getCtrlNeg());
+			stampVCVS(C, fila, ctrlP, ctrlN, src.getValor(), ref);	
+		} else {
+			//CCVS: localizamos en fV la fuente de tensión que controla
+			int kCtrl=-1;
+			for(int i=0; i<fV.size(); i++) {
+				Componente comp=fV.get(i);
+				if(comp instanceof FuenteTensionInd) {
+					if(comp.getNodo1()==src.getCtrlNeg() && comp.getNodo2()==src.getCtrlPos()) {
+						kCtrl=i;
+						break;
+					}
+				}
+			}
+			if(kCtrl>=0) {
+				//CCVS clásico: Vout=alpha*Ictrl
+				stampCCVS(D, fila, kCtrl, src.getValor());
+			} else {
+				//si no hay fuente, asumimos que la rama de control es una resistencia
+				Optional<Resistencia> rCtrl=c.getResistencias().stream()
+						.filter(r->
+							(r.getNodo1()==src.getCtrlNeg() && r.getNodo2()==src.getCtrlPos()) || 
+							(r.getNodo1()==src.getCtrlPos() && r.getNodo2()==src.getCtrlNeg()))
+						.findFirst();
+				if(rCtrl.isPresent()) {
+					double R=rCtrl.get().getValor();
+					double muEff=src.getValor()/R;
+					int cNeg=nodos.get(src.getCtrlNeg());
+					int cPos=nodos.get(src.getCtrlPos());
+					stampVCVS(C, fila, cNeg, cPos, muEff, ref);
+				} else {
+					throw new IllegalStateException("No se encontró fuente de tensión control CCVS ni resistencia en nodos "+src.getCtrlNeg()+"/"+src.getCtrlPos());
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Estampa una fuente de corriente dependiente controlada por corriente en la matriz G.
+	 * 
+	 * @param G			mapa de conductancias
+	 * @param I			vector de corrientes
+	 * @param src		fuente de corriente dependiente
+	 * @param nodos		mapa de índice de nodos actuales
+	 * @param ref		índice de referencia para comprimir
+	 */
+	public static void stampSelectFuenteCorriente(RealMatrix G, FuenteCorrienteDependiente src, 
+			Map<Integer, Integer> nodos, int ref, Circuito c) {
+		Objects.requireNonNull(src, "Fuente no puede ser null");
+		int nout=nodos.get(src.getNodo1());
+		int pout=nodos.get(src.getNodo2());
+		if(src.getControlType()==FuenteCorrienteDependiente.ControlType.CORRIENTE) {
+			Optional<Resistencia> rCtrl=c.getResistencias().stream()
+					.filter(r->
+							(r.getNodo1()==src.getCtrlNeg() && r.getNodo2()==src.getCtrlPos()) ||
+							(r.getNodo1()==src.getCtrlPos() && r.getNodo2()==src.getCtrlNeg()))
+					.findFirst();
+			if(rCtrl.isPresent()) {
+				double R=rCtrl.get().getValor();
+				double gm=src.getValor()/R;
+				int cpos=nodos.get(src.getCtrlPos());
+				int cneg=nodos.get(src.getCtrlNeg());
+				stampVCCS(G, pout, nout, cpos, cneg, gm, ref);
+				return;
+			}
+		} else {
+			//VCCS. En este caso, stampVCCS (controlado por tensión)
+			int cpos=nodos.get(src.getCtrlPos());
+			int cneg=nodos.get(src.getCtrlNeg());
+			stampVCCS(G, pout, nout, cpos, cneg, src.getValor(), ref);
+		}
+	}
+}
