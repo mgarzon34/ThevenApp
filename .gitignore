@@ -8,3 +8,4 @@ doc/
 *.db
 .env
 config.local.properties
+docker-compose.yml
