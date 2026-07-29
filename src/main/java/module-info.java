@@ -13,11 +13,16 @@ module com.circuitos.AnalisisCircuitos {
 	requires javafx.web;
 	requires com.fasterxml.jackson.core;
 	requires jbcrypt;
+	requires org.postgresql.jdbc;
+	requires com.zaxxer.hikari;
+	requires flyway.core;
+	requires flyway.database.postgresql;
 	
 	opens com.circuitos.analisiscircuitos.gui to javafx.graphics, javafx.fxml;
 	opens com.circuitos.analisiscircuitos.gui.controller to javafx.fxml;
 	opens com.circuitos.analisiscircuitos.dominio to com.fasterxml.jackson.databind;
 	opens com.circuitos.analisiscircuitos.dto to com.fasterxml.jackson.databind;
+	opens db.migration; // permite que Flyway lea los scripts SQL de migracion como recurso
 	
 	exports com.circuitos.analisiscircuitos.gui.controller;
 	exports com.circuitos.analisiscircuitos.dominio;

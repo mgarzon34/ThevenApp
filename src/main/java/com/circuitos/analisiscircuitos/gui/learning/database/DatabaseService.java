@@ -1,14 +1,13 @@
 package com.circuitos.analisiscircuitos.gui.learning.database;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.flywaydb.core.Flyway;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
  * Servicio de base de datos SQLite para el sistema de E-Learning de la aplicación ThevenApp.
@@ -20,19 +19,19 @@ import java.util.logging.Logger;
 public class DatabaseService {
 	private static final Logger logger=Logger.getLogger(DatabaseService.class.getName());
 	
-	private static final String APP_FOLDER=System.getProperty("user.home")+File.separator+"ThevenApp";
-	private static final String DB_URL="jdbc:sqlite:"+APP_FOLDER+File.separator+"thevenapp_database.db";
-	
+	private final HikariDataSource dataSource;
+
 	private final UserData userdata;
 	private final ContenidoData contendata;
 	private final PdfData pdfdata;
 	private final ProgresoData progresodata;
 	
 	/**
-	 * Constructor. Asegura que la base de datos exista.
+	 * Constructor.
 	 */
 	public DatabaseService() {
-		inicializarDatabase();
+		this.dataSource=crearDataSource();
+		ejecutarMigraciones();
 		
 		this.userdata=new UserData(this);
 		this.contendata=new ContenidoData(this);
@@ -48,7 +47,7 @@ public class DatabaseService {
 	 * @throws SQLException
 	 */
 	public Connection getConnection() throws SQLException {
-		return DriverManager.getConnection(DB_URL);
+		return dataSource.getConnection();
 	}
 	
 	/* Getters para archivos Data (user, contenido, pdf, progreso) */
@@ -58,132 +57,36 @@ public class DatabaseService {
 	public ProgresoData getProgresoData() { return progresodata; }
 	
 	/**
-	 * Inicializa la base de datos creando las tablas necesarias.
+	 * Crea el pool de conexiones. 
 	 */
-	private void inicializarDatabase() {
-		try {
-			Class.forName("org.sqlite.JDBC");
-		} catch(ClassNotFoundException e) {
-			logger.severe("No se encontró el driver de SQLite en el classpath");
-			throw new RuntimeException(e);
-		}
-		
-		try {
-			Files.createDirectories(Paths.get(APP_FOLDER));
-			try(Connection conn=DriverManager.getConnection(DB_URL)) {
-				if(conn!=null) {
-					crearTablas(conn);
-					logger.info("Base de datos conectada en: "+DB_URL);
-				}
-			}
-		} catch(Exception e) {
-			logger.log(Level.SEVERE, "Error crítico inicializando base de datos", e);
-			e.printStackTrace();
-		}
+	private HikariDataSource crearDataSource() {
+		// stringtype=unspecified: evita el error "column es de tipo X pero la expresion es de tipo character varying"
+		// al insertar Strings de Java en columnas ENUM (user_role, tipo_analisis) via setString().
+		String url=System.getenv().getOrDefault("THEVENAPP_DB_URL", "jdbc:postgresql://localhost:5433/thevenapp?stringtype=unspecified");
+		String user=System.getenv().getOrDefault("THEVENAPP_DB_USER", "thevenapp");
+		String password=System.getenv().getOrDefault("THEVENAPP_DB_PASSWORD", "thevenapp_dev");
+
+		HikariConfig config=new HikariConfig();
+		config.setJdbcUrl(url);
+		config.setUsername(user);
+		config.setPassword(password);
+		config.setMaximumPoolSize(10);
+		config.setPoolName("ThevenAppPool");
+
+		logger.info("Conectando a la base de datos: "+url);
+		return new HikariDataSource(config);
 	}
-	
+
 	/**
-	 * Crea las tablas de la base de datos.
+	 * Aplica las migraciones de Flyway (src/main/resources/db/migration/*.sql)
+	 * Sustituye al antiguo "crearTablas()"
 	 */
-	private void crearTablas(Connection conn) throws SQLException {
-		Statement stmt=conn.createStatement();
-		
-		//Tabla de usuarios
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS users (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					username TEXT UNIQUE NOT NULL,
-					password_hash TEXT NOT NULL,
-					role TEXT NOT NULL CHECK(role IN ('ESTUDIANTE', 'PROFESOR')),
-					nombre TEXT,
-					apellido1 TEXT,
-					apellido2 TEXT,
-					pregunta_seguridad TEXT,
-					respuesta_seguridad TEXT,
-					calificacion_general REAL DEFAULT 0,
-					comentarios_profesor TEXT,
-					fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			""");
-		
-		//Tabla de teoría
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS teoria (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					titulo TEXT NOT NULL,
-					contenido TEXT NOT NULL,
-					indice_orden INTEGER DEFAULT 0,
-					creado_por INTEGER,
-					fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY(creado_por) REFERENCES users(id)
-				)
-			""");
-		
-		//Tabla de ejercicios
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS ejercicios (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					titulo TEXT NOT NULL,
-					descripcion TEXT NOT NULL,
-					datos_circuito TEXT NOT NULL,
-					solucion_vth REAL,
-					solucion_rth REAL,
-					solucion_in REAL,
-					solucion_rn REAL,
-					tipo_analisis TEXT NOT NULL CHECK(tipo_analisis IN ('THEVENIN', 'NORTON', 'AMBOS')),
-					dificultad INTEGER DEFAULT 1 CHECK(dificultad BETWEEN 1 AND 5),
-					creado_por INTEGER,
-					nodo_a INTEGER DEFAULT -1,
-					nodo_b INTENGER DEFAULT -1,
-					fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY(creado_por) REFERENCES users(id)
-				)
-			""");
-		
-		//Tabla de documentos PDF
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS documentos_pdf (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					titulo TEXT NOT NULL,
-					descripcion TEXT NOT NULL,
-					nombre_archivo TEXT NOT NULL,
-					path_archivo TEXT NOT NULL,
-					tamano_archivo INTEGER DEFAULT 0,
-					subido_por INTEGER,
-					fecha_subida DATETIME DEFAULT CURRENT_TIMESTAMP,
-					FOREIGN KEY(subido_por) REFERENCES users(id)
-				)
-			""");
-		
-		//Tabla de progreso de estudiantes
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS progreso_estudiante (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					estudiante_id INTEGER NOT NULL,
-					ejercicio_id INTEGER NOT NULL,
-					completado_fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-					puntuacion REAL DEFAULT 0,
-					intentos INTEGER DEFAULT 1,
-					tiempo INTEGER DEFAULT 0,
-					FOREIGN KEY(estudiante_id) REFERENCES users(id),
-					FOREIGN KEY(ejercicio_id) REFERENCES ejercicios(id),
-					UNIQUE(estudiante_id, ejercicio_id)
-				)
-			""");
-		
-		//Tabla de teoría leída
-		stmt.execute("""
-				CREATE TABLE IF NOT EXISTS progreso_teoria (
-					user_id INTEGER,
-					teoria_id INTEGER,
-					fecha_lectura DATETIME DEFAULT CURRENT_TIMESTAMP,
-					PRIMARY KEY(user_id, teoria_id),
-					FOREIGN KEY(user_id) REFERENCES users(id),
-					FOREIGN KEY(teoria_id) REFERENCES teoria(id)
-				)
-			""");
-		
-		stmt.close();
-		logger.fine("Tablas de base de datos creadas con éxito");
+	private void ejecutarMigraciones() {
+		Flyway flyway=Flyway.configure()
+				.dataSource(dataSource)
+				.locations("classpath:db/migration")
+				.load();
+		flyway.migrate();
+		logger.info("Migraciones de Flyway aplicadas correctamente");
 	}
 }
